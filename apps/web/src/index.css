@@ -1,0 +1,85 @@
+@import './animations.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  /* 深色模式：蓝+石板黑 */
+  --bg-page: #020617;
+  --bg-elevated: #020617;
+  --bg-input: #020617;
+  --text-primary: #e2e8f0;
+  --text-secondary: #cbd5f5;
+  --text-muted: #64748b;
+  --border-subtle: #1e293b;
+  --border-strong: #3b4553;
+  --accent: #3b82f6; /* blue-500 */
+  --accent-soft: rgba(59, 130, 246, 0.22);
+  --accent-strong: #2563eb; /* blue-600 */
+  --logo-fill: var(--accent); /* 深色下 logo 使用品牌蓝 */
+}
+
+:root[data-theme='light'] {
+  /* 浅色模式：白底+蓝色主色 */
+  --bg-page: #f9fafb;
+  --bg-elevated: #ffffff;
+  --bg-input: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #1e293b;
+  --text-muted: #6b7280;
+  --border-subtle: #e5e7eb;
+  --border-strong: #d1d5db;
+  --accent: #2563eb; /* blue-600 */
+  --accent-soft: rgba(37, 99, 235, 0.18);
+  --accent-strong: #1d4ed8; /* blue-700 */
+  --logo-fill: #000000; /* 明亮模式下 logo 改为黑色 */
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text',
+    'Segoe UI', sans-serif;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+}
+
+/* Custom scrollbar styles - subtle and theme-aware */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.3);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.5);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+}
+
+/* Hide scrollbar while keeping scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

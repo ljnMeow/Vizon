@@ -1,0 +1,18 @@
+{
+  // 让（Based）Pyright 在 monorepo 里正确找到 Django 的虚拟环境依赖。
+  //
+  // 你看到的 “无法解析导入 django / rest_framework” 通常不是代码写错，
+  // 而是类型检查器没有使用正确的 Python 解释器/venv。
+  //
+  // 这里把 venv 指到 `apps/server/.venv`，并把 `apps/server` 加入搜索路径。
+  "venvPath": "apps/server",
+  "venv": ".venv",
+  "extraPaths": ["apps/server"],
+  "exclude": ["**/__pycache__/**", "**/.venv/**", "**/node_modules/**"],
+  "diagnosticSeverityOverrides": {
+    // DRF 的 ModelSerializer/Meta 是动态魔法较多，Pyright 在配合 stubs 时
+    // 容易误报 “Meta 覆写不兼容”。这类提示对我们的项目价值不高，先关闭以减少噪音。
+    "reportIncompatibleVariableOverride": "none"
+  }
+}
+

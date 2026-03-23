@@ -1,0 +1,18 @@
+{
+  "name": "Vizon",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "build:web": "pnpm --filter web build",
+    "server:install": "python3 -m venv apps/server/.venv && apps/server/.venv/bin/python -m pip install -r apps/server/requirements.txt",
+    "db:migrate": "apps/server/.venv/bin/python apps/server/manage.py migrate",
+    "dev:server": "sh -c 'if [ -f apps/server/.env ]; then set -a; . apps/server/.env; set +a; fi; PORT=${PORT:-}; if [ -z \"$PORT\" ]; then PORT=$(apps/server/.venv/bin/python -c \"import socket;s=socket.socket();s.bind((\\\"127.0.0.1\\\",0));print(s.getsockname()[1]);s.close()\" ); fi; echo \"Django running on port $PORT\"; apps/server/.venv/bin/python apps/server/manage.py runserver 0.0.0.0:$PORT'",
+    "lint": "turbo lint",
+    "build": "turbo build"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "turbo": "^2.0.0"
+  }
+}

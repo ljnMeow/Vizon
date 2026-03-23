@@ -1,0 +1,18 @@
+[tool.pyright]
+# Cursor 的 BasedPyright 会读取这里的配置（比单独的 pyrightconfig 更稳定）
+# 目标：让它识别 Django/DRF 的动态类型，并减少 DRF stubs 带来的误报噪音。
+
+venvPath = "apps/server"
+venv = ".venv"
+extraPaths = ["apps/server"]
+
+exclude = [
+  "**/__pycache__/**",
+  "**/.venv/**",
+  "**/node_modules/**",
+]
+
+# DRF 的 ModelSerializer + Meta 有大量动态行为，stubs 在部分场景会误报“覆写不兼容”。
+# 这类报错不影响运行，也不应阻塞开发，因此在项目级关闭。
+reportIncompatibleVariableOverride = "none"
+
