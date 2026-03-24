@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { SceneTreeNode } from './sceneTree';
 
 /**
  * SceneSettings 数据真相与校验/归一化：
@@ -8,7 +9,7 @@ import * as THREE from 'three';
  *
  * 设计原则：该模块尽量不依赖 UI/React，让 core 能作为独立 npm 包复用。
  */
-export type SceneSettingsVersion = Number;
+export type SceneSettingsVersion = number;
 
 // scene 的顶层数据结构：由 core 持有（数据真相），web 负责展示/编辑。
 // 后续如果要做“导出/导入”，主要就是序列化这一份结构。
@@ -124,6 +125,8 @@ export type SceneSettings = {
   helpers: SceneSettingsHelpers;
   // 渲染器（renderer）运行时配置：用于可版本化/可导出
   renderer: RendererSettings;
+  // 场景树（用于结构面板展示）
+  sceneTree: SceneTreeNode[];
 };
 
 /**
@@ -178,7 +181,8 @@ export function createDefaultSceneSettings(): SceneSettings {
       shadowMapEnabled: false,
       shadowMapType: 'PCFShadowMap',
       shadowMapAutoUpdate: true
-    }
+    },
+    sceneTree: []
   };
 }
 
@@ -187,11 +191,34 @@ function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
+function toFiniteNumber(value: unknown, fallback: number) {
+  const num = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
 // 颜色解析工具：把任意可解析的颜色字符串转换为 THREE.Color，
 // 然后再导回统一的 hex 格式（用于 normalize）。
-function parseHexColor(input: string): THREE.Color {
-  // THREE.Color can parse many formats, but we keep it strict-ish for UI parity.
-  return new THREE.Color(input);
+function parseHexColor(input: string, fallbackHex: string): THREE.Color {
+  // 防御式解析：UI 或外部输入非法颜色时回退，避免 normalize 抛错导致应用中断。
+  try {
+    return new THREE.Color(input);
+  } catch {
+    return new THREE.Color(fallbackHex);
+  }
+}
+
+function normalizeSceneTreeNode(node: SceneTreeNode): SceneTreeNode {
+  return {
+    uuid: String(node.uuid ?? ''),
+    name: String(node.name ?? ''),
+    type: String(node.type ?? ''),
+    visible: Boolean(node.visible),
+    kind:
+      node.kind === 'scene' || node.kind === 'camera' || node.kind === 'light' || node.kind === 'group'
+        ? node.kind
+        : 'object',
+    children: Array.isArray(node.children) ? node.children.map(normalizeSceneTreeNode) : []
+  };
 }
 
 /**
@@ -210,6 +237,7 @@ export function normalizeSceneSettings(input: SceneSettings): SceneSettings {
   const renderer = input.renderer;
   const camera = input.camera;
   const helpers = input.helpers;
+  const sceneTree = input.sceneTree;
   const validOutputColorSpace: RendererOutputColorSpace =
     renderer.outputColorSpace === 'LinearSRGBColorSpace' ? 'LinearSRGBColorSpace' : 'SRGBColorSpace';
 
@@ -231,21 +259,21 @@ export function normalizeSceneSettings(input: SceneSettings): SceneSettings {
         ? 'PCFSoftShadowMap'
         : 'PCFShadowMap';
 
-  const fov = clamp(Number.isFinite(camera.fov) ? camera.fov : 50, 10, 120);
-  const near = clamp(Number.isFinite(camera.near) ? camera.near : 0.01, 0.001, 100_000);
-  const far = clamp(camera.far, near + 1e-3, 100_000);
+  const fov = clamp(toFiniteNumber(camera.fov, 50), 10, 120);
+  const near = clamp(toFiniteNumber(camera.near, 0.01), 0.001, 100_000);
+  const far = clamp(toFiniteNumber(camera.far, 10_000), near + 1e-3, 100_000);
 
   return {
     ...input,
     environment: {
       ...env,
-      environmentStrength: clamp(env.environmentStrength, 0, 5),
-      backgroundColor: `#${parseHexColor(env.backgroundColor).getHexString()}`,
+      environmentStrength: clamp(toFiniteNumber(env.environmentStrength, 1), 0, 5),
+      backgroundColor: `#${parseHexColor(env.backgroundColor, '#f3f4f6').getHexString()}`,
       fog: {
         ...fog,
-        color: `#${parseHexColor(fog.color).getHexString()}`,
-        near: clamp(fog.near, 0, 50),
-        far: clamp(fog.far, 0, 200),
+        color: `#${parseHexColor(fog.color, '#c7d2fe').getHexString()}`,
+        near: clamp(toFiniteNumber(fog.near, 0.5), 0, 50),
+        far: clamp(toFiniteNumber(fog.far, 10), 0, 200),
         enabled: Boolean(fog.enabled)
       }
     },
@@ -255,25 +283,25 @@ export function normalizeSceneSettings(input: SceneSettings): SceneSettings {
       near,
       far,
       position: {
-        x: camera.position.x,
-        y: camera.position.y,
-        z: camera.position.z
+        x: toFiniteNumber(camera.position.x, 9.4),
+        y: toFiniteNumber(camera.position.y, 6.0),
+        z: toFiniteNumber(camera.position.z, 9.4)
       },
       target: {
-        x: camera.target.x,
-        y: camera.target.y,
-        z: camera.target.z
+        x: toFiniteNumber(camera.target.x, 0),
+        y: toFiniteNumber(camera.target.y, 0.8),
+        z: toFiniteNumber(camera.target.z, 0)
       }
     },
     grid: {
       enabled: Boolean(input.grid.enabled),
-      color: `#${parseHexColor(input.grid.color).getHexString()}`,
-      opacity: clamp(input.grid.opacity, 0, 1),
+      color: `#${parseHexColor(input.grid.color, '#334155').getHexString()}`,
+      opacity: clamp(toFiniteNumber(input.grid.opacity, 0.8), 0, 1),
     },
     helpers: {
       axes: {
         enabled: Boolean(helpers.axes.enabled),
-        size: clamp(helpers.axes.size, 0.1, 100)
+        size: clamp(toFiniteNumber(helpers.axes.size, 1.5), 0.1, 100)
       }
     },
     renderer: {
@@ -281,11 +309,12 @@ export function normalizeSceneSettings(input: SceneSettings): SceneSettings {
       antialias: Boolean(renderer.antialias),
       outputColorSpace: validOutputColorSpace,
       toneMapping: validToneMapping,
-      toneMappingExposure: clamp(renderer.toneMappingExposure, 0, 10),
+      toneMappingExposure: clamp(toFiniteNumber(renderer.toneMappingExposure, 1), 0, 10),
       shadowMapEnabled: Boolean(renderer.shadowMapEnabled),
       shadowMapType: validShadowMapType,
       shadowMapAutoUpdate: Boolean(renderer.shadowMapAutoUpdate)
-    }
+    },
+    sceneTree: Array.isArray(sceneTree) ? sceneTree.map(normalizeSceneTreeNode) : []
   };
 }
 

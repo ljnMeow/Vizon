@@ -1,17 +1,17 @@
-import { Tooltip } from '../../../components/Tooltip';
-import { useLocale } from '../../../hooks/useLocale';
-import { appMessages } from '../../../i18n/messages';
-import { getAssetUrl } from '../../../utils/utils';
+import { Tooltip } from '../../../../components/Tooltip';
+import { useLocale } from '../../../../hooks/useLocale';
+import { appMessages } from '../../../../i18n/messages';
+import { getAssetUrl } from '../../../../utils/utils';
 
 type LightPresetKey = 'ambientLight' | 'directionalLight' | 'pointLight' | 'spotLight' | 'hemisphereLight' | 'rectAreaLight';
 
 const ICONS: Record<LightPresetKey, string> = {
-  ambientLight: getAssetUrl('../../../assets/img/ambientLight.png', import.meta.url),
-  directionalLight: getAssetUrl('../../../assets/img/directionalLight.png', import.meta.url),
-  pointLight: getAssetUrl('../../../assets/img/pointLight.png', import.meta.url),
-  spotLight: getAssetUrl('../../../assets/img/spotLight.png', import.meta.url),
-  hemisphereLight: getAssetUrl('../../../assets/img/hemisphereLight.png', import.meta.url),
-  rectAreaLight: getAssetUrl('../../../assets/img/rectAreaLight.png', import.meta.url)
+  ambientLight: getAssetUrl('../../../../assets/img/ambientLight.png', import.meta.url),
+  directionalLight: getAssetUrl('../../../../assets/img/directionalLight.png', import.meta.url),
+  pointLight: getAssetUrl('../../../../assets/img/pointLight.png', import.meta.url),
+  spotLight: getAssetUrl('../../../../assets/img/spotLight.png', import.meta.url),
+  hemisphereLight: getAssetUrl('../../../../assets/img/hemisphereLight.png', import.meta.url),
+  rectAreaLight: getAssetUrl('../../../../assets/img/rectAreaLight.png', import.meta.url)
 };
 
 const LIGHT_KEYS: LightPresetKey[] = [

@@ -13,6 +13,7 @@ export type {
   ViewPreset,
   ViewTransitionOptions
 } from './ThreeEditor';
+export type { SceneTreeNode, SceneTreeNodeKind } from './sceneTree';
 export type { Unsubscribe } from './events';
 
 export type {

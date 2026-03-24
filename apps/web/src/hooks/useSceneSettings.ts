@@ -148,6 +148,14 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
     setRendererSettings(editor.getRendererSettings());
   }, [editor]);
 
+  useEffect(() => {
+    if (!editor) return;
+    const off = editor.on('sceneTreeChange', ({ tree }) => {
+      setSceneSettings((prev) => ({ ...prev, sceneTree: tree }));
+    });
+    return off;
+  }, [editor]);
+
   // 让 camera 输入框能随 OrbitControls 拖拽/阻尼变化同步
   useEffect(() => {
     if (!editor) return;

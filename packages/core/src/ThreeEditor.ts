@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { OrbitControls, TransformControls } from 'three-stdlib';
 import { Emitter } from './events';
 import type { RendererSettings, SceneSettings } from './sceneSettings';
+import type { SceneTreeNode, SceneTreeNodeKind } from './sceneTree';
 import { createDefaultSceneSettings, normalizeSceneSettings } from './sceneSettings';
 import { calcSceneSettingsDiff } from './threeEditor/sceneSettingsDiff';
 import { AssetLoader } from './threeEditor/AssetLoader';
@@ -24,6 +25,7 @@ export type ViewTransitionOptions = {
 
 export type ThreeEditorEvents = {
   select: { object: THREE.Object3D | null };
+  sceneTreeChange: { tree: SceneTreeNode[] };
 };
 
 export type ThreeEditorOptions = {
@@ -36,6 +38,11 @@ export type ThreeEditorOptions = {
    * Optional initial scene settings. When not provided, core uses defaults.
    */
   initialSceneSettings?: Partial<SceneSettings>;
+  /**
+   * 实验特性：对静态对象启用矩阵冻结（matrixAutoUpdate=false）。
+   * 仅建议用于编辑器场景；动画对象会自动跳过。
+   */
+  freezeStaticObjects?: boolean;
 };
 
 /**
@@ -47,6 +54,19 @@ export type ThreeEditorOptions = {
  * - **生命周期明确**：start/stop/resize/dispose，便于在 React 等框架中挂载与卸载
  */
 export class ThreeEditor {
+  private static readonly SCENE_TREE_IGNORED_TYPES = new Set([
+    'GridHelper',
+    'AxesHelper',
+    'TransformControls',
+    'TransformControlsGizmo',
+    'TransformControlsPlane',
+    'CameraHelper',
+    'PointLightHelper',
+    'DirectionalLightHelper',
+    'HemisphereLightHelper',
+    'SpotLightHelper'
+  ]);
+
   readonly canvas: HTMLCanvasElement;
   readonly scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
@@ -65,6 +85,13 @@ export class ThreeEditor {
   private sceneSettingsApplyingSeq = 0;
   private transformMode: TransformMode = 'translate';
   private transformToolEnabled = true;
+  private freezeStaticObjects: boolean;
+  private onTransformDraggingChanged: ((e: { value?: boolean }) => void) | null = null;
+  // 热路径复用临时对象，减少拖拽放置时的 GC 抖动。
+  private groundNdc = new THREE.Vector2();
+  private groundRaycaster = new THREE.Raycaster();
+  private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  private groundPoint = new THREE.Vector3();
 
   private interactionController: InteractionController;
   private rendererController: RendererController;
@@ -130,11 +157,13 @@ export class ThreeEditor {
           renderer: {
             ...base.renderer,
             ...(options.initialSceneSettings.renderer ?? {})
-          }
+          },
+          sceneTree: options.initialSceneSettings.sceneTree ?? base.sceneTree
         } as SceneSettings)
       : base;
 
     this.sceneSettings = normalizeSceneSettings(patched);
+    this.freezeStaticObjects = Boolean(options.freezeStaticObjects);
     this.cameraController = new CameraController();
     this.environmentController = new EnvironmentController();
     this.helperController = new HelperController();
@@ -166,6 +195,7 @@ export class ThreeEditor {
     });
     this.orbit = orbit;
     this.transform = transform;
+    this.bindTransformDragHooks();
     this.viewPresetController = new ViewPresetController(this.camera, this.orbit);
 
     this.bootstrapScene();
@@ -207,12 +237,40 @@ export class ThreeEditor {
       helpers: {
         axes: { ...s.helpers.axes },
       },
-      renderer: { ...s.renderer }
+      renderer: { ...s.renderer },
+      sceneTree: this.getSceneTree()
     };
   }
 
   getRendererSettings(): RendererSettings {
     return { ...this.sceneSettings.renderer };
+  }
+
+  /**
+   * 获取用于 UI 展示的场景树（相机 + scene 层级）。
+   */
+  getSceneTree(): SceneTreeNode[] {
+    const cameraNode: SceneTreeNode = {
+      uuid: this.camera.uuid,
+      name: this.camera.name || 'Camera',
+      type: this.camera.type,
+      visible: this.camera.visible,
+      kind: 'camera',
+      children: []
+    };
+
+    const sceneNode: SceneTreeNode = {
+      uuid: this.scene.uuid,
+      name: this.scene.name || 'Scene',
+      type: this.scene.type,
+      visible: this.scene.visible,
+      kind: 'scene',
+      children: this.scene.children
+        .map((child) => this.toSceneTreeNode(child))
+        .filter((node): node is SceneTreeNode => node != null)
+    };
+
+    return [cameraNode, sceneNode];
   }
 
   /**
@@ -248,6 +306,7 @@ export class ThreeEditor {
       this.renderer = recreated.renderer;
       this.orbit = recreated.orbit;
       this.transform = recreated.transform;
+      this.bindTransformDragHooks();
       this.viewPresetController.setOrbit(this.orbit);
       // 重建 renderer 后需要重新同步尺寸/DPR，避免 antialias 切换后仍使用旧像素比。
       const w = this.canvas.clientWidth ?? 1;
@@ -349,6 +408,15 @@ export class ThreeEditor {
    */
   select(object: THREE.Object3D | null) {
     const safe = object && !this.isNonSelectable(object) ? object : null;
+    const prev = this.selected;
+
+    if (this.freezeStaticObjects && prev && prev !== safe) {
+      this.freezeObjectTree(prev);
+    }
+    if (this.freezeStaticObjects && safe) {
+      this.unfreezeObjectTree(safe);
+    }
+
     this.selected = safe;
 
     if (safe && this.transformToolEnabled) {
@@ -392,6 +460,48 @@ export class ThreeEditor {
   add(object: THREE.Object3D) {
     // 把外部创建的对象挂载到 three.Scene（不做额外校验）。
     this.scene.add(object);
+    if (this.freezeStaticObjects) {
+      this.freezeObjectTree(object);
+    }
+    this.syncSceneTreeState();
+  }
+
+  setObjectVisibleByUuid(uuid: string, visible: boolean): boolean {
+    const obj = this.scene.getObjectByProperty('uuid', uuid);
+    if (!obj || this.isNonSelectable(obj)) return false;
+    obj.visible = visible;
+    if (!visible && this.selected && !this.isVisibleInHierarchy(this.selected)) {
+      this.select(null);
+    }
+    this.syncSceneTreeState();
+    return true;
+  }
+
+  removeObjectByUuid(uuid: string): boolean {
+    const obj = this.scene.getObjectByProperty('uuid', uuid);
+    if (!obj || !obj.parent || this.isNonSelectable(obj)) return false;
+    if (obj === this.selected) this.select(null);
+    obj.parent.remove(obj);
+    this.syncSceneTreeState();
+    return true;
+  }
+
+  /**
+   * 将视口归一化坐标（0~1）投影到水平地面（y=planeY）。
+   * 常用于拖拽放置模型时计算落点，避免 UI 层直接依赖 three.js 数学对象。
+   */
+  getGroundPointFromViewport(normalizedX: number, normalizedY: number, planeY = 0) {
+    this.groundNdc.set(normalizedX * 2 - 1, -(normalizedY * 2 - 1));
+    this.groundRaycaster.setFromCamera(this.groundNdc, this.camera);
+    this.groundPlane.constant = -planeY;
+    const hit = this.groundRaycaster.ray.intersectPlane(this.groundPlane, this.groundPoint);
+    if (!hit) return null;
+
+    return {
+      x: hit.x,
+      y: hit.y,
+      z: hit.z
+    };
   }
 
   /**
@@ -399,7 +509,14 @@ export class ThreeEditor {
    * - 资源管理（缓存、释放、材质替换）会在后续的 asset 系统里扩展
    */
   async loadGLTF(url: string, opts?: { addToScene?: boolean }) {
-    return this.assetLoader.loadGLTF(url, opts);
+    const out = await this.assetLoader.loadGLTF(url, opts);
+    if (opts?.addToScene ?? true) {
+      if (this.freezeStaticObjects) {
+        this.freezeObjectTree(out);
+      }
+      this.syncSceneTreeState();
+    }
+    return out;
   }
 
   private async applySceneSettings(next: SceneSettings, prev: SceneSettings, seq: number, force = false) {
@@ -459,11 +576,55 @@ export class ThreeEditor {
     this.interactionController.dispose();
     this.environmentController.dispose();
     this.helperController.dispose();
+    this.unbindTransformDragHooks();
+    this.disposeSceneResources();
     this.renderer.dispose();
   }
 
   private bootstrapScene() {
     this.helperController.mount(this.scene);
+    this.syncSceneTreeState();
+  }
+
+  private syncSceneTreeState() {
+    const tree = this.getSceneTree();
+    this.sceneSettings = {
+      ...this.sceneSettings,
+      sceneTree: tree
+    };
+    this.events.emit('sceneTreeChange', { tree });
+  }
+
+  private toSceneTreeNode(obj: THREE.Object3D): SceneTreeNode | null {
+    if (this.isIgnoredInSceneTree(obj)) return null;
+    const children = obj.children.map((child) => this.toSceneTreeNode(child)).filter((node): node is SceneTreeNode => node != null);
+    if (obj.type === 'Object3D' && !obj.name && children.length === 0) return null;
+    return {
+      uuid: obj.uuid,
+      name: obj.name || obj.type,
+      type: obj.type,
+      visible: obj.visible,
+      kind: this.getSceneNodeKind(obj),
+      children
+    };
+  }
+
+  private getSceneNodeKind(obj: THREE.Object3D): SceneTreeNodeKind {
+    if (obj.type === 'Scene') return 'scene';
+    if ((obj as any).isCamera) return 'camera';
+    if ((obj as any).isLight) return 'light';
+    if (obj.type === 'Group') return 'group';
+    return 'object';
+  }
+
+  private isIgnoredInSceneTree(obj: THREE.Object3D) {
+    if (this.isNonSelectable(obj)) return true;
+    if ((obj as any).isTransformControls) return true;
+    if (ThreeEditor.SCENE_TREE_IGNORED_TYPES.has(obj.type)) return true;
+    if (obj.name === 'TransformControlsEditor') return true;
+    if (obj.parent?.type === 'TransformControlsGizmo') return true;
+    if ((obj.userData as any)?.hideInEditor) return true;
+    return false;
   }
 
   private isNonSelectable(obj: THREE.Object3D) {
@@ -474,6 +635,103 @@ export class ThreeEditor {
       cur = cur.parent;
     }
     return false;
+  }
+
+  private isSameOrAncestor(target: THREE.Object3D, node: THREE.Object3D) {
+    let cur: THREE.Object3D | null = node;
+    while (cur) {
+      if (cur === target) return true;
+      cur = cur.parent;
+    }
+    return false;
+  }
+
+  private isVisibleInHierarchy(node: THREE.Object3D) {
+    let cur: THREE.Object3D | null = node;
+    while (cur) {
+      if (!cur.visible) return false;
+      cur = cur.parent;
+    }
+    return true;
+  }
+
+  private freezeObjectTree(root: THREE.Object3D) {
+    root.traverse((obj) => {
+      if (!this.canFreezeObject(obj)) return;
+      obj.matrixAutoUpdate = false;
+      obj.updateMatrix();
+      obj.updateMatrixWorld(true);
+    });
+  }
+
+  private unfreezeObjectTree(root: THREE.Object3D) {
+    root.traverse((obj) => {
+      if (!this.canFreezeObject(obj)) return;
+      obj.matrixAutoUpdate = true;
+      obj.updateMatrixWorld(true);
+    });
+  }
+
+  private canFreezeObject(obj: THREE.Object3D) {
+    if ((obj as any).isCamera) return false;
+    if ((obj as any).isLight) return false;
+    if ((obj as any).isBone) return false;
+    if ((obj as any).isSkinnedMesh) return false;
+    if ((obj as any).isTransformControls) return false;
+    if (obj.type === 'TransformControlsGizmo' || obj.type === 'TransformControlsPlane') return false;
+    if ((obj.userData as any).__vizonNonSelectable) return false;
+    if ((obj.userData as any).__vizonDynamic) return false;
+    return true;
+  }
+
+  private bindTransformDragHooks() {
+    if (!this.freezeStaticObjects) return;
+    this.unbindTransformDragHooks();
+
+    this.onTransformDraggingChanged = (e) => {
+      if (!this.selected) return;
+      const dragging = Boolean(e?.value);
+      if (dragging) {
+        this.unfreezeObjectTree(this.selected);
+        return;
+      }
+      this.selected.updateMatrixWorld(true);
+      this.freezeObjectTree(this.selected);
+    };
+
+    (this.transform as any).addEventListener('dragging-changed', this.onTransformDraggingChanged);
+  }
+
+  private unbindTransformDragHooks() {
+    if (!this.onTransformDraggingChanged) return;
+    (this.transform as any)?.removeEventListener?.('dragging-changed', this.onTransformDraggingChanged);
+    this.onTransformDraggingChanged = null;
+  }
+
+  private disposeSceneResources() {
+    this.scene.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (mesh.geometry) {
+        mesh.geometry.dispose();
+      }
+      const material = (mesh as any).material as THREE.Material | THREE.Material[] | undefined;
+      if (!material) return;
+
+      const materials = Array.isArray(material) ? material : [material];
+      for (const m of materials) {
+        this.disposeMaterialTextures(m);
+        m.dispose();
+      }
+    });
+  }
+
+  private disposeMaterialTextures(material: THREE.Material) {
+    // 统一释放材质上的贴图资源（map/normalMap/envMap 等），避免 WebGL 纹理泄漏。
+    for (const value of Object.values(material as unknown as Record<string, unknown>)) {
+      if (value instanceof THREE.Texture) {
+        value.dispose();
+      }
+    }
   }
 }
 

@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { Tabs, TabItem } from '../../../components/Tabs';
 import { useLocale } from '../../../hooks/useLocale';
 import { appMessages } from '../../../i18n/messages';
-import { SystemAssets } from './SystemAssets';
+import { SystemAssets } from './SystemAssets/index';
+import { Structure } from './Structure/index';
 
 type AssetTab = 'system' | 'mine' | 'structure';
 
@@ -48,7 +49,9 @@ export function AssetPane({ visible }: { visible: boolean }) {
           if (key === 'mine') {
             return <div className="h-full overflow-y-auto p-3 text-xs text-[var(--text-muted)]">{t.minePlaceholder}</div>;
           }
-          return <div className="h-full overflow-y-auto p-3 text-xs text-[var(--text-muted)]">{t.structurePlaceholder}</div>;
+          if (key === 'structure') {
+            return <Structure />;
+          }
         }}
       </Tabs>
     </aside>

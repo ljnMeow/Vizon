@@ -1,38 +1,14 @@
-import { Accordion } from '../../../components/Accordion';
-import { Tooltip } from '../../../components/Tooltip';
-import { basicModels, type ModelCategoryKey } from '../../../utils/models';
-import { useSceneSettings } from '../../../hooks/useSceneSettings';
-import { createDefaultModel, type DefaultModelKey } from 'vizon-3d-core';
-import { useLocale } from '../../../hooks/useLocale';
-import { appMessages } from '../../../i18n/messages';
+import { Accordion } from '../../../../components/Accordion';
+import { Tooltip } from '../../../../components/Tooltip';
+import { basicModels, type ModelCategoryKey } from '../../../../utils/models';
+import { appMessages } from '../../../../i18n/messages';
+import { useLocale } from '../../../../hooks/useLocale';
+import { DATA_TRANSFER_KEYS } from '../../../../utils/storageKeys';
 
 export function ModelList() {
   const { locale } = useLocale();
   const t = appMessages[locale];
-  const { editor } = useSceneSettings();
-
-  const addDefaultModelToScene = (key: string) => {
-    if (!editor) return;
-
-    const typedKey = key as DefaultModelKey;
-
-    const count = editor.scene.children.filter((c) => (c.userData as any).__vizonDefaultModel).length;
-
-    // 轻微错位放置，避免完全重叠
-    const cols = 4;
-    const col = count % cols;
-    const row = Math.floor(count / cols);
-
-    const x = (col - (cols - 1) / 2) * 1.6;
-    const z = row * 1.6;
-
-    const obj = createDefaultModel(typedKey, {
-      position: { x, y: 0, z }
-    });
-
-    editor.add(obj);
-    editor.select(obj);
-  };
+  const MODEL_DRAG_MIME = DATA_TRANSFER_KEYS.MODEL_MIME;
 
   return (
     <Accordion<ModelCategoryKey>
@@ -51,7 +27,11 @@ export function ModelList() {
                       <button
                         key={m.key}
                         type="button"
-                        onClick={() => addDefaultModelToScene(m.key)}
+                        draggable={true}
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData(MODEL_DRAG_MIME, m.key);
+                          e.dataTransfer.effectAllowed = 'copy';
+                        }}
                         className={[
                           'group overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/45',
                           'text-center transition-colors hover:border-[var(--border-strong)]'

@@ -34,6 +34,8 @@ export const defaultModels: DefaultModelMeta[] = [
   { key: 'theConduit', label: 'theConduit' }
 ];
 
+const DEFAULT_MESH_COLOR = 0x60a5fa;
+
 function makeEmissiveMaterial(color: number) {
   // Scene currently doesn't manage lights yet; emissive keeps meshes visible.
   return new THREE.MeshStandardMaterial({
@@ -59,67 +61,53 @@ function withDefaultUserData(root: THREE.Object3D, key: DefaultModelKey) {
 }
 
 export function createDefaultModel(key: DefaultModelKey, opts?: CreateDefaultModelOptions) {
-  const group = new THREE.Group();
-  withDefaultUserData(group, key);
-  group.name = `DefaultModel:${key}`;
-
-  // Basic palette to keep models distinguishable even without lights.
-  const palette: Record<DefaultModelKey, number> = {
-    cube: 0x60a5fa,
-    sphere: 0x34d399,
-    plane: 0x93c5fd,
-    circular: 0xfbbf24,
-    cone: 0xf472b6,
-    cylinder: 0xa78bfa,
-    torus: 0x22c55e,
-    theConduit: 0x60a5fa
-  };
-
-  const mat = makeEmissiveMaterial(palette[key]);
+  const mat = makeEmissiveMaterial(DEFAULT_MESH_COLOR);
+  let mesh: THREE.Mesh;
 
   switch (key) {
     case 'cube': {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+      mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+      mesh.name = 'BoxGeometry';
       mesh.position.set(0, 0.5, 0);
-      group.add(mesh);
       break;
     }
     case 'sphere': {
-      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.65, 64, 32), mat);
+      // 降低默认分段，兼顾视觉与编辑器实时性能。
+      mesh = new THREE.Mesh(new THREE.SphereGeometry(0.65, 32, 18), mat);
+      mesh.name = 'SphereGeometry';
       mesh.position.set(0, 0.65, 0);
-      group.add(mesh);
       break;
     }
     case 'plane': {
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
+      mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
+      mesh.name = 'PlaneGeometry';
       mesh.rotation.x = -Math.PI / 2;
       mesh.position.set(0, 0, 0);
-      group.add(mesh);
       break;
     }
     case 'circular': {
-      const mesh = new THREE.Mesh(new THREE.CircleGeometry(0.75, 64), mat);
+      mesh = new THREE.Mesh(new THREE.CircleGeometry(0.75, 32), mat);
+      mesh.name = 'CircleGeometry';
       mesh.rotation.x = -Math.PI / 2;
       mesh.position.set(0, 0.02, 0);
-      group.add(mesh);
       break;
     }
     case 'cone': {
-      const mesh = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.2, 48), mat);
+      mesh = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.2, 24), mat);
+      mesh.name = 'ConeGeometry';
       mesh.position.set(0, 0.6, 0);
-      group.add(mesh);
       break;
     }
     case 'cylinder': {
-      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.2, 48), mat);
+      mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.2, 24), mat);
+      mesh.name = 'CylinderGeometry';
       mesh.position.set(0, 0.6, 0);
-      group.add(mesh);
       break;
     }
     case 'torus': {
-      const mesh = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.18, 16, 100), mat);
+      mesh = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.18, 12, 48), mat);
+      mesh.name = 'TorusGeometry';
       mesh.position.set(0, 0.6, 0);
-      group.add(mesh);
       break;
     }
     case 'theConduit': {
@@ -130,14 +118,17 @@ export function createDefaultModel(key: DefaultModelKey, opts?: CreateDefaultMod
         new THREE.Vector3(0.2, -0.1, 0.25),
         new THREE.Vector3(0.6, 0.0, 0.0)
       ]);
-      const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 32, 0.14, 16, false), mat);
+      mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 20, 0.14, 12, false), mat);
+      mesh.name = 'TubeGeometry';
       mesh.position.set(0, 0.65, 0);
-      group.add(mesh);
       break;
     }
   }
 
-  applyTransform(group, opts);
-  return group;
+  withDefaultUserData(mesh, key);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  applyTransform(mesh, opts);
+  return mesh;
 }
 

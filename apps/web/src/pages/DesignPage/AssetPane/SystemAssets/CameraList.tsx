@@ -1,6 +1,6 @@
-import { Tooltip } from '../../../components/Tooltip';
+import { Tooltip } from '../../../../components/Tooltip';
 
-import { getAssetUrl } from '../../../utils/utils';
+import { getAssetUrl } from '../../../../utils/utils';
 
 type CameraPresetKey = 'orthographic' | 'perspective';
 
@@ -14,12 +14,12 @@ const CAMERA_PRESETS: CameraPreset[] = [
   {
     key: 'orthographic',
     label: '正交相机',
-    iconSrc: getAssetUrl('../../../assets/img/orthographicCamera.png', import.meta.url)
+    iconSrc: getAssetUrl('../../../../assets/img/orthographicCamera.png', import.meta.url)
   },
   {
     key: 'perspective',
     label: '透视相机',
-    iconSrc: getAssetUrl('../../../assets/img/perspectiveCamera.png', import.meta.url)
+    iconSrc: getAssetUrl('../../../../assets/img/perspectiveCamera.png', import.meta.url)
   }
 ];
 

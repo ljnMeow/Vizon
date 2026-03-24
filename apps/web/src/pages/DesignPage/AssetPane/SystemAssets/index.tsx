@@ -1,8 +1,8 @@
 import { useState } from 'react';
 
-import { Tabs, TabItem } from '../../../components/Tabs';
-import { useLocale } from '../../../hooks/useLocale';
-import { appMessages } from '../../../i18n/messages';
+import { Tabs, TabItem } from '../../../../components/Tabs';
+import { useLocale } from '../../../../hooks/useLocale';
+import { appMessages } from '../../../../i18n/messages';
 import { CameraList } from './CameraList';
 import { ModelList } from './ModelList';
 import { LightList } from './LightList';

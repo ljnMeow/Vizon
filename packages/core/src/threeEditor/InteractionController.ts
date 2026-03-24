@@ -160,18 +160,24 @@ export class InteractionController {
         const intersects = this.raycaster.intersectObjects(this.init.scene.children, true);
         const hit = intersects.find((i: THREE.Intersection) => {
           const obj = i.object;
+          if (!this.isVisibleInHierarchy(obj)) return false;
           // 避免选中 gizmo/辅助对象：TransformControls 自己挂在 scene 上（且其子节点很多）。
           if (obj === this.transform || this.isTransformChild(obj)) return false;
 
           // 对于带映射标记的 helper/代理：即便它标了 __vizonNonSelectable，也允许通过映射进入 selected。
           const pickTarget = this.findPickTarget(obj);
-          if (pickTarget) return true;
+          if (pickTarget) return this.isVisibleInHierarchy(pickTarget);
 
           return !this.isNonSelectable(obj);
         });
 
         const pickTarget = hit?.object != null ? this.findPickTarget(hit.object) : undefined;
-        this.init.select(pickTarget ?? hit?.object ?? null);
+        const next = pickTarget ?? hit?.object ?? null;
+        if (next && !this.isVisibleInHierarchy(next)) {
+          this.init.select(null);
+          return;
+        }
+        this.init.select(next);
       },
       { signal: this.pointerAbort.signal }
     );
@@ -211,6 +217,15 @@ export class InteractionController {
       cur = cur.parent;
     }
     return false;
+  }
+
+  private isVisibleInHierarchy(obj: THREE.Object3D) {
+    let cur: THREE.Object3D | null = obj;
+    while (cur) {
+      if (!cur.visible) return false;
+      cur = cur.parent;
+    }
+    return true;
   }
 }
 
