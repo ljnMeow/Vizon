@@ -31,7 +31,9 @@ export type StorageKeyName = keyof typeof STORAGE_KEYS;
  * - 统一集中管理，避免硬编码字符串散落在各处
  */
 export const DATA_TRANSFER_KEYS = {
-  MODEL_MIME: 'application/x-vizon-model-key'
+  MODEL_MIME: 'application/x-vizon-model-key',
+  CAMERA_MIME: 'application/x-vizon-camera-key',
+  LIGHT_MIME: 'application/x-vizon-light-key'
 } as const;
 
 export type DataTransferKeyName = keyof typeof DATA_TRANSFER_KEYS;

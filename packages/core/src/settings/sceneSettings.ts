@@ -2,12 +2,14 @@ import * as THREE from 'three';
 import type { SceneTreeNode } from './sceneTree';
 
 /**
- * SceneSettings 数据真相与校验/归一化：
- * - 定义核心的可序列化场景配置结构（SceneSettings/Camera/Renderer/Environment 等）
- * - 提供默认配置（createDefaultSceneSettings）
- * - 提供归一化与约束（normalizeSceneSettings），用于保证 UI 输入不会导致 three 异常
+ * SceneSettings：可序列化「场景真理源」，位于 `settings/` 目录。
  *
- * 设计原则：该模块尽量不依赖 UI/React，让 core 能作为独立 npm 包复用。
+ * 职责：
+ * - 类型定义（相机/渲染器/环境/网格/辅助线/场景树快照字段等）；
+ * - `createDefaultSceneSettings` 提供编辑器冷启动默认值；
+ * - `normalizeSceneSettings` 把 UI/导入的脏数据钳制到安全区间并统一颜色为 `#rrggbb`。
+ *
+ * 依赖：`three` 仅用于 `THREE.Color` 解析；不创建 WebGL 资源。
  */
 export type SceneSettingsVersion = number;
 

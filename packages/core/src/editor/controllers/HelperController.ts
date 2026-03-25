@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import type { SceneSettingsGrid, SceneSettingsHelpers } from '../sceneSettings';
+import type { SceneSettingsGrid, SceneSettingsHelpers } from '../../settings/sceneSettings';
+import { applyEditorOverlayLayer } from '../picking/pickLayers';
 
 /**
  * 辅助器控制器：统一管理网格与坐标轴。
@@ -22,8 +23,10 @@ export class HelperController {
       new THREE.Color(this.lastGridColor)
     );
     this.grid.userData.__vizonNonSelectable = true;
+    applyEditorOverlayLayer(this.grid);
 
     this.axes.userData.__vizonNonSelectable = true;
+    applyEditorOverlayLayer(this.axes);
     // 默认先不显示，避免 mount 后到首次 applySceneSettings 之间出现闪烁。
     this.axes.visible = false;
     this.axes.position.set(0, 0.001, 0);
@@ -75,6 +78,7 @@ export class HelperController {
       new THREE.Color(gridColorHex)
     );
     next.userData.__vizonNonSelectable = true;
+    applyEditorOverlayLayer(next);
     next.visible = this.grid.visible;
 
     // 尽量复用当前透明度配置（applyGrid 会紧接着再设置一次 opacity）

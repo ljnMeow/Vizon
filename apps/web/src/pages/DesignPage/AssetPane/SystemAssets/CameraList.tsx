@@ -1,6 +1,7 @@
 import { Tooltip } from '../../../../components/Tooltip';
 
 import { getAssetUrl } from '../../../../utils/utils';
+import { DATA_TRANSFER_KEYS } from '../../../../utils/storageKeys';
 
 type CameraPresetKey = 'orthographic' | 'perspective';
 
@@ -24,12 +25,18 @@ const CAMERA_PRESETS: CameraPreset[] = [
 ];
 
 export function CameraList() {
+  const CAMERA_DRAG_MIME = DATA_TRANSFER_KEYS.CAMERA_MIME;
   return (
     <div className="grid grid-cols-2 gap-2 p-4">
       {CAMERA_PRESETS.map((preset) => (
         <button
           key={preset.key}
           type="button"
+          draggable={true}
+          onDragStart={(e) => {
+            e.dataTransfer.setData(CAMERA_DRAG_MIME, preset.key);
+            e.dataTransfer.effectAllowed = 'copy';
+          }}
           className={[
             'group overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/45',
             'text-center transition-colors hover:border-[var(--border-strong)]'

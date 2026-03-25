@@ -1,6 +1,7 @@
 import { Tooltip } from '../../../../components/Tooltip';
 import { useLocale } from '../../../../hooks/useLocale';
 import { appMessages } from '../../../../i18n/messages';
+import { DATA_TRANSFER_KEYS } from '../../../../utils/storageKeys';
 import { getAssetUrl } from '../../../../utils/utils';
 
 type LightPresetKey = 'ambientLight' | 'directionalLight' | 'pointLight' | 'spotLight' | 'hemisphereLight' | 'rectAreaLight';
@@ -26,6 +27,7 @@ const LIGHT_KEYS: LightPresetKey[] = [
 export function LightList() {
   const { locale } = useLocale();
   const t = appMessages[locale];
+  const LIGHT_DRAG_MIME = DATA_TRANSFER_KEYS.LIGHT_MIME;
 
   return (
     <div className="grid grid-cols-2 gap-2 p-4">
@@ -35,7 +37,11 @@ export function LightList() {
           <button
             key={key}
             type="button"
-            // 作为当前列表的预设展示；点击行为后续可接入“切换灯光类型”的逻辑
+            draggable={true}
+            onDragStart={(e) => {
+              e.dataTransfer.setData(LIGHT_DRAG_MIME, key);
+              e.dataTransfer.effectAllowed = 'copy';
+            }}
             className={[
               'group overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/45',
               'text-center transition-colors hover:border-[var(--border-strong)]'

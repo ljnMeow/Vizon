@@ -1,3 +1,8 @@
+/**
+ * 默认几何体工厂：`Mesh` + `MeshStandardMaterial`，用于资产面板快速占位。
+ *
+ * 使用 emissive 略提亮，在场景尚未布置灯光时仍可辨认形状；非 PBR 工作流最终应由用户替换材质。
+ */
 import * as THREE from 'three';
 
 export type DefaultModelKey =
@@ -37,7 +42,7 @@ export const defaultModels: DefaultModelMeta[] = [
 const DEFAULT_MESH_COLOR = 0x60a5fa;
 
 function makeEmissiveMaterial(color: number) {
-  // Scene currently doesn't manage lights yet; emissive keeps meshes visible.
+  // 自带 emissive 可在弱光环境下看清形体；roughness/metalness 为朴素 PBR 占位
   return new THREE.MeshStandardMaterial({
     color,
     roughness: 0.45,

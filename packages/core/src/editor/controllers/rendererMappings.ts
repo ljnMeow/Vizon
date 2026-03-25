@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { RendererOutputColorSpace, RendererToneMapping, RendererSettings } from '../sceneSettings';
+import type { RendererOutputColorSpace, RendererToneMapping, RendererSettings } from '../../settings/sceneSettings';
 
 /**
  * Settings -> three.js 常量映射表：

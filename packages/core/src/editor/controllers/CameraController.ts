@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { SceneSettings } from '../sceneSettings';
+import type { SceneSettings } from '../../settings/sceneSettings';
 import type { OrbitControls } from 'three-stdlib';
 
 /**

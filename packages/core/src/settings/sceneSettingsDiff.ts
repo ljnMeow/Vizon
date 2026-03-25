@@ -1,4 +1,4 @@
-import type { SceneSettings, RendererSettings } from '../sceneSettings';
+import type { SceneSettings, RendererSettings } from './sceneSettings';
 
 /**
  * 用于 `SceneSettings` 的差异判断：
@@ -24,6 +24,7 @@ export type SceneSettingsDiff = {
  * - 输入类型由 core 的 `SceneSettings` 约束，diff 判定与 `ThreeEditor.applySceneSettings` 的行为保持一致
  */
 export function calcSceneSettingsDiff(next: SceneSettings, prev: SceneSettings): SceneSettingsDiff {
+  // 任一项变化都触发 environment 应用分支（含可能较慢的 HDRI 加载）
   const environmentChanged =
     next.environment.backgroundMode !== prev.environment.backgroundMode ||
     next.environment.backgroundColor !== prev.environment.backgroundColor ||
@@ -31,12 +32,13 @@ export function calcSceneSettingsDiff(next: SceneSettings, prev: SceneSettings):
     next.environment.hdri.type !== prev.environment.hdri.type ||
     (next.environment.hdri.type === 'uploaded' && prev.environment.hdri.type === 'uploaded'
       ? next.environment.hdri.url !== prev.environment.hdri.url
-      : false) ||
+      : false) || // 仅当两侧均为 uploaded 时才比较 url，避免把类型切换误判为 url 变
     next.environment.fog.enabled !== prev.environment.fog.enabled ||
     next.environment.fog.color !== prev.environment.fog.color ||
     next.environment.fog.near !== prev.environment.fog.near ||
     next.environment.fog.far !== prev.environment.fog.far;
 
+  // renderer 多数项可热更；antialias 在实现层会触发 WebGL 重建
   const rendererChanged =
     next.renderer.antialias !== prev.renderer.antialias ||
     next.renderer.outputColorSpace !== prev.renderer.outputColorSpace ||
@@ -51,6 +53,7 @@ export function calcSceneSettingsDiff(next: SceneSettings, prev: SceneSettings):
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _rendererSettingsForTypeOnly: RendererSettings | null = null;
 
+  // 与 orbit 联动的透视相机参数；全等量比较避免对象向量化带来的引用噪声
   const cameraChanged =
     next.camera.fov !== prev.camera.fov ||
     next.camera.near !== prev.camera.near ||

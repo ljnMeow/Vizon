@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls, TransformControls } from 'three-stdlib';
 import type { TransformMode } from '../ThreeEditor';
+import { isNonSelectableInHierarchy, isVisibleInHierarchy } from '../picking/objectGuards';
+import { applyEditorOverlayLayer, configureRaycasterForScenePicking } from '../picking/pickLayers';
 
 /**
  * InteractionController：
@@ -28,22 +30,32 @@ export type InteractionRecreateControlsOptions = {
 };
 
 export class InteractionController {
+  /** 拾取与 Orbit/Transform 共用的透视相机（与 ThreeEditor.camera 同一引用） */
   private camera: THREE.PerspectiveCamera;
   private orbit: OrbitControls | null = null;
   private transform: TransformControls | null = null;
 
+  /** 已配置为仅检测「场景内容层」，避免命中 overlay 上大段无用遍历 */
   private raycaster = new THREE.Raycaster();
+  /** 复用向量：client 坐标 → NDC */
   private pointerNdc = new THREE.Vector2();
+  /** TransformControls dragging 为 true 时屏蔽单击拾取，防止误切换选中 */
   private dragging = false;
+  /** 绑定 pointerdown 时用的 signal，dispose / 重建时一次 abort 全部注销 */
   private pointerAbort: AbortController | null = null;
+  /** 当前 renderer.domElement；工具开关需知道往谁身上挂监听 */
   private domElement: HTMLElement | null = null;
+  /** false 时移除监听，避免禁选模式下仍 raycast */
   private toolEnabled = true;
 
+  /**
+   * 沿父链查找「代理拾取目标」：CameraHelper 等线框 mesh 通过 userData 指向真实 Camera/Light。
+   */
   private findPickTarget(obj: THREE.Object3D): THREE.Object3D | undefined {
     let cur: THREE.Object3D | null = obj;
     while (cur) {
       const pick = (cur.userData as any).__vizonPickTarget as THREE.Object3D | undefined;
-      if (pick) return pick;
+      if (pick) return pick; // 命中即返回，不再往上走
       cur = cur.parent;
     }
     return undefined;
@@ -55,6 +67,7 @@ export class InteractionController {
    */
   constructor(private readonly init: InteractionControllerInit) {
     this.camera = init.camera;
+    configureRaycasterForScenePicking(this.raycaster);
   }
 
   setCamera(camera: THREE.PerspectiveCamera) {
@@ -85,6 +98,7 @@ export class InteractionController {
     this.orbit.update();
 
     this.transform = new TransformControls(this.camera, domElement);
+    applyEditorOverlayLayer(this.transform);
     this.transform.setMode(opts.transformMode);
     (this.transform as any).addEventListener('dragging-changed', (e: any) => {
       this.dragging = Boolean((e as any).value);
@@ -148,36 +162,35 @@ export class InteractionController {
     dom.addEventListener(
       'pointerdown',
       (e: PointerEvent) => {
-        if (this.dragging) return;
-        if (e.button !== 0) return;
+        if (this.dragging) return; // 拖拽 gizmo 过程中不处理点击选中
+        if (e.button !== 0) return; // 仅响应主键，避免中键平移抢 focus
 
         const rect = dom.getBoundingClientRect();
-        const x = (e.clientX - rect.left) / Math.max(1, rect.width);
+        const x = (e.clientX - rect.left) / Math.max(1, rect.width); // 归一化到 [0,1]
         const y = (e.clientY - rect.top) / Math.max(1, rect.height);
-        this.pointerNdc.set(x * 2 - 1, -(y * 2 - 1));
+        this.pointerNdc.set(x * 2 - 1, -(y * 2 - 1)); // 转标准 NDC，Y 轴翻转匹配 WebGL
         this.raycaster.setFromCamera(this.pointerNdc, this.camera);
 
+        // 从 scene 根递归；layers 已剪掉 overlay，但 helper 仍在内容层需业务过滤
         const intersects = this.raycaster.intersectObjects(this.init.scene.children, true);
         const hit = intersects.find((i: THREE.Intersection) => {
           const obj = i.object;
-          if (!this.isVisibleInHierarchy(obj)) return false;
-          // 避免选中 gizmo/辅助对象：TransformControls 自己挂在 scene 上（且其子节点很多）。
-          if (obj === this.transform || this.isTransformChild(obj)) return false;
+          if (!isVisibleInHierarchy(obj)) return false; // 隐藏父级下的 mesh 视作不可见
+          if (obj === this.transform || this.isTransformChild(obj)) return false; // 不选 gizmo 子网格
 
-          // 对于带映射标记的 helper/代理：即便它标了 __vizonNonSelectable，也允许通过映射进入 selected。
           const pickTarget = this.findPickTarget(obj);
-          if (pickTarget) return this.isVisibleInHierarchy(pickTarget);
+          if (pickTarget) return isVisibleInHierarchy(pickTarget); // 代理目标也要整链可见
 
-          return !this.isNonSelectable(obj);
+          return !isNonSelectableInHierarchy(obj); // 普通物体：非装饰分支才可选
         });
 
         const pickTarget = hit?.object != null ? this.findPickTarget(hit.object) : undefined;
-        const next = pickTarget ?? hit?.object ?? null;
-        if (next && !this.isVisibleInHierarchy(next)) {
-          this.init.select(null);
+        const next = pickTarget ?? hit?.object ?? null; // 优先落到「真实」灯/相机
+        if (next && !isVisibleInHierarchy(next)) {
+          this.init.select(null); // 理论防御：映射目标被隐藏则清空选中
           return;
         }
-        this.init.select(next);
+        this.init.select(next); // 委托 ThreeEditor：冻结矩阵、attach gizmo、emit
       },
       { signal: this.pointerAbort.signal }
     );
@@ -210,22 +223,5 @@ export class InteractionController {
     return false;
   }
 
-  private isNonSelectable(obj: THREE.Object3D) {
-    let cur: THREE.Object3D | null = obj;
-    while (cur) {
-      if ((cur.userData as any).__vizonNonSelectable) return true;
-      cur = cur.parent;
-    }
-    return false;
-  }
-
-  private isVisibleInHierarchy(obj: THREE.Object3D) {
-    let cur: THREE.Object3D | null = obj;
-    while (cur) {
-      if (!cur.visible) return false;
-      cur = cur.parent;
-    }
-    return true;
-  }
 }
 

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { EXRLoader, RGBELoader } from 'three-stdlib';
-import type { SceneSettings } from '../sceneSettings';
+import type { SceneSettings } from '../../settings/sceneSettings';
 
 /**
  * 环境/背景控制器的参数：

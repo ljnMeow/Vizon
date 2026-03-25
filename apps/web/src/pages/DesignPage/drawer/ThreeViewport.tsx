@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { ThreeEditor, createDefaultModel, type DefaultModelKey, type ViewPreset } from 'vizon-3d-core';
+import {
+  ThreeEditor,
+  createDefaultCamera,
+  createDefaultLight,
+  createDefaultModel,
+  type DefaultCameraKey,
+  type DefaultLightKey,
+  type DefaultModelKey,
+  type ViewPreset
+} from 'vizon-3d-core';
 import { TransformToolbar, type ViewportTool } from './tools/TransformToolbar';
 import { ViewPresetToolbar } from './tools/ViewPresetToolbar';
 import { DATA_TRANSFER_KEYS } from '../../../utils/storageKeys';
@@ -9,6 +18,8 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const toolRef = useRef<ViewportTool | null>('translate');
   const MODEL_DRAG_MIME = DATA_TRANSFER_KEYS.MODEL_MIME;
+  const CAMERA_DRAG_MIME = DATA_TRANSFER_KEYS.CAMERA_MIME;
+  const LIGHT_DRAG_MIME = DATA_TRANSFER_KEYS.LIGHT_MIME;
 
   const editor = useMemo(() => ({ current: null as ThreeEditor | null }), []);
   const [view, setView] = useState<ViewPreset>('default');
@@ -94,9 +105,6 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
     const inst = editor.current;
     if (!inst) return;
 
-    const key = e.dataTransfer.getData(MODEL_DRAG_MIME);
-    if (!key) return;
-
     const host = hostRef.current;
     if (!host) return;
 
@@ -104,14 +112,34 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
     const x = (e.clientX - rect.left) / Math.max(1, rect.width);
     const y = (e.clientY - rect.top) / Math.max(1, rect.height);
 
-    const point = inst.getGroundPointFromViewport(x, y, 0);
+    const point = inst.getDropPointFromViewport(x, y, { groundPlaneY: 0, defaultDistance: 6 });
     if (!point) return;
 
-    const typedKey = key as DefaultModelKey;
-    const obj = createDefaultModel(typedKey, { position: point });
+    const modelKey = e.dataTransfer.getData(MODEL_DRAG_MIME);
+    if (modelKey) {
+      const typedKey = modelKey as DefaultModelKey;
+      const obj = createDefaultModel(typedKey, { position: point });
+      inst.add(obj);
+      inst.select(obj);
+      return;
+    }
 
-    inst.add(obj);
-    inst.select(obj);
+    const cameraKey = e.dataTransfer.getData(CAMERA_DRAG_MIME);
+    if (cameraKey) {
+      const typedKey = cameraKey as DefaultCameraKey;
+      const cam = createDefaultCamera(typedKey, { position: point });
+      inst.add(cam);
+      inst.select(cam);
+      return;
+    }
+
+    const lightKey = e.dataTransfer.getData(LIGHT_DRAG_MIME);
+    if (lightKey) {
+      const typedKey = lightKey as DefaultLightKey;
+      const light = createDefaultLight(typedKey, { position: point, target: { x: 0, y: 0, z: 0 } });
+      inst.add(light);
+      inst.select(light);
+    }
   };
 
   return (
