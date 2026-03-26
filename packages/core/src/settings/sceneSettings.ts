@@ -1,5 +1,5 @@
-import * as THREE from 'three';
 import type { SceneTreeNode } from './sceneTree';
+import { clamp, parseHexColor, toFiniteNumber } from '../infra/utils';
 
 /**
  * SceneSettings：可序列化「场景真理源」，位于 `settings/` 目录。
@@ -186,27 +186,6 @@ export function createDefaultSceneSettings(): SceneSettings {
     },
     sceneTree: []
   };
-}
-
-// 数值约束工具：把输入限制在 [min, max] 区间内，避免 UI 传入非法值导致 three 报错/表现异常。
-function clamp(n: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, n));
-}
-
-function toFiniteNumber(value: unknown, fallback: number) {
-  const num = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(num) ? num : fallback;
-}
-
-// 颜色解析工具：把任意可解析的颜色字符串转换为 THREE.Color，
-// 然后再导回统一的 hex 格式（用于 normalize）。
-function parseHexColor(input: string, fallbackHex: string): THREE.Color {
-  // 防御式解析：UI 或外部输入非法颜色时回退，避免 normalize 抛错导致应用中断。
-  try {
-    return new THREE.Color(input);
-  } catch {
-    return new THREE.Color(fallbackHex);
-  }
 }
 
 function normalizeSceneTreeNode(node: SceneTreeNode): SceneTreeNode {

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { RendererSettings } from '../../settings/sceneSettings';
 import type { TransformMode } from '../ThreeEditor';
-import { clamp } from '../../infra/utils/math';
+import { clamp } from '../../infra/utils';
 import { rendererOutputColorSpaceToThree, rendererShadowMapTypeToThree, rendererToneMappingToThree } from './rendererMappings';
 import type { InteractionController } from './InteractionController';
 import type { InteractionRecreateControlsOptions } from './InteractionController';

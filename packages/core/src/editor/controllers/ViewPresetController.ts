@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { OrbitControls } from 'three-stdlib';
 import type { ViewPreset, ViewTransitionOptions } from '../ThreeEditor';
-import { easeInOutCubic } from '../../infra/utils/math';
+import { easeInOutCubic } from '../../infra/utils';
 
 /**
  * ViewPresetController：
