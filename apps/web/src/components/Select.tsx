@@ -31,7 +31,7 @@ export function Select<T extends string = string>({
       onChange={(e) => onChange(e.target.value as T | '')}
       aria-label={ariaLabel}
       className={[
-        'w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none',
+        'w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none',
         'transition-colors',
         'focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]',
         'disabled:opacity-50',

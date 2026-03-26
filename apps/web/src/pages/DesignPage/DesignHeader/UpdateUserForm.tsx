@@ -71,7 +71,7 @@ export function UpdateUserForm({
         <input
           value={nickname}
           onChange={(e) => setNickname(e.target.value)}
-          className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+          className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
           placeholder={t.profile.nicknamePlaceholder}
         />
       </div>

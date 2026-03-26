@@ -40,7 +40,7 @@ function LoginFormCard({
             required
             value={username}
             onChange={(e) => onUsernameChange(e.target.value)}
-            className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] outline-none ring-0 transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] placeholder:text-[var(--text-muted)]"
+            className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] outline-none ring-0 transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] placeholder:text-[var(--text-muted)]"
             placeholder={t.emailPlaceholder}
           />
         </div>
@@ -56,7 +56,7 @@ function LoginFormCard({
               required
               value={password}
               onChange={(e) => onPasswordChange(e.target.value)}
-              className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-3.5 py-2.5 pr-10 text-sm text-[var(--text-primary)] outline-none ring-0 transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] placeholder:text-[var(--text-muted)]"
+              className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-3.5 py-2.5 pr-10 text-sm text-[var(--text-primary)] outline-none ring-0 transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] placeholder:text-[var(--text-muted)]"
               placeholder={t.passwordPlaceholder}
             />
             <button
@@ -89,7 +89,7 @@ function LoginFormCard({
         <button
           type="submit"
           disabled={submitting}
-          className="mt-4 flex w-full items-center justify-center rounded-xl bg-[var(--accent)] px-3 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-[var(--accent-strong)] active:scale-[0.99]"
+          className="mt-4 flex w-full items-center justify-center rounded-md bg-[var(--accent)] px-3 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-[var(--accent-strong)] active:scale-[0.99]"
         >
           {submitting ? `${t.loginButton}...` : t.loginButton}
         </button>

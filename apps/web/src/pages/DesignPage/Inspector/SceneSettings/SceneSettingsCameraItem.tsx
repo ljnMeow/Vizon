@@ -37,7 +37,7 @@ function AxisInput({
           if (!Number.isFinite(next)) return;
           onChange(next);
         }}
-        className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+        className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
       />
     </div>
   );
@@ -88,7 +88,7 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
       </div>
 
       {/* Near / Far */}
-      <div className="space-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/40 p-2">
+      <div className="space-y-2 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/40 p-2">
         <div className="space-y-1.5">
           <label className="block text-[11px] font-semibold tracking-wide text-[var(--text-muted)]">
             {labels.nearLabel}
@@ -100,7 +100,7 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
             step={0.001}
             value={near}
             onChange={(e) => setCameraNear(Number(e.target.value))}
-            className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+            className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
           />
         </div>
 
@@ -115,7 +115,7 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
             step={1}
             value={far}
             onChange={(e) => setCameraFar(Number(e.target.value))}
-            className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+            className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
           />
         </div>
       </div>
@@ -148,7 +148,7 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
           aria-disabled={!canResetCamera}
           aria-label={labels.resetCameraLabel}
           className={[
-            'inline-flex items-center justify-center rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors',
+            'inline-flex items-center justify-center rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors',
             canResetCamera
               ? 'border-[var(--border-subtle)] bg-[var(--bg-elevated)]/50 text-[var(--text-secondary)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-soft)]'
               : 'cursor-not-allowed border-[var(--border-subtle)] bg-[var(--bg-elevated)]/30 text-[var(--text-muted)] opacity-60'

@@ -8,6 +8,10 @@ import React, {
 } from 'react';
 import { createPortal } from 'react-dom';
 
+import { appMessages } from '../i18n/messages';
+import type { Locale } from '../hooks/useLocale';
+import { STORAGE_KEYS } from '../utils/storageKeys';
+
 type MessageType = 'success' | 'info' | 'warning' | 'error' | 'loading';
 
 type ShowOptions = {
@@ -54,6 +58,16 @@ const messageConfig: MessageConfig = {
     error: 1000
   }
 };
+
+function getLocaleFromStorage(): Locale {
+  if (typeof window === 'undefined') return 'zh-CN';
+  const stored = window.localStorage.getItem(STORAGE_KEYS.LOCALE);
+  return stored === 'en-US' ? 'en-US' : 'zh-CN';
+}
+
+function getDefaultLoadingText(): string {
+  return appMessages[getLocaleFromStorage()].common.loading;
+}
 
 export type MessageLoadingHandle = {
   id: string;
@@ -115,7 +129,7 @@ export const message = {
       }).done ?? Promise.resolve()
     );
   },
-  loading(text = '加载中...', opts?: { blockInteraction?: boolean }): MessageLoadingHandle {
+  loading(text = getDefaultLoadingText(), opts?: { blockInteraction?: boolean }): MessageLoadingHandle {
     const r =
       controller?.show({
         type: 'loading',

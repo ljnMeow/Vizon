@@ -18,7 +18,7 @@ export function ColorPicker({
   return (
     <div
       className={[
-        'relative inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)]',
+        'relative inline-flex items-center gap-2 rounded-md border border-[var(--border-subtle)]',
         'bg-[var(--bg-input)] px-1.5 py-1',
         'transition-colors',
         disabled ? 'opacity-50' : 'hover:border-[var(--border-strong)]',

@@ -22,6 +22,22 @@ export function isNonSelectableInHierarchy(obj: THREE.Object3D) {
 }
 
 /**
+ * 自当前节点向上：若任一祖先标记 `userData.__vizonNonPickable === true`，则认为该对象及其分支在「鼠标拾取」层面不可拾取。
+ *
+ * 与 `__vizonNonSelectable` 的区别：
+ * - `__vizonNonSelectable`：既用于选择/结构树过滤，也用于拾取过滤（当前历史遗留语义）
+ * - `__vizonNonPickable`：仅用于拾取过滤，允许结构树中仍可选中（但鼠标点选不行）
+ */
+export function isNonPickableInHierarchy(obj: THREE.Object3D) {
+  let cur: THREE.Object3D | null = obj;
+  while (cur) {
+    if ((cur.userData as any)?.__vizonNonPickable) return true;
+    cur = cur.parent;
+  }
+  return false;
+}
+
+/**
  * 自当前节点向上：若任一祖先 `visible === false`，则认为世界空间中不可见。
  * 用于拾取时忽略被隐藏父级下面的 mesh（即使子级 visible 为 true，与 three 默认渲染一致）。
  */

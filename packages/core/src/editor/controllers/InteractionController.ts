@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls, TransformControls } from 'three-stdlib';
 import type { TransformMode } from '../ThreeEditor';
-import { isNonSelectableInHierarchy, isVisibleInHierarchy } from '../picking/objectGuards';
-import { applyEditorOverlayLayer, configureRaycasterForScenePicking } from '../picking/pickLayers';
+import { isNonPickableInHierarchy, isNonSelectableInHierarchy, isVisibleInHierarchy } from '../picking/objectGuards';
+import {
+  applyEditorOverlayLayer,
+  configureRaycasterForScenePicking,
+  VIZON_EDITOR_OVERLAY_LAYER
+} from '../picking/pickLayers';
 
 /**
  * InteractionController：
@@ -99,6 +103,10 @@ export class InteractionController {
 
     this.transform = new TransformControls(this.camera, domElement);
     applyEditorOverlayLayer(this.transform);
+    // TransformControls 内部的 gizmo 拾取使用它自己的 Raycaster。
+    // 由于我们把 gizmo/平面等对象统一放到了 overlay layer，
+    // 需要把 TransformControls 的 Raycaster layers 一并打开，否则“看得到但点不动”。
+    ((this.transform as any).raycaster?.layers?.enable?.(VIZON_EDITOR_OVERLAY_LAYER) ?? undefined);
     this.transform.setMode(opts.transformMode);
     (this.transform as any).addEventListener('dragging-changed', (e: any) => {
       this.dragging = Boolean((e as any).value);
@@ -181,7 +189,8 @@ export class InteractionController {
           const pickTarget = this.findPickTarget(obj);
           if (pickTarget) return isVisibleInHierarchy(pickTarget); // 代理目标也要整链可见
 
-          return !isNonSelectableInHierarchy(obj); // 普通物体：非装饰分支才可选
+          // 普通物体：非装饰/可见分支才允许鼠标拾取
+          return !isNonSelectableInHierarchy(obj) && !isNonPickableInHierarchy(obj);
         });
 
         const pickTarget = hit?.object != null ? this.findPickTarget(hit.object) : undefined;

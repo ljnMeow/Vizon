@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { SceneTreeNode } from 'vizon-3d-core';
+import { useLocale } from '../../../../hooks/useLocale';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
+import { appMessages } from '../../../../i18n/messages';
 import { getAssetUrl } from '../../../../utils/utils';
 
 const TREE_DRAG_MIME = 'application/x-vizon-scene-node-uuid';
@@ -260,6 +262,8 @@ function SceneTreeItem({
 }
 
 export function Structure() {
+  const { locale } = useLocale();
+  const t = appMessages[locale].assetPane;
   const { sceneSettings, editor } = useSceneSettings();
   const tree = sceneSettings.sceneTree;
   const [expandedSet, setExpandedSet] = useState<Set<string>>(new Set());
@@ -392,7 +396,7 @@ export function Structure() {
   return (
     <div className="h-full overflow-y-auto p-3">
       {tree.length === 0 ? (
-        <div className="text-xs text-[var(--text-muted)]">scene tree is empty</div>
+        <div className="text-xs text-[var(--text-muted)]">{t.structureEmpty}</div>
       ) : (
         <ul>
           {tree.map((node) => (

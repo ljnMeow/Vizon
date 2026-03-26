@@ -21,7 +21,7 @@ export function SceneSettingsBasicItem({ labels }: { labels: SceneSettingsBasicL
         <input
           value={sceneName}
           onChange={(e) => setSceneName(e.target.value)}
-          className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+          className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
           placeholder={labels.sceneNamePlaceholder}
         />
       </div>
@@ -34,7 +34,7 @@ export function SceneSettingsBasicItem({ labels }: { labels: SceneSettingsBasicL
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={2}
-          className="w-full resize-none rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+          className="w-full resize-none rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
           placeholder={labels.descriptionPlaceholder}
         />
       </div>

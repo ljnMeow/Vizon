@@ -134,7 +134,7 @@ export function SceneSettingsEnvironmentItem({
               />
 
               <div className="flex items-center gap-3">
-                <label className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/50 px-2 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/50 px-2 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
                   <input
                     type="file"
                     accept=".hdr,.exr,image/*"
@@ -195,7 +195,7 @@ export function SceneSettingsEnvironmentItem({
         </div>
 
         {/* Fog */}
-        <div className="space-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/40 p-2">
+        <div className="space-y-2 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/40 p-2">
           <label className="flex cursor-pointer items-center justify-between gap-3">
             <span className="text-[11px] font-semibold tracking-wide text-[var(--text-muted)]">
               {env.fogToggleLabel}
@@ -233,7 +233,7 @@ export function SceneSettingsEnvironmentItem({
                   step={0.1}
                   value={fogNear}
                   onChange={(e) => setFogNear(Number(e.target.value))}
-                  className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+                  className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
                 />
               </div>
 
@@ -248,7 +248,7 @@ export function SceneSettingsEnvironmentItem({
                   step={0.1}
                   value={fogFar}
                   onChange={(e) => setFogFar(Number(e.target.value))}
-                  className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+                  className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
                 />
               </div>
             </div>

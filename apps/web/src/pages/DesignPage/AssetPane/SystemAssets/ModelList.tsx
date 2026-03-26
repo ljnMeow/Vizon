@@ -16,7 +16,7 @@ export function ModelList() {
       items={[
         {
           key: 'basic',
-          header: '基础几何体',
+          header: t.systemAssets.modelList.basicHeader,
           content: (
             basicModels.length > 0 ? (
               <div className="grid grid-cols-2 gap-2">
@@ -33,7 +33,7 @@ export function ModelList() {
                           e.dataTransfer.effectAllowed = 'copy';
                         }}
                         className={[
-                          'group overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/45',
+                          'group overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/45',
                           'text-center transition-colors hover:border-[var(--border-strong)]'
                         ].join(' ')}
                       >
@@ -72,24 +72,24 @@ export function ModelList() {
             ) : (
               <div
                 className={[
-                  'rounded-xl border border-dashed border-[var(--border-subtle)]',
+                  'rounded-md border border-dashed border-[var(--border-subtle)]',
                   'bg-[var(--bg-elevated)]/30 p-3 text-xs text-[var(--text-muted)]'
                 ].join(' ')}
               >
-                暂无模型数据
+                {t.systemAssets.modelList.emptyBasic}
               </div>
             )
           )
         },
         {
           key: 'environment',
-          header: '环境',
-          content: <div className="text-xs text-[var(--text-muted)]">暂无环境模型</div>,
+          header: t.systemAssets.modelList.environmentHeader,
+          content: <div className="text-xs text-[var(--text-muted)]">{t.systemAssets.modelList.emptyEnvironment}</div>,
         },
         {
           key: 'characters',
-          header: '角色',
-          content: <div className="text-xs text-[var(--text-muted)]">暂无角色模型</div>,
+          header: t.systemAssets.modelList.charactersHeader,
+          content: <div className="text-xs text-[var(--text-muted)]">{t.systemAssets.modelList.emptyCharacters}</div>,
         }
       ]}
     />

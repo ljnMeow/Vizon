@@ -10,6 +10,7 @@ export interface AppMessages {
     confirm: string;
     cancel: string;
     processing: string;
+    loading: string;
   };
   auth: {
     sessionInvalidToast: string;
@@ -56,6 +57,7 @@ export interface AppMessages {
     profileDialogCancel: string;
     profileMenuLabel: string;
     logoutMenuLabel: string;
+    nicknameFallback: string;
     nicknameLabel: string;
     nicknamePlaceholder: string;
     nicknameRequiredToast: string;
@@ -70,6 +72,7 @@ export interface AppMessages {
     systemPlaceholder: string;
     minePlaceholder: string;
     structurePlaceholder: string;
+    structureEmpty: string;
   };
   systemAssets: {
     modelsTab: string;
@@ -85,6 +88,18 @@ export interface AppMessages {
       rectAreaLight: string;
     };
     materialsPlaceholder: string;
+    cameraNames: {
+      orthographic: string;
+      perspective: string;
+    };
+    modelList: {
+      basicHeader: string;
+      environmentHeader: string;
+      charactersHeader: string;
+      emptyBasic: string;
+      emptyEnvironment: string;
+      emptyCharacters: string;
+    };
   };
   modelNames: {
     cube: string;
@@ -118,11 +133,110 @@ export interface AppMessages {
         scene: string;
         data: string;
         interaction: string;
+        properties: string;
+        materials: string;
+        effects: string;
       };
       placeholders: {
         scene: string;
         data: string;
         interaction: string;
+        properties: string;
+        materials: string;
+        effects: string;
+      };
+      propertiesSettings: {
+        baseSettingTitle: string;
+        typeLabel: string;
+        nameLabel: string;
+        namePlaceholder: string;
+        uuidLabel: string;
+        copyLabel: string;
+        copiedLabel: string;
+        copyFailedLabel: string;
+        positionLabel: string;
+        rotationLabel: string;
+        scaleLabel: string;
+        castShadowLabel: string;
+        receiveShadowLabel: string;
+        frustumCulledLabel: string;
+        shadowTitleLabel: string;
+        yesLabel: string;
+        noLabel: string;
+        visibleLabel: string;
+        pickableLabel: string;
+        freezeLabel: string;
+        opacityLabel: string;
+        renderOrderLabel: string;
+        xLabel: string;
+        yLabel: string;
+        zLabel: string;
+      };
+      objectAttributes: {
+        header: string;
+        modelTypeLabel: string;
+        geometryTypeLabel: string;
+        notDefaultText: string;
+        conduitEditToggleLabel: string;
+        yesLabel: string;
+        noLabel: string;
+        models: {
+          cubeTitle: string;
+          sphereTitle: string;
+          planeTitle: string;
+          circularTitle: string;
+          coneTitle: string;
+          cylinderTitle: string;
+          torusTitle: string;
+          theConduitTitle: string;
+        };
+        attributes: {
+          cube: {
+            widthLabel: string;
+            heightLabel: string;
+            depthLabel: string;
+          };
+          sphere: {
+            radiusLabel: string;
+            widthSegmentsLabel: string;
+            heightSegmentsLabel: string;
+          };
+          plane: {
+            widthLabel: string;
+            heightLabel: string;
+          };
+          circular: {
+            radiusLabel: string;
+            segmentsLabel: string;
+          };
+          cone: {
+            radiusLabel: string;
+            heightLabel: string;
+            radialSegmentsLabel: string;
+            heightSegmentsLabel: string;
+          };
+          cylinder: {
+            radiusTopLabel: string;
+            radiusBottomLabel: string;
+            heightLabel: string;
+            radialSegmentsLabel: string;
+            heightSegmentsLabel: string;
+          };
+          torus: {
+            radiusLabel: string;
+            tubeLabel: string;
+            radialSegmentsLabel: string;
+            tubularSegmentsLabel: string;
+            arcLabel: string;
+          };
+          theConduit: {
+            pathControlPointsLabel: string;
+            tubularSegmentsLabel: string;
+            radiusLabel: string;
+            radialSegmentsLabel: string;
+            closedLabel: string;
+          };
+        };
       };
       sceneSettings: {
         title: string;
@@ -215,7 +329,8 @@ export const appMessages: Record<Locale, AppMessages> = {
       brandName: '维造',
       confirm: '确定',
       cancel: '取消',
-      processing: '处理中...'
+      processing: '处理中...',
+      loading: '加载中...'
     },
     auth: {
       sessionInvalidToast: '登录状态失效，请重新登录',
@@ -259,6 +374,7 @@ export const appMessages: Record<Locale, AppMessages> = {
       profileDialogCancel: '取消',
       profileMenuLabel: '个人中心',
       logoutMenuLabel: '退出',
+      nicknameFallback: '用户',
       nicknameLabel: '昵称',
       nicknamePlaceholder: '请输入昵称',
       nicknameRequiredToast: '昵称不能为空',
@@ -272,7 +388,8 @@ export const appMessages: Record<Locale, AppMessages> = {
       structureTab: '结构',
       systemPlaceholder: '系统预设资源将在这里展示。',
       minePlaceholder: '用户上传的资源将在这里展示。',
-      structurePlaceholder: '场景结构树将在这里展示。'
+      structurePlaceholder: '场景结构树将在这里展示。',
+      structureEmpty: '场景树为空'
     },
     systemAssets: {
       modelsTab: '模型',
@@ -287,7 +404,19 @@ export const appMessages: Record<Locale, AppMessages> = {
         hemisphereLight: '半球光',
         rectAreaLight: '矩形光'
       },
-      materialsPlaceholder: '预设材质将在这里展示。'
+      materialsPlaceholder: '预设材质将在这里展示。',
+      cameraNames: {
+        orthographic: '正交相机',
+        perspective: '透视相机'
+      },
+      modelList: {
+        basicHeader: '基础几何体',
+        environmentHeader: '环境',
+        charactersHeader: '角色',
+        emptyBasic: '暂无模型数据',
+        emptyEnvironment: '暂无环境模型',
+        emptyCharacters: '暂无角色模型'
+      }
     },
     modelNames: {
       cube: '立方体',
@@ -320,12 +449,111 @@ export const appMessages: Record<Locale, AppMessages> = {
         tabs: {
           scene: '场景',
           data: '数据',
-          interaction: '交互'
+          interaction: '交互',
+          properties: '属性',
+          materials: '材质',
+          effects: '特效'
         },
         placeholders: {
           scene: '这里将来是场景属性（Scene）',
           data: '这里将来是数据属性（Data）',
-          interaction: '这里将来是交互属性（Interaction）'
+          interaction: '这里将来是交互属性（Interaction）',
+          properties: '这里将来是属性（Properties）',
+          materials: '这里将来是材质（Materials）',
+          effects: '这里将来是特效（Effects）'
+        },
+        propertiesSettings: {
+          baseSettingTitle: '通用属性',
+          typeLabel: '类型',
+          nameLabel: '名称',
+          namePlaceholder: '请输入名称',
+          uuidLabel: 'UUID',
+          copyLabel: '复制',
+          copiedLabel: '已复制',
+          copyFailedLabel: '复制失败，请重试',
+          positionLabel: '位置',
+          rotationLabel: '旋转',
+          scaleLabel: '缩放',
+          castShadowLabel: '产生阴影',
+          receiveShadowLabel: '接受阴影',
+          frustumCulledLabel: '视锥体裁剪',
+          shadowTitleLabel: '阴影',
+          yesLabel: '是',
+          noLabel: '否',
+          visibleLabel: '显示',
+          pickableLabel: '可拾取',
+          freezeLabel: '冻结',
+          opacityLabel: '透明度',
+          renderOrderLabel: '渲染层级',
+          xLabel: 'X',
+          yLabel: 'Y',
+          zLabel: 'Z'
+        },
+        objectAttributes: {
+          header: '对象属性',
+          modelTypeLabel: '模型类型',
+          geometryTypeLabel: '几何体',
+          notDefaultText: '当前选择不是内置默认几何体（无法读取其自身特殊属性）。',
+          conduitEditToggleLabel: '管道编辑模式',
+          yesLabel: '是',
+          noLabel: '否',
+          models: {
+            cubeTitle: '立方体',
+            sphereTitle: '球体',
+            planeTitle: '平面',
+            circularTitle: '圆形',
+            coneTitle: '圆锥',
+            cylinderTitle: '圆柱',
+            torusTitle: '圆环',
+            theConduitTitle: '管道'
+          },
+          attributes: {
+            cube: {
+              widthLabel: '宽度',
+              heightLabel: '高度',
+              depthLabel: '深度'
+            },
+            sphere: {
+              radiusLabel: '半径',
+              widthSegmentsLabel: '宽分段',
+              heightSegmentsLabel: '高分段'
+            },
+            plane: {
+              widthLabel: '宽度',
+              heightLabel: '高度'
+            },
+            circular: {
+              radiusLabel: '半径',
+              segmentsLabel: '分段'
+            },
+            cone: {
+              radiusLabel: '底面半径',
+              heightLabel: '高度',
+              radialSegmentsLabel: '径向分段',
+              heightSegmentsLabel: '高度分段'
+            },
+            cylinder: {
+              radiusTopLabel: '上半径',
+              radiusBottomLabel: '下半径',
+              heightLabel: '高度',
+              radialSegmentsLabel: '径向分段',
+              heightSegmentsLabel: '高度分段'
+            },
+            torus: {
+              radiusLabel: '主半径',
+              tubeLabel: '管半径',
+              radialSegmentsLabel: '径向分段',
+              tubularSegmentsLabel: '管道分段',
+              arcLabel: '弧长'
+            },
+            theConduit: {
+              pathControlPointsLabel: '路径控制点数',
+              tubularSegmentsLabel: '管道分段',
+              radiusLabel: '半径',
+              radialSegmentsLabel: '径向分段',
+              closedLabel: '是否闭合'
+            }
+          }
         },
         sceneSettings: {
           title: '基础设置',
@@ -411,7 +639,8 @@ export const appMessages: Record<Locale, AppMessages> = {
       brandName: 'Vizon',
       confirm: 'Confirm',
       cancel: 'Cancel',
-      processing: 'Processing...'
+      processing: 'Processing...',
+      loading: 'Loading...'
     },
     auth: {
       sessionInvalidToast: 'Your session has expired. Please sign in again.',
@@ -455,6 +684,7 @@ export const appMessages: Record<Locale, AppMessages> = {
       profileDialogCancel: 'Cancel',
       profileMenuLabel: 'Profile',
       logoutMenuLabel: 'Sign out',
+      nicknameFallback: 'User',
       nicknameLabel: 'Nickname',
       nicknamePlaceholder: 'Enter nickname',
       nicknameRequiredToast: 'Nickname is required.',
@@ -468,7 +698,8 @@ export const appMessages: Record<Locale, AppMessages> = {
       structureTab: 'Structure',
       systemPlaceholder: 'System presets will be displayed here.',
       minePlaceholder: 'Your uploaded assets will be displayed here.',
-      structurePlaceholder: 'Scene structure tree will be displayed here.'
+      structurePlaceholder: 'Scene structure tree will be displayed here.',
+      structureEmpty: 'Scene tree is empty'
     },
     systemAssets: {
       modelsTab: 'Models',
@@ -483,7 +714,19 @@ export const appMessages: Record<Locale, AppMessages> = {
         hemisphereLight: 'HemisphereLight',
         rectAreaLight: 'RectAreaLight'
       },
-      materialsPlaceholder: 'Preset materials will be displayed here.'
+      materialsPlaceholder: 'Preset materials will be displayed here.',
+      cameraNames: {
+        orthographic: 'Orthographic Camera',
+        perspective: 'Perspective Camera'
+      },
+      modelList: {
+        basicHeader: 'Basic Geometry',
+        environmentHeader: 'Environment',
+        charactersHeader: 'Characters',
+        emptyBasic: 'No model data',
+        emptyEnvironment: 'No environment models',
+        emptyCharacters: 'No character models'
+      }
     },
     modelNames: {
       cube: 'Cube',
@@ -516,12 +759,111 @@ export const appMessages: Record<Locale, AppMessages> = {
         tabs: {
           scene: 'Scene',
           data: 'Data',
-          interaction: 'Interaction'
+          interaction: 'Interaction',
+          properties: 'Properties',
+          materials: 'Materials',
+          effects: 'Effects'
         },
         placeholders: {
           scene: 'Scene properties will appear here.',
           data: 'Data properties will appear here.',
-          interaction: 'Interaction properties will appear here.'
+          interaction: 'Interaction properties will appear here.',
+          properties: 'Properties will appear here.',
+          materials: 'Materials will appear here.',
+          effects: 'Effects will appear here.'
+        },
+        propertiesSettings: {
+          baseSettingTitle: 'Common Properties',
+          typeLabel: 'Type',
+          nameLabel: 'Name',
+          namePlaceholder: 'Enter name',
+          uuidLabel: 'UUID',
+          copyLabel: 'Copy',
+          copiedLabel: 'Copied',
+          copyFailedLabel: 'Copy failed. Please try again.',
+          positionLabel: 'Position',
+          rotationLabel: 'Rotation',
+          scaleLabel: 'Scale',
+          castShadowLabel: 'Cast Shadow',
+          receiveShadowLabel: 'Receive Shadow',
+          frustumCulledLabel: 'Frustum Culling',
+          shadowTitleLabel: 'Shadow',
+          yesLabel: 'Yes',
+          noLabel: 'No',
+          visibleLabel: 'Visible',
+          pickableLabel: 'Pickable',
+          freezeLabel: 'Freeze',
+          opacityLabel: 'Opacity',
+          renderOrderLabel: 'Render Order',
+          xLabel: 'X',
+          yLabel: 'Y',
+          zLabel: 'Z'
+        },
+        objectAttributes: {
+          header: 'Object Attributes',
+          modelTypeLabel: 'Model Type',
+          geometryTypeLabel: 'Geometry',
+          notDefaultText: 'The current selection is not a built-in default geometry (its special parameters cannot be read).',
+          conduitEditToggleLabel: 'Conduit edit mode',
+          yesLabel: 'Yes',
+          noLabel: 'No',
+          models: {
+            cubeTitle: 'Cube',
+            sphereTitle: 'Sphere',
+            planeTitle: 'Plane',
+            circularTitle: 'Circle',
+            coneTitle: 'Cone',
+            cylinderTitle: 'Cylinder',
+            torusTitle: 'Torus',
+            theConduitTitle: 'Conduit'
+          },
+          attributes: {
+            cube: {
+              widthLabel: 'Width',
+              heightLabel: 'Height',
+              depthLabel: 'Depth'
+            },
+            sphere: {
+              radiusLabel: 'Radius',
+              widthSegmentsLabel: 'Width Segments',
+              heightSegmentsLabel: 'Height Segments'
+            },
+            plane: {
+              widthLabel: 'Width',
+              heightLabel: 'Height'
+            },
+            circular: {
+              radiusLabel: 'Radius',
+              segmentsLabel: 'Segments'
+            },
+            cone: {
+              radiusLabel: 'Radius',
+              heightLabel: 'Height',
+              radialSegmentsLabel: 'Radial Segments',
+              heightSegmentsLabel: 'Height Segments'
+            },
+            cylinder: {
+              radiusTopLabel: 'Top Radius',
+              radiusBottomLabel: 'Bottom Radius',
+              heightLabel: 'Height',
+              radialSegmentsLabel: 'Radial Segments',
+              heightSegmentsLabel: 'Height Segments'
+            },
+            torus: {
+              radiusLabel: 'Radius',
+              tubeLabel: 'Tube',
+              radialSegmentsLabel: 'Radial Segments',
+              tubularSegmentsLabel: 'Tubular Segments',
+              arcLabel: 'Arc'
+            },
+            theConduit: {
+              pathControlPointsLabel: 'Control Points',
+              tubularSegmentsLabel: 'Tubular Segments',
+              radiusLabel: 'Radius',
+              radialSegmentsLabel: 'Radial Segments',
+              closedLabel: 'Closed'
+            }
+          }
         },
         sceneSettings: {
           title: 'Basic Settings',

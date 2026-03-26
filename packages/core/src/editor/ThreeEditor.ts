@@ -14,6 +14,7 @@ import { RendererController } from './controllers/RendererController';
 import { ViewPresetController } from './controllers/ViewPresetController';
 import { SceneTreeController } from './controllers/SceneTreeController';
 import { StaticObjectFreezeController } from './controllers/StaticObjectFreezeController';
+import { ConduitEditController } from './controllers/ConduitEditController';
 import { isNonSelectableInHierarchy, isVisibleInHierarchy } from './picking/objectGuards';
 import {
   applyEditorOverlayLayer,
@@ -147,6 +148,7 @@ export class ThreeEditor {
   private cameraController: CameraController;
   private environmentController: EnvironmentController;
   private helperController: HelperController;
+  private conduitEditController: ConduitEditController;
   private viewPresetController: ViewPresetController;
   private sceneTreeController: SceneTreeController;
   private staticObjectFreezeController: StaticObjectFreezeController;
@@ -273,6 +275,8 @@ export class ThreeEditor {
     });
     this.orbit = orbit;
     this.transform = transform;
+    this.conduitEditController = new ConduitEditController({ scene: this.scene, camera: this.camera, orbit: this.orbit });
+    this.conduitEditController.setDomElement(this.renderer.domElement);
     // 仅在 freezeStaticObjects 时注册 dragging 监听，避免无意义闭包
     this.bindTransformDragHooks();
     this.viewPresetController = new ViewPresetController(this.camera, this.orbit);
@@ -368,6 +372,8 @@ export class ThreeEditor {
       this.renderer = recreated.renderer;
       this.orbit = recreated.orbit;
       this.transform = recreated.transform;
+      this.conduitEditController = new ConduitEditController({ scene: this.scene, camera: this.camera, orbit: this.orbit });
+      this.conduitEditController.setDomElement(this.renderer.domElement);
       this.bindTransformDragHooks();
       this.viewPresetController.setOrbit(this.orbit);
       // 重建 renderer 后需要重新同步尺寸/DPR，避免 antialias 切换后仍使用旧像素比。
@@ -442,6 +448,8 @@ export class ThreeEditor {
       }
       this.lightHelpersDirty = false;
     }
+    // 管道编辑节点（端点）需要跟随对象 transform 实时更新。
+    this.conduitEditController?.update();
     this.updateSelectionBoxHelper(); // 可能创建/更新 BoxHelper
 
     this.renderer.render(this.scene, this.camera); // 单视口单相机
@@ -518,6 +526,7 @@ export class ThreeEditor {
       this.transform.detach();
       this.transform.visible = false;
     }
+    this.conduitEditController?.syncFromSelection(safe);
     this.events.emit('select', { object: safe });
   }
 
@@ -857,6 +866,9 @@ export class ThreeEditor {
     this.interactionController.dispose();
     this.environmentController.dispose();
     this.helperController.dispose();
+    // pointer events are bound to renderer.domElement; disposing editor should abort them
+    // (controller keeps its own AbortController)
+    this.conduitEditController?.syncFromSelection(null);
     this.unbindTransformDragHooks();
     this.disposeSelectionBoxHelper();
     this.cameraHelpers.clear();

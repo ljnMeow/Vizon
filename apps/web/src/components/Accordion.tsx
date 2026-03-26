@@ -186,7 +186,7 @@ export function Accordion<T extends string = string>({
           <div
             key={item.key}
             className={[
-              'rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60',
+              'rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60',
               'overflow-hidden',
               item.disabled ? 'opacity-60' : '',
               itemClassName

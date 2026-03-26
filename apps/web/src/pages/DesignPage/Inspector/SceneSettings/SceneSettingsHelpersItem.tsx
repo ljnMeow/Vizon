@@ -83,13 +83,13 @@ export function SceneSettingsHelpersItem({
   return (
     <div className="space-y-4">
       {/* 表格/网格辅助 */}
-      <div className="space-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/40 p-3">
+      <div className="space-y-2 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/40 p-3">
         <div className="text-[11px] font-semibold tracking-wide text-[var(--text-muted)]">{gridLabels.title}</div>
         <GridHelperSettings labels={gridLabels} />
       </div>
 
       {/* 坐标轴辅助 */}
-      <div className="space-y-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/40 p-3">
+      <div className="space-y-3 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/40 p-3">
         <div className="text-[11px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.axisTitle}</div>
         <label className="flex cursor-pointer items-center justify-between gap-3">
           <span className="text-[11px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.axisEnabledLabel}</span>

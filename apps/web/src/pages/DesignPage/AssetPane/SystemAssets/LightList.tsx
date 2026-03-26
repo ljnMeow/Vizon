@@ -43,7 +43,7 @@ export function LightList() {
               e.dataTransfer.effectAllowed = 'copy';
             }}
             className={[
-              'group overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/45',
+              'group overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/45',
               'text-center transition-colors hover:border-[var(--border-strong)]'
             ].join(' ')}
           >

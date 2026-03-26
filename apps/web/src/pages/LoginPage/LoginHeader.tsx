@@ -12,7 +12,7 @@ function LoginHeader({ t, theme, locale, onToggleLocale, onToggleTheme }: LoginH
   return (
     <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
       <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 p-1 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 shadow-sm">
+        <div className="flex h-9 w-9 p-1 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 shadow-sm">
           <LogoMark />
         </div>
         <div className="leading-tight">

@@ -116,13 +116,9 @@ export function createDefaultModel(key: DefaultModelKey, opts?: CreateDefaultMod
       break;
     }
     case 'theConduit': {
-      // A lightweight “pipe” approximation: tube along a curve.
-      const curve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-0.6, 0.0, -0.2),
-        new THREE.Vector3(-0.2, 0.2, 0.1),
-        new THREE.Vector3(0.2, -0.1, 0.25),
-        new THREE.Vector3(0.6, 0.0, 0.0)
-      ]);
+      // Lightweight “straight pipe” approximation: tube along a line segment.
+      // (TubeGeometry accepts any Curve; LineCurve3 gives a visually straight conduit.)
+      const curve = new THREE.LineCurve3(new THREE.Vector3(-0.6, 0.0, -0.2), new THREE.Vector3(0.6, 0.0, 0.0));
       mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 20, 0.14, 12, false), mat);
       mesh.name = 'TubeGeometry';
       mesh.position.set(0, 0.65, 0);

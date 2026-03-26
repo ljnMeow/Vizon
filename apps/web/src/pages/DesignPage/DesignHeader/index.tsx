@@ -27,7 +27,7 @@ export function DesignHeader() {
 
   const [storedUser, setStoredUser] = useState<StoredUser | null>(() => getUserInfo<StoredUser>());
   const displayName = useMemo(
-    () => (storedUser?.nickname || storedUser?.username || '').trim() || '用户',
+    () => (storedUser?.nickname || storedUser?.username || '').trim() || t.profile.nicknameFallback,
     [storedUser]
   );
   const initial = displayName.charAt(0);
@@ -82,7 +82,7 @@ export function DesignHeader() {
   return (
     <header className="flex h-12 items-center justify-between border-b border-[var(--border-subtle)] px-3 md:px-4">
       <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 p-1 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 shadow-sm">
+        <div className="flex h-9 w-9 p-1 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/90 shadow-sm">
           <LogoMark />
         </div>
         <div className="leading-tight">
@@ -97,7 +97,7 @@ export function DesignHeader() {
           className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-xs text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
         >
           <span className="inline-block h-2 w-2 rounded-full bg-[var(--accent)]" />
-          <span>{theme === 'dark' ? 'Dark' : 'Light'}</span>
+          <span>{theme === 'dark' ? t.auth.login.themeDark : t.auth.login.themeLight}</span>
         </button>
 
         {/* 头像 + 昵称按钮：放在头部导航中 */}
