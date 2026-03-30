@@ -490,6 +490,43 @@ export class ThreeEditor {
   }
 
   /**
+   * 将相机平滑过渡到目标（position / orbit.target / FOV / near / far）。
+   * 与 `setViewPreset` 共用 RAF 动画槽位；`immediate` 或 `durationMs: 0` 时立即落点。
+   */
+  animateCameraTo(nextCamera: SceneSettings['camera'], opts?: ViewTransitionOptions): Promise<void> {
+    const normalized = normalizeSceneSettings({
+      ...this.sceneSettings,
+      camera: nextCamera
+    }).camera;
+
+    const durationMs = Math.max(0, opts?.durationMs ?? 420);
+    if (opts?.immediate || durationMs === 0) {
+      this.viewPresetController.cancel();
+      this.sceneSettings = normalizeSceneSettings({
+        ...this.sceneSettings,
+        camera: normalized
+      });
+      this.applyCameraSettings(this.sceneSettings.camera);
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      this.viewPresetController.animateCameraTo(normalized, {
+        durationMs,
+        easing: opts?.easing,
+        onComplete: () => {
+          this.sceneSettings = normalizeSceneSettings({
+            ...this.sceneSettings,
+            camera: normalized
+          });
+          this.applyCameraSettings(this.sceneSettings.camera);
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
    * 设置当前选中对象。会同步 TransformControls 的 attach/detach。
    */
   private canAttachTransformTarget(object: THREE.Object3D | null): object is THREE.Object3D {

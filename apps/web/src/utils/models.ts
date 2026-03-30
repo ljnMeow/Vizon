@@ -16,5 +16,6 @@ export const basicModels: ModelItem[] = [
   { key: 'cylinder', imageUrl: getAssetUrl('../assets/img/cylinder.png', import.meta.url) },
   { key: 'torus', imageUrl: getAssetUrl('../assets/img/torus.png', import.meta.url) },
   { key: 'theConduit', imageUrl: getAssetUrl('../assets/img/theConduit.png', import.meta.url) },
+  { key: 'group', imageUrl: getAssetUrl('../assets/img/group.png', import.meta.url) },
 ];
 

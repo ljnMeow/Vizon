@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { OrbitControls } from 'three-stdlib';
+import type { SceneSettingsCamera } from '../../settings/sceneSettings';
 import type { ViewPreset, ViewTransitionOptions } from '../ThreeEditor';
 import { easeInOutCubic } from '../../infra/utils';
 
@@ -98,6 +99,63 @@ export class ViewPresetController {
     // 停止未完成的 RAF 动画，避免切换预设后仍继续拉动相机。
     if (this.viewTransitionRaf != null) cancelAnimationFrame(this.viewTransitionRaf);
     this.viewTransitionRaf = null;
+  }
+
+  /**
+   * 将相机（含 FOV / clip / position / orbit.target）补间到目标配置。
+   * 与 `setViewPreset` 共用同一套 RAF 槽位，互斥取消。
+   */
+  animateCameraTo(
+    next: SceneSettingsCamera,
+    opts: ViewTransitionOptions & { durationMs: number; onComplete?: () => void }
+  ) {
+    this.cancel();
+
+    const easing = opts.easing ?? easeInOutCubic;
+    const durationMs = Math.max(1, opts.durationMs);
+    const onComplete = opts.onComplete;
+
+    const fromFov = this.camera.fov;
+    const fromNear = this.camera.near;
+    const fromFar = this.camera.far;
+    const fromPos = this.camera.position.clone();
+    const fromTarget = this.orbit.target.clone();
+    const toPos = new THREE.Vector3(next.position.x, next.position.y, next.position.z);
+    const toTarget = new THREE.Vector3(next.target.x, next.target.y, next.target.z);
+
+    const start = performance.now();
+    const tick = (now: number) => {
+      const rawT = (now - start) / durationMs;
+      const t = rawT >= 1 ? 1 : rawT <= 0 ? 0 : rawT;
+      const k = easing(t);
+
+      if (t >= 1) {
+        this.camera.position.copy(toPos);
+        this.orbit.target.copy(toTarget);
+        this.camera.fov = next.fov;
+        this.camera.near = next.near;
+        this.camera.far = next.far;
+        this.camera.lookAt(this.orbit.target);
+        this.camera.updateProjectionMatrix();
+        this.orbit.update();
+        this.viewTransitionRaf = null;
+        onComplete?.();
+        return;
+      }
+
+      this.camera.fov = THREE.MathUtils.lerp(fromFov, next.fov, k);
+      this.camera.near = THREE.MathUtils.lerp(fromNear, next.near, k);
+      this.camera.far = THREE.MathUtils.lerp(fromFar, next.far, k);
+      this.camera.position.lerpVectors(fromPos, toPos, k);
+      this.orbit.target.lerpVectors(fromTarget, toTarget, k);
+      this.camera.lookAt(this.orbit.target);
+      this.camera.updateProjectionMatrix();
+      this.orbit.update();
+
+      this.viewTransitionRaf = requestAnimationFrame(tick);
+    };
+
+    this.viewTransitionRaf = requestAnimationFrame(tick);
   }
 
   private animateViewTo(

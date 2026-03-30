@@ -189,6 +189,7 @@ export interface AppMessages {
           cylinderTitle: string;
           torusTitle: string;
           theConduitTitle: string;
+          groupTitle: string;
         };
         attributes: {
           cube: {
@@ -505,7 +506,8 @@ export const appMessages: Record<Locale, AppMessages> = {
             coneTitle: '圆锥',
             cylinderTitle: '圆柱',
             torusTitle: '圆环',
-            theConduitTitle: '管道'
+            theConduitTitle: '管道',
+            groupTitle: '集合体'
           },
           attributes: {
             cube: {
@@ -815,7 +817,8 @@ export const appMessages: Record<Locale, AppMessages> = {
             coneTitle: 'Cone',
             cylinderTitle: 'Cylinder',
             torusTitle: 'Torus',
-            theConduitTitle: 'Conduit'
+            theConduitTitle: 'Conduit',
+            groupTitle: 'Group'
           },
           attributes: {
             cube: {

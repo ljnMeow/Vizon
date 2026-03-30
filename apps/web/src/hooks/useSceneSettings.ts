@@ -341,11 +341,34 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
   );
 
   const resetCamera = useCallback(() => {
-    update((prev) => ({
-      ...prev,
-      camera: { ...prev.camera, ...DEFAULT_CAMERA_SETTINGS }
-    }));
-  }, [update]);
+    const applyDefaultToState = () => {
+      update((prev) => ({
+        ...prev,
+        camera: { ...prev.camera, ...DEFAULT_CAMERA_SETTINGS }
+      }));
+    };
+
+    if (!editor) {
+      applyDefaultToState();
+      return;
+    }
+
+    const target = createDefaultSceneSettings().camera;
+    const reducedMotion =
+      typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    void (async () => {
+      try {
+        await editor.animateCameraTo(target, {
+          durationMs: reducedMotion ? 0 : 480,
+          immediate: reducedMotion
+        });
+      } catch {
+        // 与 setSceneSettings 一致：不阻塞 UI
+      }
+      applyDefaultToState();
+    })();
+  }, [editor, update]);
 
   const value = useMemo<SceneSettingsContextValue>(
     () => ({

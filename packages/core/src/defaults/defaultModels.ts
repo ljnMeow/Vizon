@@ -13,7 +13,8 @@ export type DefaultModelKey =
   | 'cone'
   | 'cylinder'
   | 'torus'
-  | 'theConduit';
+  | 'theConduit'
+  | 'group';
 
 export type Vec3Like = { x: number; y: number; z: number };
 
@@ -36,7 +37,8 @@ export const defaultModels: DefaultModelMeta[] = [
   { key: 'cone', label: 'cone' },
   { key: 'cylinder', label: 'cylinder' },
   { key: 'torus', label: 'torus' },
-  { key: 'theConduit', label: 'theConduit' }
+  { key: 'theConduit', label: 'theConduit' },
+  { key: 'group', label: 'group' }
 ];
 
 const DEFAULT_MESH_COLOR = 0x60a5fa;
@@ -65,71 +67,89 @@ function withDefaultUserData(root: THREE.Object3D, key: DefaultModelKey) {
   (root.userData as any).__vizonDefaultModelKey = key;
 }
 
-export function createDefaultModel(key: DefaultModelKey, opts?: CreateDefaultModelOptions) {
+export function createDefaultModel(key: DefaultModelKey, opts?: CreateDefaultModelOptions): THREE.Object3D {
   const mat = makeEmissiveMaterial(DEFAULT_MESH_COLOR);
-  let mesh: THREE.Mesh;
+  let root: THREE.Object3D;
 
   switch (key) {
     case 'cube': {
-      mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
       mesh.name = 'BoxGeometry';
       mesh.position.set(0, 0.5, 0);
+      root = mesh;
       break;
     }
     case 'sphere': {
       // 降低默认分段，兼顾视觉与编辑器实时性能。
-      mesh = new THREE.Mesh(new THREE.SphereGeometry(0.65, 32, 18), mat);
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.65, 32, 18), mat);
       mesh.name = 'SphereGeometry';
       mesh.position.set(0, 0.65, 0);
+      root = mesh;
       break;
     }
     case 'plane': {
-      mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
       mesh.name = 'PlaneGeometry';
       mesh.rotation.x = -Math.PI / 2;
       mesh.position.set(0, 0, 0);
+      root = mesh;
       break;
     }
     case 'circular': {
-      mesh = new THREE.Mesh(new THREE.CircleGeometry(0.75, 32), mat);
+      const mesh = new THREE.Mesh(new THREE.CircleGeometry(0.75, 32), mat);
       mesh.name = 'CircleGeometry';
       mesh.rotation.x = -Math.PI / 2;
       mesh.position.set(0, 0.02, 0);
+      root = mesh;
       break;
     }
     case 'cone': {
-      mesh = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.2, 24), mat);
+      const mesh = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.2, 24), mat);
       mesh.name = 'ConeGeometry';
       mesh.position.set(0, 0.6, 0);
+      root = mesh;
       break;
     }
     case 'cylinder': {
-      mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.2, 24), mat);
+      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.2, 24), mat);
       mesh.name = 'CylinderGeometry';
       mesh.position.set(0, 0.6, 0);
+      root = mesh;
       break;
     }
     case 'torus': {
-      mesh = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.18, 12, 48), mat);
+      const mesh = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.18, 12, 48), mat);
       mesh.name = 'TorusGeometry';
       mesh.position.set(0, 0.6, 0);
+      root = mesh;
       break;
     }
     case 'theConduit': {
       // Lightweight “straight pipe” approximation: tube along a line segment.
       // (TubeGeometry accepts any Curve; LineCurve3 gives a visually straight conduit.)
       const curve = new THREE.LineCurve3(new THREE.Vector3(-0.6, 0.0, -0.2), new THREE.Vector3(0.6, 0.0, 0.0));
-      mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 20, 0.14, 12, false), mat);
+      const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 20, 0.14, 12, false), mat);
       mesh.name = 'TubeGeometry';
       mesh.position.set(0, 0.65, 0);
+      root = mesh;
+      break;
+    }
+    case 'group': {
+      const group = new THREE.Group();
+      group.name = 'Group';
+      root = group;
       break;
     }
   }
 
-  withDefaultUserData(mesh, key);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  applyTransform(mesh, opts);
-  return mesh;
+  withDefaultUserData(root, key);
+  root.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+  applyTransform(root, opts);
+  return root;
 }
 

@@ -90,7 +90,7 @@ export function ObjectAttributes({
       return { modelKey: null as DefaultModelKey | null, modelTitle: '', geometryType: geometry?.type ?? '', attributes: null as AttributeItem[] | null };
     }
 
-    const SPECIAL_ATTRIBUTES_BY_MODEL: Record<DefaultModelKey, { title: string; items: AttributeItem[] }> = {
+    const SPECIAL_ATTRIBUTES_BY_MODEL: Partial<Record<DefaultModelKey, { title: string; items: AttributeItem[] }>> = {
       cube: {
         title: objAttrT.models.cubeTitle,
         items: [
@@ -180,10 +180,22 @@ export function ObjectAttributes({
             format: (v) => (v ? objAttrT.yesLabel : objAttrT.noLabel)
           }
         ]
+      },
+      group: {
+        title: objAttrT.models.groupTitle,
+        items: []
       }
     };
 
     const base = SPECIAL_ATTRIBUTES_BY_MODEL[key];
+    if (!base) {
+      return {
+        modelKey: key,
+        modelTitle: '',
+        geometryType: geometry?.type ?? '',
+        attributes: null as AttributeItem[] | null
+      };
+    }
 
     // TubeGeometry：把 pathControlPoints 做成“派生属性”，避免直接展示 curve 对象。
     if (key === 'theConduit') {
@@ -361,84 +373,88 @@ export function ObjectAttributes({
         </div>
       ) : null}
 
-      <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
-        {(() => {
-          // 这里重新读取 geometry.parameters，以便拿到最新 value。
-          const obj = editor?.scene?.getObjectByProperty?.('uuid', selectedInfo.uuid) as any;
-          const parameters = obj?.geometry?.parameters as Record<string, unknown> | undefined;
+      {attributes && attributes.length > 0 ? (
+        <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
+          {(() => {
+            // 这里重新读取 geometry.parameters，以便拿到最新 value。
+            const obj = editor?.scene?.getObjectByProperty?.('uuid', selectedInfo.uuid) as any;
+            const parameters = obj?.geometry?.parameters as Record<string, unknown> | undefined;
 
-          return (
-            <div className="space-y-2">
-              {attributes.map((it) => {
-                const getParamValue = () => {
-                  if (it.paramKey === 'pathControlPoints') {
-                    const path = parameters?.path as any;
-                    return Array.isArray(path?.points) ? path.points.length : it.fallback;
-                  }
+            return (
+              <div className="space-y-2">
+                {attributes.map((it) => {
+                  const getParamValue = () => {
+                    if (it.paramKey === 'pathControlPoints') {
+                      const path = parameters?.path as any;
+                      return Array.isArray(path?.points) ? path.points.length : it.fallback;
+                    }
 
-                  return parameters?.[it.paramKey] ?? it.fallback;
-                };
+                    return parameters?.[it.paramKey] ?? it.fallback;
+                  };
 
-                const v = getParamValue();
-                const num = typeof v === 'number' ? v : Number(v);
-                const meta = PARAM_META[it.paramKey];
-                const isInteger = meta?.integer ?? false;
-                const min = meta?.min ?? 0;
-                const max = meta?.max ?? 9999;
-                const step = meta?.step ?? 0.01;
-                const clampedCurrent = Number.isFinite(num) ? clamp(num, min, max) : min;
+                  const v = getParamValue();
+                  const num = typeof v === 'number' ? v : Number(v);
+                  const meta = PARAM_META[it.paramKey];
+                  const isInteger = meta?.integer ?? false;
+                  const min = meta?.min ?? 0;
+                  const max = meta?.max ?? 9999;
+                  const step = meta?.step ?? 0.01;
+                  const clampedCurrent = Number.isFinite(num) ? clamp(num, min, max) : min;
 
-                return (
-                  <div key={it.paramKey} className="space-y-1.5">
-                    <label className="block text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{it.label}</label>
-                    {it.paramKey === 'closed' ? (
-                      <label className="flex cursor-pointer items-center justify-between gap-3">
-                        <span className="text-[10px] font-semibold tabular-nums text-[var(--text-secondary)]">
-                          {Boolean(v) ? objAttrT.yesLabel : objAttrT.noLabel}
-                        </span>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(v)}
-                          onChange={(e) => applyParam(it.paramKey, e.target.checked)}
-                          className="h-4 w-4"
-                        />
+                  return (
+                    <div key={it.paramKey} className="space-y-1.5">
+                      <label className="block text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">
+                        {it.label}
                       </label>
-                    ) : (
-                      <input
-                        key={`${it.paramKey}-${refreshKey}`}
-                        type="number"
-                        inputMode="decimal"
-                        step={step}
-                        min={min}
-                        max={max}
-                        defaultValue={clampedCurrent}
-                        onBlur={(e) => {
-                          const next = e.target.valueAsNumber;
-                          if (!Number.isFinite(next)) {
-                            // 不允许空值：回退到当前有效值
-                            e.currentTarget.value = String(clampedCurrent);
-                            return;
-                          }
+                      {it.paramKey === 'closed' ? (
+                        <label className="flex cursor-pointer items-center justify-between gap-3">
+                          <span className="text-[10px] font-semibold tabular-nums text-[var(--text-secondary)]">
+                            {Boolean(v) ? objAttrT.yesLabel : objAttrT.noLabel}
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(v)}
+                            onChange={(e) => applyParam(it.paramKey, e.target.checked)}
+                            className="h-4 w-4"
+                          />
+                        </label>
+                      ) : (
+                        <input
+                          key={`${it.paramKey}-${refreshKey}`}
+                          type="number"
+                          inputMode="decimal"
+                          step={step}
+                          min={min}
+                          max={max}
+                          defaultValue={clampedCurrent}
+                          onBlur={(e) => {
+                            const next = e.target.valueAsNumber;
+                            if (!Number.isFinite(next)) {
+                              // 不允许空值：回退到当前有效值
+                              e.currentTarget.value = String(clampedCurrent);
+                              return;
+                            }
 
-                          const clamped = clamp(next, min, max);
-                          const applied = isInteger ? Math.round(clamped) : clamped;
-                          e.currentTarget.value = String(applied);
-                          applyParam(it.paramKey, applied);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key !== 'Enter') return;
-                          e.currentTarget.blur();
-                        }}
-                        className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors disabled:opacity-60 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
-      </div>
+                            const clamped = clamp(next, min, max);
+                            const applied = isInteger ? Math.round(clamped) : clamped;
+                            e.currentTarget.value = String(applied);
+                            applyParam(it.paramKey, applied);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key !== 'Enter') return;
+                            e.currentTarget.blur();
+                          }}
+                          className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors disabled:opacity-60 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      ) : null}
     </div>
   );
 }
