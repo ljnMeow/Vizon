@@ -44,13 +44,11 @@ export const defaultModels: DefaultModelMeta[] = [
 const DEFAULT_MESH_COLOR = 0x60a5fa;
 
 function makeEmissiveMaterial(color: number) {
-  // 自带 emissive 可在弱光环境下看清形体；roughness/metalness 为朴素 PBR 占位
-  return new THREE.MeshStandardMaterial({
+  // MeshBasicMaterial 不受光照影响，默认就能保证在弱光/无灯情况下可见。
+  return new THREE.MeshBasicMaterial({
     color,
-    roughness: 0.45,
-    metalness: 0.05,
-    emissive: new THREE.Color(color),
-    emissiveIntensity: 0.6
+    // 显式指定默认渲染面，避免默认值在不同材质/three 版本行为差异。
+    side: THREE.FrontSide,
   });
 }
 

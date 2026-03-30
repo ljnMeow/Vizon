@@ -148,6 +148,59 @@ export interface AppMessages {
       propertiesSettings: {
         baseSettingTitle: string;
         typeLabel: string;
+        materialTypeLabel: string;
+        materialTypeOptions: {
+          MeshBasicMaterial: string;
+          MeshDepthMaterial: string;
+          MeshNormalMaterial: string;
+          MeshMatcapMaterial: string;
+          MeshLambertMaterial: string;
+          MeshPhongMaterial: string;
+          MeshToonMaterial: string;
+          MeshStandardMaterial: string;
+          MeshPhysicalMaterial: string;
+          PointsMaterial: string;
+          LineBasicMaterial: string;
+          ShadowMaterial: string;
+          ShaderMaterial: string;
+        };
+        materialColorLabel: string;
+        materialVertexColorLabel: string;
+        materialVertexColorEnabledLabel: string;
+        materialOpacityLabel: string;
+        materialWireframeLabel: string;
+        materialFogLabel: string;
+        materialSideLabel: string;
+        materialSideOptions: {
+          FrontSide: string;
+          BackSide: string;
+          DoubleSide: string;
+        };
+        materialRoughnessLabel: string;
+        materialMetalnessLabel: string;
+        materialShininessLabel: string;
+        materialSpecularLabel: string;
+        materialEmissiveLabel: string;
+        materialEmissiveIntensityLabel: string;
+        materialGradientScaleLabel: string;
+        materialNormalScaleXLabel: string;
+        materialNormalScaleYLabel: string;
+        materialFlatShadingLabel: string;
+        materialBlendingLabel: string;
+        materialBlendingOptions: {
+          NoBlending: string;
+          NormalBlending: string;
+          AdditiveBlending: string;
+          SubtractiveBlending: string;
+          MultiplyBlending: string;
+        };
+        materialBlendingDescriptions: {
+          NoBlending: string;
+          NormalBlending: string;
+          AdditiveBlending: string;
+          SubtractiveBlending: string;
+          MultiplyBlending: string;
+        };
         nameLabel: string;
         namePlaceholder: string;
         uuidLabel: string;
@@ -466,6 +519,59 @@ export const appMessages: Record<Locale, AppMessages> = {
         propertiesSettings: {
           baseSettingTitle: '通用属性',
           typeLabel: '类型',
+          materialTypeLabel: '材质类型',
+          materialTypeOptions: {
+            MeshBasicMaterial: '基础材质',
+            MeshDepthMaterial: '深度材质',
+            MeshNormalMaterial: '法线材质',
+            MeshMatcapMaterial: 'Matcap 材质',
+            MeshLambertMaterial: 'Lambert 漫反射',
+            MeshPhongMaterial: 'Phong 高光',
+            MeshToonMaterial: '卡通材质',
+            MeshStandardMaterial: '标准 PBR',
+            MeshPhysicalMaterial: '物理 PBR',
+            PointsMaterial: '点材质',
+            LineBasicMaterial: '线材质',
+            ShadowMaterial: '阴影材质',
+            ShaderMaterial: '自定义 Shader'
+          },
+          materialColorLabel: '颜色',
+          materialVertexColorLabel: '顶点颜色',
+          materialVertexColorEnabledLabel: '启用顶点颜色',
+          materialOpacityLabel: '不透明度',
+          materialWireframeLabel: '线框',
+          materialFogLabel: '雾',
+          materialSideLabel: '面',
+          materialSideOptions: {
+            FrontSide: '正面',
+            BackSide: '背面',
+            DoubleSide: '双面'
+          },
+          materialRoughnessLabel: '粗糙度',
+          materialMetalnessLabel: '金属度',
+          materialShininessLabel: '高光',
+          materialSpecularLabel: '镜面',
+          materialEmissiveLabel: '自发光',
+          materialEmissiveIntensityLabel: '自发光强度',
+          materialGradientScaleLabel: '渐变缩放',
+          materialNormalScaleXLabel: '法线缩放 X',
+          materialNormalScaleYLabel: '法线缩放 Y',
+          materialFlatShadingLabel: '平面着色',
+          materialBlendingLabel: '混合模式',
+          materialBlendingOptions: {
+            NoBlending: '无混合',
+            NormalBlending: '默认',
+            AdditiveBlending: '加法混合',
+            SubtractiveBlending: '减法混合',
+            MultiplyBlending: '乘法混合',
+          },
+          materialBlendingDescriptions: {
+            NoBlending: '提高性能（不透明物体）。',
+            NormalBlending: '普通透明物体（玻璃、塑料）。',
+            AdditiveBlending: '发光效果、激光、火焰、粒子。',
+            SubtractiveBlending: '阴影效果、特殊的滤镜效果。',
+            MultiplyBlending: '类似 Photoshop 的正片叠底，使画面变暗。',
+          },
           nameLabel: '名称',
           namePlaceholder: '请输入名称',
           uuidLabel: 'UUID',
@@ -777,6 +883,59 @@ export const appMessages: Record<Locale, AppMessages> = {
         propertiesSettings: {
           baseSettingTitle: 'Common Properties',
           typeLabel: 'Type',
+          materialTypeLabel: 'Material Type',
+          materialTypeOptions: {
+            MeshBasicMaterial: 'MeshBasicMaterial',
+            MeshDepthMaterial: 'MeshDepthMaterial',
+            MeshNormalMaterial: 'MeshNormalMaterial',
+            MeshMatcapMaterial: 'MeshMatcapMaterial',
+            MeshLambertMaterial: 'MeshLambertMaterial',
+            MeshPhongMaterial: 'MeshPhongMaterial',
+            MeshToonMaterial: 'MeshToonMaterial',
+            MeshStandardMaterial: 'MeshStandardMaterial',
+            MeshPhysicalMaterial: 'MeshPhysicalMaterial',
+            PointsMaterial: 'PointsMaterial',
+            LineBasicMaterial: 'LineBasicMaterial',
+            ShadowMaterial: 'ShadowMaterial',
+            ShaderMaterial: 'ShaderMaterial'
+          },
+          materialColorLabel: 'Color',
+          materialVertexColorLabel: 'Vertex Color',
+          materialVertexColorEnabledLabel: 'Enable Vertex Color',
+          materialOpacityLabel: 'Opacity',
+          materialWireframeLabel: 'Wireframe',
+          materialFogLabel: 'Fog',
+          materialSideLabel: 'Side',
+          materialSideOptions: {
+            FrontSide: 'FrontSide',
+            BackSide: 'BackSide',
+            DoubleSide: 'DoubleSide'
+          },
+          materialRoughnessLabel: 'Roughness',
+          materialMetalnessLabel: 'Metalness',
+          materialShininessLabel: 'Shininess',
+          materialSpecularLabel: 'Specular',
+          materialEmissiveLabel: 'Emissive',
+          materialEmissiveIntensityLabel: 'Emissive Intensity',
+          materialGradientScaleLabel: 'Gradient Scale',
+          materialNormalScaleXLabel: 'Normal Scale X',
+          materialNormalScaleYLabel: 'Normal Scale Y',
+          materialFlatShadingLabel: 'Flat Shading',
+          materialBlendingLabel: 'Blending Mode',
+          materialBlendingOptions: {
+            NoBlending: 'NoBlending',
+            NormalBlending: 'NormalBlending',
+            AdditiveBlending: 'AdditiveBlending',
+            SubtractiveBlending: 'SubtractiveBlending',
+            MultiplyBlending: 'MultiplyBlending',
+          },
+          materialBlendingDescriptions: {
+            NoBlending: '',
+            NormalBlending: '',
+            AdditiveBlending: '',
+            SubtractiveBlending: '',
+            MultiplyBlending: '',
+          },
           nameLabel: 'Name',
           namePlaceholder: 'Enter name',
           uuidLabel: 'UUID',

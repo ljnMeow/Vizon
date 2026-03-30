@@ -6,6 +6,7 @@ import { useSceneSettings } from '../../../hooks/useSceneSettings';
 import { appMessages } from '../../../i18n/messages';
 import { SceneSettings } from './SceneSettings/index';
 import { PropertiesSettings } from './Properties/index';
+import { MaterialSettings } from './Material/index';
 
 type InspectorTab = 'scene' | 'data' | 'interaction' | 'properties' | 'materials' | 'effects';
 
@@ -94,6 +95,8 @@ export function InspectorPanel({ visible }: { visible: boolean }) {
           <div className="h-full overflow-y-auto p-3 text-xs text-[var(--text-muted)]">
             {key === 'scene' ? (
               <SceneSettings />
+            ) : key === 'materials' ? (
+              <MaterialSettings />
             ) : key === 'properties' ? (
               <PropertiesSettings />
             ) : (
