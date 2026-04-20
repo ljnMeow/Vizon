@@ -168,7 +168,13 @@ export interface AppMessages {
         materialVertexColorLabel: string;
         materialVertexColorEnabledLabel: string;
         materialOpacityLabel: string;
+        materialTransparentEnabledLabel: string;
         materialWireframeLabel: string;
+        materialForceSingleChannelLabel: string;
+        materialForceSingleChannelHint: string;
+        materialAlphaTestLabel: string;
+        materialDepthTestLabel: string;
+        materialDepthWriteLabel: string;
         materialFogLabel: string;
         materialSideLabel: string;
         materialSideOptions: {
@@ -200,6 +206,54 @@ export interface AppMessages {
           AdditiveBlending: string;
           SubtractiveBlending: string;
           MultiplyBlending: string;
+        };
+        /** 贴图设置面板 */
+        materialTextureMapsTitle: string;
+        materialTextureDebugDisableAllLabel: string;
+        materialTextureDebugDisableOneLabel: string;
+        materialTextureMapsGroupBasic: string;
+        materialTextureMapsGroupLighting: string;
+        materialTextureMapsGroupNormal: string;
+        materialTextureMapsGroupPbr: string;
+        materialTextureMapsGroupAdvanced: string;
+        materialTextureUpload: string;
+        materialTextureClear: string;
+        materialTextureEmpty: string;
+        materialTextureNameFallback: string;
+        materialTexturePropEnvMapIntensity: string;
+        materialTexturePropAoMapIntensity: string;
+        materialTexturePropNormalScale: string;
+        materialTexturePropNormalScaleX: string;
+        materialTexturePropNormalScaleY: string;
+        materialTexturePropClearcoatNormalScale: string;
+        materialTexturePropClearcoatNormalScaleX: string;
+        materialTexturePropClearcoatNormalScaleY: string;
+        materialTextureFieldLabels: {
+          map: string;
+          envMap: string;
+          alphaMap: string;
+          lightMap: string;
+          aoMap: string;
+          specularMap: string;
+          emissiveMap: string;
+          bumpMap: string;
+          normalMap: string;
+          displacementMap: string;
+          roughnessMap: string;
+          metalnessMap: string;
+          gradientMap: string;
+          anisotropyMap: string;
+          clearcoatMap: string;
+          clearcoatRoughnessMap: string;
+          clearcoatNormalMap: string;
+          iridescenceMap: string;
+          iridescenceThicknessMap: string;
+          sheenColorMap: string;
+          sheenRoughnessMap: string;
+          transmissionMap: string;
+          thicknessMap: string;
+          specularIntensityMap: string;
+          specularColorMap: string;
         };
         nameLabel: string;
         namePlaceholder: string;
@@ -539,7 +593,13 @@ export const appMessages: Record<Locale, AppMessages> = {
           materialVertexColorLabel: '顶点颜色',
           materialVertexColorEnabledLabel: '启用顶点颜色',
           materialOpacityLabel: '不透明度',
+          materialTransparentEnabledLabel: '透明性',
           materialWireframeLabel: '线框',
+          materialForceSingleChannelLabel: '强制单通道',
+          materialForceSingleChannelHint: '仅在开启抗锯齿（MSAA）时效果更明显。',
+          materialAlphaTestLabel: 'α 测试阀值',
+          materialDepthTestLabel: '深度测试',
+          materialDepthWriteLabel: '深度写入',
           materialFogLabel: '雾',
           materialSideLabel: '面',
           materialSideOptions: {
@@ -571,6 +631,53 @@ export const appMessages: Record<Locale, AppMessages> = {
             AdditiveBlending: '发光效果、激光、火焰、粒子。',
             SubtractiveBlending: '阴影效果、特殊的滤镜效果。',
             MultiplyBlending: '类似 Photoshop 的正片叠底，使画面变暗。',
+          },
+          materialTextureMapsTitle: '贴图设置',
+          materialTextureDebugDisableAllLabel: '调试：禁用贴图',
+          materialTextureDebugDisableOneLabel: '是否开启',
+          materialTextureMapsGroupBasic: '基础',
+          materialTextureMapsGroupLighting: '光照',
+          materialTextureMapsGroupNormal: '法线',
+          materialTextureMapsGroupPbr: 'PBR',
+          materialTextureMapsGroupAdvanced: '高级',
+          materialTextureUpload: '上传',
+          materialTextureClear: '清除',
+          materialTextureEmpty: '无',
+          materialTextureNameFallback: '贴图',
+          materialTexturePropEnvMapIntensity: '环境强度 (envMapIntensity)',
+          materialTexturePropAoMapIntensity: '遮蔽强度 (aoMapIntensity)',
+          materialTexturePropNormalScale: '法线强度 (normalScale)',
+          materialTexturePropNormalScaleX: '法线缩放 X',
+          materialTexturePropNormalScaleY: '法线缩放 Y',
+          materialTexturePropClearcoatNormalScale: '清漆法线强度 (clearcoatNormalScale)',
+          materialTexturePropClearcoatNormalScaleX: '清漆法线缩放 X',
+          materialTexturePropClearcoatNormalScaleY: '清漆法线缩放 Y',
+          materialTextureFieldLabels: {
+            map: '颜色贴图 (map)',
+            envMap: '环境贴图 (envMap)',
+            alphaMap: '透明度贴图 (alphaMap)',
+            lightMap: '光照贴图 (lightMap)',
+            aoMap: '环境光遮蔽 (aoMap)',
+            specularMap: '高光贴图 (specularMap)',
+            emissiveMap: '自发光贴图 (emissiveMap)',
+            bumpMap: '凹凸贴图 (bumpMap)',
+            normalMap: '法线贴图 (normalMap)',
+            displacementMap: '位移贴图 (displacementMap)',
+            roughnessMap: '粗糙度贴图 (roughnessMap)',
+            metalnessMap: '金属度贴图 (metalnessMap)',
+            gradientMap: '渐变贴图 (gradientMap)',
+            anisotropyMap: '各向异性贴图 (anisotropyMap)',
+            clearcoatMap: '清漆贴图 (clearcoatMap)',
+            clearcoatRoughnessMap: '清漆粗糙度 (clearcoatRoughnessMap)',
+            clearcoatNormalMap: '清漆法线 (clearcoatNormalMap)',
+            iridescenceMap: '薄膜干涉 (iridescenceMap)',
+            iridescenceThicknessMap: '薄膜厚度 (iridescenceThicknessMap)',
+            sheenColorMap: '布料光泽颜色 (sheenColorMap)',
+            sheenRoughnessMap: '布料光泽粗糙度 (sheenRoughnessMap)',
+            transmissionMap: '透射贴图 (transmissionMap)',
+            thicknessMap: '厚度贴图 (thicknessMap)',
+            specularIntensityMap: '镜面强度 (specularIntensityMap)',
+            specularColorMap: '镜面颜色 (specularColorMap)',
           },
           nameLabel: '名称',
           namePlaceholder: '请输入名称',
@@ -903,7 +1010,13 @@ export const appMessages: Record<Locale, AppMessages> = {
           materialVertexColorLabel: 'Vertex Color',
           materialVertexColorEnabledLabel: 'Enable Vertex Color',
           materialOpacityLabel: 'Opacity',
+          materialTransparentEnabledLabel: 'Transparency',
           materialWireframeLabel: 'Wireframe',
+          materialForceSingleChannelLabel: 'Force Single Channel',
+          materialForceSingleChannelHint: 'Most visible when MSAA antialiasing is enabled.',
+          materialAlphaTestLabel: 'Alpha Test Threshold',
+          materialDepthTestLabel: 'Depth Test',
+          materialDepthWriteLabel: 'Depth Write',
           materialFogLabel: 'Fog',
           materialSideLabel: 'Side',
           materialSideOptions: {
@@ -935,6 +1048,53 @@ export const appMessages: Record<Locale, AppMessages> = {
             AdditiveBlending: '',
             SubtractiveBlending: '',
             MultiplyBlending: '',
+          },
+          materialTextureMapsTitle: 'Texture maps',
+          materialTextureDebugDisableAllLabel: 'Debug: disable textures',
+          materialTextureDebugDisableOneLabel: 'Enabled',
+          materialTextureMapsGroupBasic: 'Basic',
+          materialTextureMapsGroupLighting: 'Lighting',
+          materialTextureMapsGroupNormal: 'Normal',
+          materialTextureMapsGroupPbr: 'PBR',
+          materialTextureMapsGroupAdvanced: 'Advanced',
+          materialTextureUpload: 'Upload',
+          materialTextureClear: 'Clear',
+          materialTextureEmpty: 'None',
+          materialTextureNameFallback: 'Texture',
+          materialTexturePropEnvMapIntensity: 'Environment intensity (envMapIntensity)',
+          materialTexturePropAoMapIntensity: 'Occlusion intensity (aoMapIntensity)',
+          materialTexturePropNormalScale: 'Normal scale (normalScale)',
+          materialTexturePropNormalScaleX: 'Normal scale X',
+          materialTexturePropNormalScaleY: 'Normal scale Y',
+          materialTexturePropClearcoatNormalScale: 'Clearcoat normal scale (clearcoatNormalScale)',
+          materialTexturePropClearcoatNormalScaleX: 'Clearcoat normal scale X',
+          materialTexturePropClearcoatNormalScaleY: 'Clearcoat normal scale Y',
+          materialTextureFieldLabels: {
+            map: 'Color map (map)',
+            envMap: 'Environment map (envMap)',
+            alphaMap: 'Alpha map (alphaMap)',
+            lightMap: 'Light map (lightMap)',
+            aoMap: 'Ambient occlusion (aoMap)',
+            specularMap: 'Specular map (specularMap)',
+            emissiveMap: 'Emissive map (emissiveMap)',
+            bumpMap: 'Bump map (bumpMap)',
+            normalMap: 'Normal map (normalMap)',
+            displacementMap: 'Displacement map (displacementMap)',
+            roughnessMap: 'Roughness map (roughnessMap)',
+            metalnessMap: 'Metalness map (metalnessMap)',
+            gradientMap: 'Gradient map (gradientMap)',
+            anisotropyMap: 'Anisotropy map (anisotropyMap)',
+            clearcoatMap: 'Clearcoat map (clearcoatMap)',
+            clearcoatRoughnessMap: 'Clearcoat roughness (clearcoatRoughnessMap)',
+            clearcoatNormalMap: 'Clearcoat normal (clearcoatNormalMap)',
+            iridescenceMap: 'Iridescence (iridescenceMap)',
+            iridescenceThicknessMap: 'Iridescence thickness (iridescenceThicknessMap)',
+            sheenColorMap: 'Sheen color (sheenColorMap)',
+            sheenRoughnessMap: 'Sheen roughness (sheenRoughnessMap)',
+            transmissionMap: 'Transmission map (transmissionMap)',
+            thicknessMap: 'Thickness map (thicknessMap)',
+            specularIntensityMap: 'Specular intensity (specularIntensityMap)',
+            specularColorMap: 'Specular color (specularColorMap)',
           },
           nameLabel: 'Name',
           namePlaceholder: 'Enter name',

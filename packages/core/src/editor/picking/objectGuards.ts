@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VIZON_USER_DATA_KEYS } from '../../infra/utils';
 
 /**
  * 拾取与场景树共用的「对象是否可选 / 是否可见」判断。
@@ -15,7 +16,7 @@ export function isNonSelectableInHierarchy(obj: THREE.Object3D) {
   let cur: THREE.Object3D | null = obj; // 从命中节点开始
   while (cur) {
     // 祖先链上任一处标记则整支参与交互时排除（helper、gizmo 子部件常用此标记）
-    if ((cur.userData as any).__vizonNonSelectable) return true;
+    if ((cur.userData as any)[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE]) return true;
     cur = cur.parent; // 向场景根回溯
   }
   return false; // 整条链上均未禁止选择
@@ -31,7 +32,7 @@ export function isNonSelectableInHierarchy(obj: THREE.Object3D) {
 export function isNonPickableInHierarchy(obj: THREE.Object3D) {
   let cur: THREE.Object3D | null = obj;
   while (cur) {
-    if ((cur.userData as any)?.__vizonNonPickable) return true;
+    if ((cur.userData as any)?.[VIZON_USER_DATA_KEYS.COMMON.NON_PICKABLE]) return true;
     cur = cur.parent;
   }
   return false;

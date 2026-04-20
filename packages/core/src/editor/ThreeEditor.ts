@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { OrbitControls, TransformControls } from 'three-stdlib';
 import { Emitter } from '../infra/events';
+import { VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '../infra/utils';
 import type { RendererSettings, SceneSettings } from '../settings/sceneSettings';
 import type { SceneTreeNode } from '../settings/sceneTree';
 import { createDefaultSceneSettings, normalizeSceneSettings } from '../settings/sceneSettings';
@@ -8,6 +9,7 @@ import { calcSceneSettingsDiff } from '../settings/sceneSettingsDiff';
 import { AssetLoader } from './controllers/AssetLoader';
 import { CameraController } from './controllers/CameraController';
 import { EnvironmentController } from './controllers/EnvironmentController';
+import { EffectsController } from './controllers/EffectsController';
 import { HelperController } from './controllers/HelperController';
 import { InteractionController } from './controllers/InteractionController';
 import { RendererController } from './controllers/RendererController';
@@ -148,6 +150,7 @@ export class ThreeEditor {
   private cameraController: CameraController;
   private environmentController: EnvironmentController;
   private helperController: HelperController;
+  private effectsController: EffectsController;
   private conduitEditController: ConduitEditController;
   private viewPresetController: ViewPresetController;
   private sceneTreeController: SceneTreeController;
@@ -241,6 +244,7 @@ export class ThreeEditor {
     this.cameraController = new CameraController();
     this.environmentController = new EnvironmentController();
     this.helperController = new HelperController();
+    this.effectsController = new EffectsController(this.scene, this.camera);
     this.sceneTreeController = new SceneTreeController();
     this.staticObjectFreezeController = new StaticObjectFreezeController();
     // 加载器持有 scene 引用，便于 `loadGLTF` 默认 add
@@ -258,6 +262,7 @@ export class ThreeEditor {
     // 首屏 renderer：alpha true 便于与 DOM 背景融合（见 RendererController 实现）
     this.renderer = this.rendererController.createRenderer(this.sceneSettings.renderer.antialias);
     this.rendererController.applyRendererSettings(this.renderer, this.sceneSettings.renderer);
+    this.effectsController.bindRenderer(this.renderer);
 
     // 创建 Orbit + TransformControls，挂到 scene 与 domElement；restore 当前无选中故 detach
     const { orbit, transform } = this.interactionController.recreateControls({
@@ -372,6 +377,7 @@ export class ThreeEditor {
       this.renderer = recreated.renderer;
       this.orbit = recreated.orbit;
       this.transform = recreated.transform;
+      this.effectsController.bindRenderer(this.renderer);
       this.conduitEditController = new ConduitEditController({ scene: this.scene, camera: this.camera, orbit: this.orbit });
       this.conduitEditController.setDomElement(this.renderer.domElement);
       this.bindTransformDragHooks();
@@ -452,7 +458,7 @@ export class ThreeEditor {
     this.conduitEditController?.update();
     this.updateSelectionBoxHelper(); // 可能创建/更新 BoxHelper
 
-    this.renderer.render(this.scene, this.camera); // 单视口单相机
+    this.effectsController.render(this.renderer);
   }
 
   /**
@@ -463,6 +469,7 @@ export class ThreeEditor {
     const dpr = pixelRatio ?? Math.min(window.devicePixelRatio || 1, 2);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(width, height, false);
+    this.effectsController.resize(width, height, dpr);
     const aspect = Math.max(1e-6, width) / Math.max(1e-6, height);
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
@@ -601,7 +608,9 @@ export class ThreeEditor {
     this.scene.add(object);
     // 默认相机 helper：作为独立对象加入 scene，避免作为子节点导致二次变换偏移。
     if ((object as any).isCamera) {
-      const helper = (object.userData as any)?.__vizonCameraHelper as THREE.CameraHelper | undefined;
+      const helper = (object.userData as any)?.[VIZON_USER_DATA_KEYS.HELPERS.CAMERA_HELPER] as
+        | THREE.CameraHelper
+        | undefined;
       if (helper && !this.cameraHelpers.has(object.uuid)) {
         this.cameraHelpers.set(object.uuid, helper);
         this.scene.add(helper);
@@ -610,7 +619,9 @@ export class ThreeEditor {
       }
     }
     if ((object as any).isLight) {
-      const helper = (object.userData as any)?.__vizonLightHelper as THREE.Object3D | undefined;
+      const helper = (object.userData as any)?.[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] as
+        | THREE.Object3D
+        | undefined;
       if (helper && !this.lightHelpers.has(object.uuid)) {
         this.lightHelpers.set(object.uuid, helper);
         this.scene.add(helper);
@@ -813,7 +824,7 @@ export class ThreeEditor {
       if (obj === this.transform || this.isTransformChild(obj)) return false;
       // 排除编辑器辅助对象与显式标记隐藏对象
       if ((obj as any).isTransformControls) return false;
-      if ((obj.userData as any)?.hideInEditor) return false;
+      if ((obj.userData as any)?.[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR]) return false;
       if (obj.type.endsWith('Helper')) return false;
       // 一些不可选对象也不应作为放置落点（例如网格/坐标轴）
       if (isNonSelectableInHierarchy(obj)) return false;
@@ -902,6 +913,7 @@ export class ThreeEditor {
     this.viewPresetController.cancel();
     this.interactionController.dispose();
     this.environmentController.dispose();
+    this.effectsController.dispose();
     this.helperController.dispose();
     // pointer events are bound to renderer.domElement; disposing editor should abort them
     // (controller keeps its own AbortController)
@@ -956,7 +968,9 @@ export class ThreeEditor {
 
   private updateSelectionBoxHelper() {
     const sel = this.selected;
-    if (!sel || sel.children.length === 0) {
+    // 当对象已启用“特效边框”（OutlinePass）时，关闭旧的 BoxHelper 指示器，
+    // 避免出现“对象轮廓 + 指示器框”双重边框。
+    if (!sel || sel.children.length === 0 || this.hasOutlineBorderEffect(sel)) {
       this.disposeSelectionBoxHelper();
       return;
     }
@@ -967,8 +981,8 @@ export class ThreeEditor {
       this.disposeSelectionBoxHelper();
       const box = new THREE.BoxHelper(sel, 0xff0000);
       box.name = 'VizonSelectionBoxHelper';
-      (box.userData as { __vizonNonSelectable?: boolean; hideInEditor?: boolean }).__vizonNonSelectable = true;
-      (box.userData as { hideInEditor?: boolean }).hideInEditor = true;
+      (box.userData as Record<string, boolean | undefined>)[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE] = true;
+      (box.userData as Record<string, boolean | undefined>)[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR] = true;
       const mat = box.material as THREE.LineBasicMaterial;
       mat.depthTest = false;
       mat.transparent = true;
@@ -979,6 +993,17 @@ export class ThreeEditor {
       this.selectionBoxHelper = box;
     }
     this.selectionBoxHelper!.update();
+  }
+
+  private hasOutlineBorderEffect(root: THREE.Object3D) {
+    let enabled = false;
+    root.traverse((obj) => {
+      if (enabled) return;
+      if (!(obj as any).isMesh) return;
+      const borderEnabled = Boolean((obj.userData as any)?.[VIZON_STORAGE_KEYS.EFFECTS]?.borderEnabled);
+      if (borderEnabled) enabled = true;
+    });
+    return enabled;
   }
 
   private disposeSelectionBoxHelper() {

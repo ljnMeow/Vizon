@@ -4,6 +4,7 @@
  * 使用 emissive 略提亮，在场景尚未布置灯光时仍可辨认形状；非 PBR 工作流最终应由用户替换材质。
  */
 import * as THREE from 'three';
+import { VIZON_USER_DATA_KEYS } from '../infra/utils';
 
 export type DefaultModelKey =
   | 'cube'
@@ -61,8 +62,8 @@ function applyTransform(root: THREE.Object3D, opts?: CreateDefaultModelOptions) 
 
 function withDefaultUserData(root: THREE.Object3D, key: DefaultModelKey) {
   // userData is intentionally flexible; we use it as a lightweight bridge for UI.
-  (root.userData as any).__vizonDefaultModel = true;
-  (root.userData as any).__vizonDefaultModelKey = key;
+  (root.userData as any)[VIZON_USER_DATA_KEYS.DEFAULTS.DEFAULT_MODEL] = true;
+  (root.userData as any)[VIZON_USER_DATA_KEYS.DEFAULTS.DEFAULT_MODEL_KEY] = key;
 }
 
 export function createDefaultModel(key: DefaultModelKey, opts?: CreateDefaultModelOptions): THREE.Object3D {

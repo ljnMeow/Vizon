@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { isNonSelectableInHierarchy } from '../picking/objectGuards';
 import { configureRaycasterForScenePicking } from '../picking/pickLayers';
-import { clamp, computeAverageCenterVec3, fromVec3, toVec3, type XYZ } from '../../infra/utils';
+import { clamp, computeAverageCenterVec3, fromVec3, toVec3, VIZON_USER_DATA_KEYS, type XYZ } from '../../infra/utils';
 
 type ConduitPoint = XYZ;
 
@@ -14,11 +14,11 @@ function ensureConduitPointsLocal(mesh: THREE.Mesh): ConduitPoint[] {
   const ud = mesh.userData as any;
   const CURRENT_POINTS_VERSION = 2;
   if (
-    ud.__vizonConduitPointsLocalVersion === CURRENT_POINTS_VERSION &&
-    Array.isArray(ud.__vizonConduitPointsLocal) &&
-    ud.__vizonConduitPointsLocal.length >= 2
+    ud[VIZON_USER_DATA_KEYS.CONDUIT.POINTS_LOCAL_VERSION] === CURRENT_POINTS_VERSION &&
+    Array.isArray(ud[VIZON_USER_DATA_KEYS.CONDUIT.POINTS_LOCAL]) &&
+    ud[VIZON_USER_DATA_KEYS.CONDUIT.POINTS_LOCAL].length >= 2
   ) {
-    return ud.__vizonConduitPointsLocal as ConduitPoint[];
+    return ud[VIZON_USER_DATA_KEYS.CONDUIT.POINTS_LOCAL] as ConduitPoint[];
   }
 
   // 尝试从 TubeGeometry.parameters.path 推断点：
@@ -42,8 +42,8 @@ function ensureConduitPointsLocal(mesh: THREE.Mesh): ConduitPoint[] {
     pts = [fromVec3(new THREE.Vector3(-0.6, 0, -0.2)), fromVec3(new THREE.Vector3(0.6, 0, 0))];
   }
 
-  ud.__vizonConduitPointsLocal = pts;
-  ud.__vizonConduitPointsLocalVersion = CURRENT_POINTS_VERSION;
+  ud[VIZON_USER_DATA_KEYS.CONDUIT.POINTS_LOCAL] = pts;
+  ud[VIZON_USER_DATA_KEYS.CONDUIT.POINTS_LOCAL_VERSION] = CURRENT_POINTS_VERSION;
   return pts;
 }
 
@@ -172,8 +172,8 @@ export class ConduitEditController {
   private resolveConduit(selected: THREE.Object3D | null): THREE.Mesh | null {
     if (!selected) return null;
     const obj: any = selected;
-    const isConduit = obj?.userData?.__vizonDefaultModelKey === 'theConduit';
-    const enabled = Boolean(obj?.userData?.__vizonConduitEditEnabled);
+    const isConduit = obj?.userData?.[VIZON_USER_DATA_KEYS.DEFAULTS.DEFAULT_MODEL_KEY] === 'theConduit';
+    const enabled = Boolean(obj?.userData?.[VIZON_USER_DATA_KEYS.CONDUIT.EDIT_ENABLED]);
     if (isConduit && enabled && (obj as any).isMesh) return obj as THREE.Mesh;
     return null;
   }
@@ -198,7 +198,7 @@ export class ConduitEditController {
 
     const group = new THREE.Group();
     group.name = 'VizonConduitEditHelpers';
-    (group.userData as any).hideInEditor = true;
+    (group.userData as any)[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR] = true;
     // 这里的策略是：节点保持在“内容层”参与可见/拾取过滤，
     // 同时通过材质 depthTest=false 来达到 overlay 式的“更容易看清”效果。
     group.renderOrder = 998;
@@ -241,10 +241,10 @@ export class ConduitEditController {
         });
         const node = new THREE.Mesh(g, m);
         node.name = `VizonConduitNode-${index}`;
-        (node.userData as any).hideInEditor = true;
-        (node.userData as any).__vizonConduitNode = { index };
+        (node.userData as any)[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR] = true;
+        (node.userData as any)[VIZON_USER_DATA_KEYS.CONDUIT.NODE_META] = { index };
         node.renderOrder = 999;
-        (node.userData as any).__vizonPickTarget = conduit;
+        (node.userData as any)[VIZON_USER_DATA_KEYS.COMMON.PICK_TARGET] = conduit;
         this.helperGroup!.add(node);
         this.nodes.push(node);
       };
@@ -260,7 +260,7 @@ export class ConduitEditController {
       this.tmpVec3.set(pts[i].x, pts[i].y, pts[i].z);
       conduit.localToWorld(this.tmpVec3);
       this.nodes[i].position.copy(this.tmpVec3);
-      (this.nodes[i].userData as any).__vizonConduitNode.index = i;
+      (this.nodes[i].userData as any)[VIZON_USER_DATA_KEYS.CONDUIT.NODE_META].index = i;
     }
 
     // 更新缓存矩阵：下一帧如果 matrixWorld 不变就可以跳过同步。
@@ -303,7 +303,7 @@ export class ConduitEditController {
       if (!hit) return;
 
       const node = hit.object as THREE.Object3D;
-      const nodeData = (node.userData as any).__vizonConduitNode as { index: number } | undefined;
+      const nodeData = (node.userData as any)[VIZON_USER_DATA_KEYS.CONDUIT.NODE_META] as { index: number } | undefined;
       if (!nodeData) return;
       if (isNonSelectableInHierarchy(node)) return;
 
@@ -378,8 +378,8 @@ export class ConduitEditController {
 
       const normalized = this.recenterConduitOrigin(pts);
       const ud = this.activeConduit.userData as any;
-      ud.__vizonConduitPointsLocal = normalized;
-      ud.__vizonConduitPointsLocalVersion = 2;
+      ud[VIZON_USER_DATA_KEYS.CONDUIT.POINTS_LOCAL] = normalized;
+      ud[VIZON_USER_DATA_KEYS.CONDUIT.POINTS_LOCAL_VERSION] = 2;
 
       this.rebuildConduitGeometry(normalized);
       this.updateHelpersFromConduit();
@@ -411,8 +411,8 @@ export class ConduitEditController {
       const normalized = this.recenterConduitOrigin(pts);
 
       const ud = this.activeConduit.userData as any;
-      ud.__vizonConduitPointsLocal = normalized;
-      ud.__vizonConduitPointsLocalVersion = 2;
+      ud[VIZON_USER_DATA_KEYS.CONDUIT.POINTS_LOCAL] = normalized;
+      ud[VIZON_USER_DATA_KEYS.CONDUIT.POINTS_LOCAL_VERSION] = 2;
       this.rebuildConduitGeometry(normalized);
       this.updateHelpersFromConduit();
       e.stopPropagation();

@@ -50,3 +50,14 @@ export { createDefaultCamera, defaultCameras } from './defaults/defaultCameras';
 export type { DefaultCameraKey, CreateDefaultCameraOptions, DefaultCameraMeta } from './defaults/defaultCameras';
 export { createDefaultLight, defaultLights } from './defaults/defaultLights';
 export type { DefaultLightKey, CreateDefaultLightOptions, DefaultLightMeta } from './defaults/defaultLights';
+
+/** 贴图加载（避免 apps 直接依赖 three.js API） */
+export {
+  loadImageTextureFromUrl,
+  loadImageTextureFromFile,
+  loadEquirectEnvMapTextureFromUrl,
+  loadEquirectEnvMapTextureFromFile,
+} from './texture/loadImageTexture';
+
+/** 材质类型切换（避免 apps 直接依赖 three.js API） */
+export { switchMaterialType, switchMaterialTypeOnObject } from './material/switchMaterialType';

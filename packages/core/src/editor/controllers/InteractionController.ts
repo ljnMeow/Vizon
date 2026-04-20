@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls, TransformControls } from 'three-stdlib';
 import type { TransformMode } from '../ThreeEditor';
+import { VIZON_USER_DATA_KEYS } from '../../infra/utils';
 import { isNonPickableInHierarchy, isNonSelectableInHierarchy, isVisibleInHierarchy } from '../picking/objectGuards';
 import {
   applyEditorOverlayLayer,
@@ -58,7 +59,7 @@ export class InteractionController {
   private findPickTarget(obj: THREE.Object3D): THREE.Object3D | undefined {
     let cur: THREE.Object3D | null = obj;
     while (cur) {
-      const pick = (cur.userData as any).__vizonPickTarget as THREE.Object3D | undefined;
+      const pick = (cur.userData as any)[VIZON_USER_DATA_KEYS.COMMON.PICK_TARGET] as THREE.Object3D | undefined;
       if (pick) return pick; // 命中即返回，不再往上走
       cur = cur.parent;
     }

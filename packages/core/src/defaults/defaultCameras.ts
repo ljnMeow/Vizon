@@ -5,6 +5,7 @@
  * `ThreeEditor.add` 会读取 `userData.__vizonCameraHelper` 并维护更新。
  */
 import * as THREE from 'three';
+import { VIZON_USER_DATA_KEYS } from '../infra/utils';
 
 export type DefaultCameraKey = 'orthographic' | 'perspective';
 
@@ -34,8 +35,8 @@ export const defaultCameras: DefaultCameraMeta[] = [
 function applyCommon(camera: THREE.Camera, key: DefaultCameraKey, opts?: CreateDefaultCameraOptions) {
   const name = opts?.name ?? (key === 'perspective' ? 'PerspectiveCamera' : 'OrthographicCamera');
   camera.name = name;
-  (camera.userData as any).__vizonDefaultCamera = true;
-  (camera.userData as any).__vizonDefaultCameraKey = key;
+  (camera.userData as any)[VIZON_USER_DATA_KEYS.DEFAULTS.DEFAULT_CAMERA] = true;
+  (camera.userData as any)[VIZON_USER_DATA_KEYS.DEFAULTS.DEFAULT_CAMERA_KEY] = key;
 
   if (opts?.position) {
     camera.position.set(opts.position.x, opts.position.y, opts.position.z);
@@ -46,8 +47,8 @@ function applyCommon(camera: THREE.Camera, key: DefaultCameraKey, opts?: CreateD
 }
 
 function configureCameraHelper(helper: THREE.CameraHelper) {
-  helper.userData.__vizonNonSelectable = true;
-  helper.userData.hideInEditor = true;
+  helper.userData[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE] = true;
+  helper.userData[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR] = true;
 
   const material = (helper as any).material as THREE.Material | THREE.Material[] | undefined;
   const materials = material ? (Array.isArray(material) ? material : [material]) : [];
@@ -79,8 +80,8 @@ export function createDefaultCamera(key: DefaultCameraKey, opts?: CreateDefaultC
       // 注意：CameraHelper.update() 内部会使用 camera.matrixWorld 变换顶点；
       // 若把 helper 作为 camera 子节点挂载会导致“二次变换”产生偏移。
       // 因此 helper 由 ThreeEditor 以独立对象加入 scene，并在渲染时更新。
-      helper.userData.__vizonPickTarget = camera;
-      (camera.userData as any).__vizonCameraHelper = helper;
+      helper.userData[VIZON_USER_DATA_KEYS.COMMON.PICK_TARGET] = camera;
+      (camera.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.CAMERA_HELPER] = helper;
     }
     camera.updateProjectionMatrix();
     return camera;
@@ -97,8 +98,8 @@ export function createDefaultCamera(key: DefaultCameraKey, opts?: CreateDefaultC
   if (helperEnabled) {
     const helper = new THREE.CameraHelper(camera);
     configureCameraHelper(helper);
-    helper.userData.__vizonPickTarget = camera;
-    (camera.userData as any).__vizonCameraHelper = helper;
+    helper.userData[VIZON_USER_DATA_KEYS.COMMON.PICK_TARGET] = camera;
+    (camera.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.CAMERA_HELPER] = helper;
   }
   camera.updateProjectionMatrix();
   return camera;

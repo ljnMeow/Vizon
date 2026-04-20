@@ -7,6 +7,7 @@ import { appMessages } from '../../../i18n/messages';
 import { SceneSettings } from './SceneSettings/index';
 import { PropertiesSettings } from './Properties/index';
 import { MaterialSettings } from './Material/index';
+import { EffectsSettings } from './effects/index';
 
 type InspectorTab = 'scene' | 'data' | 'interaction' | 'properties' | 'materials' | 'effects';
 
@@ -99,6 +100,8 @@ export function InspectorPanel({ visible }: { visible: boolean }) {
               <MaterialSettings />
             ) : key === 'properties' ? (
               <PropertiesSettings />
+            ) : key === 'effects' ? (
+              <EffectsSettings />
             ) : (
               t.placeholders[key]
             )}

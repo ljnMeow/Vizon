@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VIZON_USER_DATA_KEYS } from '../../infra/utils';
 import type { SceneTreeNode, SceneTreeNodeKind } from '../../settings/sceneTree';
 import { isNonSelectableInHierarchy } from '../picking/objectGuards';
 
@@ -51,7 +52,7 @@ export class SceneTreeController {
     if (SceneTreeController.IGNORED_TYPES.has(obj.type)) return true;
     if (obj.name === 'TransformControlsEditor') return true;
     if (obj.parent?.type === 'TransformControlsGizmo') return true;
-    if ((obj.userData as any)?.hideInEditor) return true;
+    if ((obj.userData as any)?.[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR]) return true;
     return false;
   }
 

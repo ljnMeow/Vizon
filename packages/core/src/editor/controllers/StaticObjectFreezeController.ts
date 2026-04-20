@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VIZON_USER_DATA_KEYS } from '../../infra/utils';
 
 /**
  * 管理静态对象矩阵冻结策略（matrixAutoUpdate=false）。
@@ -28,8 +29,8 @@ export class StaticObjectFreezeController {
     if ((obj as any).isSkinnedMesh) return false;
     if ((obj as any).isTransformControls) return false;
     if (obj.type === 'TransformControlsGizmo' || obj.type === 'TransformControlsPlane') return false;
-    if ((obj.userData as any).__vizonNonSelectable) return false;
-    if ((obj.userData as any).__vizonDynamic) return false;
+    if ((obj.userData as any)[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE]) return false;
+    if ((obj.userData as any)[VIZON_USER_DATA_KEYS.COMMON.DYNAMIC]) return false;
     return true;
   }
 }

@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
+import { VIZON_USER_DATA_KEYS } from '../infra/utils';
 
 /** 可创建的灯光种类枚举（与 UI 列表 key 对齐） */
 export type DefaultLightKey =
@@ -64,8 +65,8 @@ let rectAreaUniformsInited = false;
  */
 function applyCommon(light: THREE.Light, key: DefaultLightKey, opts?: CreateDefaultLightOptions) {
   light.name = opts?.name ?? light.type; // 未起名则用 three 类型名
-  (light.userData as any).__vizonDefaultLight = true; // 业务标记：预设灯
-  (light.userData as any).__vizonDefaultLightKey = key; // 记录创建枚举，便于导入导出
+  (light.userData as any)[VIZON_USER_DATA_KEYS.DEFAULTS.DEFAULT_LIGHT] = true; // 业务标记：预设灯
+  (light.userData as any)[VIZON_USER_DATA_KEYS.DEFAULTS.DEFAULT_LIGHT_KEY] = key; // 记录创建枚举，便于导入导出
   if (opts?.position) {
     light.position.set(opts.position.x, opts.position.y, opts.position.z);
   }
@@ -83,9 +84,9 @@ function getTarget(opts?: CreateDefaultLightOptions): THREE.Vector3 {
  * - depthTest 关闭减少 Z-fighting，略透明避免完全遮挡模型。
  */
 function configureLightHelper(helper: THREE.Object3D, light: THREE.Light) {
-  helper.userData.__vizonNonSelectable = true; // helper 本身非业务节点
-  helper.userData.hideInEditor = true; // 结构面板隐藏
-  helper.userData.__vizonPickTarget = light; // 射线命中 helper 时选中灯
+  helper.userData[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE] = true; // helper 本身非业务节点
+  helper.userData[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR] = true; // 结构面板隐藏
+  helper.userData[VIZON_USER_DATA_KEYS.COMMON.PICK_TARGET] = light; // 射线命中 helper 时选中灯
 
   const mat = (helper as any).material as THREE.Material | THREE.Material[] | undefined;
   const materials = mat ? (Array.isArray(mat) ? mat : [mat]) : [];
@@ -124,7 +125,7 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
     if (helperEnabled) {
       const helper = new THREE.DirectionalLightHelper(light, 1.2, DEFAULT_LIGHT_HELPER_COLOR);
       configureLightHelper(helper, light);
-      (light.userData as any).__vizonLightHelper = helper; // editor 取出并 scene.add
+      (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helper; // editor 取出并 scene.add
     }
     return light;
   }
@@ -136,7 +137,7 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
     if (helperEnabled) {
       const helper = new THREE.PointLightHelper(light, 0.45, DEFAULT_LIGHT_HELPER_COLOR);
       configureLightHelper(helper, light);
-      (light.userData as any).__vizonLightHelper = helper;
+      (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helper;
     }
     return light;
   }
@@ -151,7 +152,7 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
     if (helperEnabled) {
       const helper = new THREE.SpotLightHelper(light, DEFAULT_LIGHT_HELPER_COLOR);
       configureLightHelper(helper, light);
-      (light.userData as any).__vizonLightHelper = helper;
+      (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helper;
     }
     return light;
   }
@@ -163,7 +164,7 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
     if (helperEnabled) {
       const helper = new THREE.HemisphereLightHelper(light, 0.9, DEFAULT_LIGHT_HELPER_COLOR);
       configureLightHelper(helper, light);
-      (light.userData as any).__vizonLightHelper = helper;
+      (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helper;
     }
     return light;
   }
@@ -180,7 +181,7 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
   if (helperEnabled) {
     const helper = new RectAreaLightHelper(light, DEFAULT_LIGHT_HELPER_COLOR);
     configureLightHelper(helper, light);
-    (light.userData as any).__vizonLightHelper = helper;
+    (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helper;
   }
   return light;
 }

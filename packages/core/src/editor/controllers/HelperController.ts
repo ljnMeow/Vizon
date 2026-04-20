@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { SceneSettingsGrid, SceneSettingsHelpers } from '../../settings/sceneSettings';
+import { VIZON_USER_DATA_KEYS } from '../../infra/utils';
 import { applyEditorOverlayLayer } from '../picking/pickLayers';
 
 /**
@@ -22,10 +23,10 @@ export class HelperController {
       new THREE.Color(this.lastGridColor),
       new THREE.Color(this.lastGridColor)
     );
-    this.grid.userData.__vizonNonSelectable = true;
+    this.grid.userData[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE] = true;
     applyEditorOverlayLayer(this.grid);
 
-    this.axes.userData.__vizonNonSelectable = true;
+    this.axes.userData[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE] = true;
     applyEditorOverlayLayer(this.axes);
     // 默认先不显示，避免 mount 后到首次 applySceneSettings 之间出现闪烁。
     this.axes.visible = false;
@@ -77,7 +78,7 @@ export class HelperController {
       new THREE.Color(gridColorHex),
       new THREE.Color(gridColorHex)
     );
-    next.userData.__vizonNonSelectable = true;
+    next.userData[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE] = true;
     applyEditorOverlayLayer(next);
     next.visible = this.grid.visible;
 
