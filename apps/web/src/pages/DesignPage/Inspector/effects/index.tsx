@@ -3,16 +3,18 @@ import { useCallback, useEffect, useState } from 'react';
 import { ColorPicker } from '../../../../components/ColorPicker';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 
+// 写入 mesh.userData 的键名，渲染侧通过同一 key 读取特效配置
 const EFFECTS_USERDATA_KEY = '__vizonEffects';
 
+// 描边 + 辉光两套特效的状态定义
 type EffectsState = {
   borderEnabled: boolean;
-  borderWidth: number; // numeric input (宽度)
-  borderColor: string; // hex color
+  borderWidth: number; // 描边宽度 1 ~ 20
+  borderColor: string; // #rrggbb
   glowEnabled: boolean;
-  glowColor: string; // hex color
-  glowRange: number; // 0 ~ 60
-  glowBrightness: number; // 0 ~ 2
+  glowColor: string; // #rrggbb
+  glowRange: number; // 辉光扩散范围 0 ~ 60
+  glowBrightness: number; // 辉光亮度 0 ~ 2
 };
 
 const DEFAULT_EFFECTS: EffectsState = {
@@ -25,10 +27,12 @@ const DEFAULT_EFFECTS: EffectsState = {
   glowBrightness: 1
 };
 
+// 将数值限制在 [min, max] 区间内
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
+// 校验并规范化十六进制颜色，非法值回退到默认红色
 function sanitizeHexColor(hex: unknown) {
   if (typeof hex !== 'string') return DEFAULT_EFFECTS.borderColor;
   const v = hex.trim();
@@ -37,6 +41,7 @@ function sanitizeHexColor(hex: unknown) {
   return v;
 }
 
+// 将任意原始数据安全地转换为合法的 EffectsState，缺失字段回退默认值，数值做 clamp
 function normalizeEffectsState(raw: any): EffectsState {
   const borderEnabled = Boolean(raw?.borderEnabled ?? DEFAULT_EFFECTS.borderEnabled);
   const borderWidthRaw = raw?.borderWidth;
@@ -63,6 +68,7 @@ function normalizeEffectsState(raw: any): EffectsState {
   };
 }
 
+// 判断对象是否为可配置特效的 Mesh（排除标记为不可选/隐藏的对象）
 function isConfigurableMesh(obj: any): boolean {
   if (!obj?.isMesh) return false;
   if (obj?.userData?.__vizonNonSelectable) return false;
