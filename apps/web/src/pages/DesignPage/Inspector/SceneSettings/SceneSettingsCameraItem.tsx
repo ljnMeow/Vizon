@@ -1,4 +1,5 @@
 import { createDefaultSceneSettings } from 'vizon-3d-core';
+import { useEffect, useState } from 'react';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 
 export type SceneSettingsCameraLabels = {
@@ -20,11 +21,13 @@ function almostEqual(a: number, b: number, eps = 1e-6) {
 function AxisInput({
   label,
   value,
-  onChange
+  onPreviewChange,
+  onCommit
 }: {
   label: string;
   value: number;
-  onChange: (next: number) => void;
+  onPreviewChange: (next: number) => void;
+  onCommit: (next: number) => void;
 }) {
   return (
     <div className="space-y-1">
@@ -35,7 +38,15 @@ function AxisInput({
         onChange={(e) => {
           const next = Number(e.target.value);
           if (!Number.isFinite(next)) return;
-          onChange(next);
+          onPreviewChange(next);
+        }}
+        onBlur={(e) => {
+          const next = Number((e.target as HTMLInputElement).value);
+          if (!Number.isFinite(next)) return;
+          onCommit(next);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
         }}
         className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
       />
@@ -47,14 +58,22 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
   const {
     cameraSettings,
     setCameraFov,
-    setCameraNear,
-    setCameraFar,
-    setCameraPosition,
-    setCameraTarget,
-    resetCamera
+    resetCamera,
+    updateSceneSettings
   } = useSceneSettings();
 
   const { fov, near, far, position, target } = cameraSettings;
+  const [draftFov, setDraftFov] = useState(fov);
+  const [draftNear, setDraftNear] = useState(near);
+  const [draftFar, setDraftFar] = useState(far);
+  const [draftPos, setDraftPos] = useState(position);
+  const [draftTarget, setDraftTarget] = useState(target);
+
+  useEffect(() => setDraftFov(fov), [fov]);
+  useEffect(() => setDraftNear(near), [near]);
+  useEffect(() => setDraftFar(far), [far]);
+  useEffect(() => setDraftPos(position), [position]);
+  useEffect(() => setDraftTarget(target), [target]);
   const canResetCamera =
     !almostEqual(fov, DEFAULT_CAMERA_SETTINGS.fov) ||
     !almostEqual(near, DEFAULT_CAMERA_SETTINGS.near) ||
@@ -81,8 +100,19 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
           min={10}
           max={120}
           step={0.1}
-          value={fov}
-          onChange={(e) => setCameraFov(Number(e.target.value))}
+          value={draftFov}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            if (!Number.isFinite(v)) return;
+            setDraftFov(v);
+            updateSceneSettings(
+              (prev) => ({ ...prev, camera: { ...prev.camera, fov: v } }),
+              { recordHistory: false }
+            );
+          }}
+          onPointerUp={() => setCameraFov(draftFov)}
+          onMouseUp={() => setCameraFov(draftFov)}
+          onTouchEnd={() => setCameraFov(draftFov)}
           className="w-full"
         />
       </div>
@@ -98,8 +128,22 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
             min={0.001}
             max={100}
             step={0.001}
-            value={near}
-            onChange={(e) => setCameraNear(Number(e.target.value))}
+            value={draftNear}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (!Number.isFinite(v)) return;
+              setDraftNear(v);
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, near: v } }),
+                { recordHistory: false }
+              );
+            }}
+            onBlur={() => {
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, near: draftNear } }),
+                { recordHistory: true, operationName: `修改场景属性-相机-近平面 = ${Number(draftNear.toFixed(4))}` }
+              );
+            }}
             className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
           />
         </div>
@@ -113,8 +157,22 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
             min={1}
             max={100000}
             step={1}
-            value={far}
-            onChange={(e) => setCameraFar(Number(e.target.value))}
+            value={draftFar}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (!Number.isFinite(v)) return;
+              setDraftFar(v);
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, far: v } }),
+                { recordHistory: false }
+              );
+            }}
+            onBlur={() => {
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, far: draftFar } }),
+                { recordHistory: true, operationName: `修改场景属性-相机-远平面 = ${Number(draftFar.toFixed(4))}` }
+              );
+            }}
             className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
           />
         </div>
@@ -124,9 +182,66 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
       <div className="space-y-2">
         <div className="text-[11px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.positionLabel}</div>
         <div className="grid grid-cols-3 gap-2">
-          <AxisInput label="X" value={position.x} onChange={(x) => setCameraPosition({ ...position, x })} />
-          <AxisInput label="Y" value={position.y} onChange={(y) => setCameraPosition({ ...position, y })} />
-          <AxisInput label="Z" value={position.z} onChange={(z) => setCameraPosition({ ...position, z })} />
+          <AxisInput
+            label="X"
+            value={draftPos.x}
+            onPreviewChange={(x) => {
+              const next = { ...draftPos, x };
+              setDraftPos(next);
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, position: next } }),
+                  { recordHistory: false }
+              );
+            }}
+            onCommit={(x) => {
+              const next = { ...draftPos, x };
+              setDraftPos(next);
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, position: next } }),
+                  { recordHistory: true, operationName: `修改场景属性-相机-位置 = (${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})` }
+              );
+            }}
+          />
+          <AxisInput
+            label="Y"
+            value={draftPos.y}
+            onPreviewChange={(y) => {
+              const next = { ...draftPos, y };
+              setDraftPos(next);
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, position: next } }),
+                  { recordHistory: false }
+              );
+            }}
+            onCommit={(y) => {
+              const next = { ...draftPos, y };
+              setDraftPos(next);
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, position: next } }),
+                  { recordHistory: true, operationName: `修改场景属性-相机-位置 = (${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})` }
+              );
+            }}
+          />
+          <AxisInput
+            label="Z"
+            value={draftPos.z}
+            onPreviewChange={(z) => {
+              const next = { ...draftPos, z };
+              setDraftPos(next);
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, position: next } }),
+                  { recordHistory: false }
+              );
+            }}
+            onCommit={(z) => {
+              const next = { ...draftPos, z };
+              setDraftPos(next);
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, position: next } }),
+                  { recordHistory: true, operationName: `修改场景属性-相机-位置 = (${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})` }
+              );
+            }}
+          />
         </div>
       </div>
 
@@ -134,9 +249,66 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
       <div className="space-y-2">
         <div className="text-[11px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.targetLabel}</div>
         <div className="grid grid-cols-3 gap-2">
-          <AxisInput label="X" value={target.x} onChange={(x) => setCameraTarget({ ...target, x })} />
-          <AxisInput label="Y" value={target.y} onChange={(y) => setCameraTarget({ ...target, y })} />
-          <AxisInput label="Z" value={target.z} onChange={(z) => setCameraTarget({ ...target, z })} />
+          <AxisInput
+            label="X"
+            value={draftTarget.x}
+            onPreviewChange={(x) => {
+              const next = { ...draftTarget, x };
+              setDraftTarget(next);
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, target: next } }),
+                  { recordHistory: false }
+              );
+            }}
+            onCommit={(x) => {
+              const next = { ...draftTarget, x };
+              setDraftTarget(next);
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, target: next } }),
+                  { recordHistory: true, operationName: `修改场景属性-相机-目标 = (${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})` }
+              );
+            }}
+          />
+          <AxisInput
+            label="Y"
+            value={draftTarget.y}
+            onPreviewChange={(y) => {
+              const next = { ...draftTarget, y };
+              setDraftTarget(next);
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, target: next } }),
+                  { recordHistory: false }
+              );
+            }}
+            onCommit={(y) => {
+              const next = { ...draftTarget, y };
+              setDraftTarget(next);
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, target: next } }),
+                  { recordHistory: true, operationName: `修改场景属性-相机-目标 = (${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})` }
+              );
+            }}
+          />
+          <AxisInput
+            label="Z"
+            value={draftTarget.z}
+            onPreviewChange={(z) => {
+              const next = { ...draftTarget, z };
+              setDraftTarget(next);
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, target: next } }),
+                  { recordHistory: false }
+              );
+            }}
+            onCommit={(z) => {
+              const next = { ...draftTarget, z };
+              setDraftTarget(next);
+              updateSceneSettings(
+                (prev) => ({ ...prev, camera: { ...prev.camera, target: next } }),
+                  { recordHistory: true, operationName: `修改场景属性-相机-目标 = (${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})` }
+              );
+            }}
+          />
         </div>
       </div>
 

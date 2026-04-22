@@ -3,7 +3,17 @@ import { Tooltip } from '../../../../components/Tooltip';
 
 export type TextureMapItemIntensity =
   | { type: 'none' }
-  | { type: 'number'; label: string; value: number; min?: number; max?: number; step?: number; onChange: (v: number) => void }
+  | {
+      type: 'number';
+      label: string;
+      value: number;
+      min?: number;
+      max?: number;
+      step?: number;
+      onPreviewChange: (v: number) => void;
+      onCommit: (v: number) => void;
+      onDragStart?: () => void;
+    }
   | {
       type: 'vector2';
       labelX: string;
@@ -15,7 +25,9 @@ export type TextureMapItemIntensity =
       minY?: number;
       maxY?: number;
       stepY?: number;
-      onChange: (v: { x: number; y: number }) => void;
+      onPreviewChange: (v: { x: number; y: number }) => void;
+      onCommit: (v: { x: number; y: number }) => void;
+      onDragStart?: (axis: 'x' | 'y') => void;
     };
 
 export type TextureMapItemLabels = {
@@ -167,7 +179,13 @@ export function TextureMapItem({
             max={intensity.max ?? 1}
             step={intensity.step ?? 0.01}
             value={intensity.value}
-            onChange={(e) => intensity.onChange(Number(e.target.value))}
+            onPointerDown={() => intensity.onDragStart?.()}
+            onMouseDown={() => intensity.onDragStart?.()}
+            onTouchStart={() => intensity.onDragStart?.()}
+            onChange={(e) => intensity.onPreviewChange(Number(e.target.value))}
+            onPointerUp={(e) => intensity.onCommit(Number((e.target as HTMLInputElement).value))}
+            onMouseUp={(e) => intensity.onCommit(Number((e.target as HTMLInputElement).value))}
+            onTouchEnd={(e) => intensity.onCommit(Number((e.target as HTMLInputElement).value))}
             className="w-full"
           />
         </div>
@@ -186,7 +204,13 @@ export function TextureMapItem({
               max={intensity.maxX ?? 5}
               step={intensity.stepX ?? 0.01}
               value={intensity.value.x}
-              onChange={(e) => intensity.onChange({ ...intensity.value, x: Number(e.target.value) })}
+              onPointerDown={() => intensity.onDragStart?.('x')}
+              onMouseDown={() => intensity.onDragStart?.('x')}
+              onTouchStart={() => intensity.onDragStart?.('x')}
+              onChange={(e) => intensity.onPreviewChange({ ...intensity.value, x: Number(e.target.value) })}
+              onPointerUp={(e) => intensity.onCommit({ ...intensity.value, x: Number((e.target as HTMLInputElement).value) })}
+              onMouseUp={(e) => intensity.onCommit({ ...intensity.value, x: Number((e.target as HTMLInputElement).value) })}
+              onTouchEnd={(e) => intensity.onCommit({ ...intensity.value, x: Number((e.target as HTMLInputElement).value) })}
               className="w-full"
             />
           </div>
@@ -202,7 +226,13 @@ export function TextureMapItem({
               max={intensity.maxY ?? 5}
               step={intensity.stepY ?? 0.01}
               value={intensity.value.y}
-              onChange={(e) => intensity.onChange({ ...intensity.value, y: Number(e.target.value) })}
+              onPointerDown={() => intensity.onDragStart?.('y')}
+              onMouseDown={() => intensity.onDragStart?.('y')}
+              onTouchStart={() => intensity.onDragStart?.('y')}
+              onChange={(e) => intensity.onPreviewChange({ ...intensity.value, y: Number(e.target.value) })}
+              onPointerUp={(e) => intensity.onCommit({ ...intensity.value, y: Number((e.target as HTMLInputElement).value) })}
+              onMouseUp={(e) => intensity.onCommit({ ...intensity.value, y: Number((e.target as HTMLInputElement).value) })}
+              onTouchEnd={(e) => intensity.onCommit({ ...intensity.value, y: Number((e.target as HTMLInputElement).value) })}
               className="w-full"
             />
           </div>

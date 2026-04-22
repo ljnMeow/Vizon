@@ -82,10 +82,10 @@ type SceneSettingsContextValue = {
 
   setOutputColorSpace: (colorSpace: RendererOutputColorSpace) => void;
   setToneMapping: (mapping: RendererToneMapping) => void;
-  setToneMappingExposure: (exposure: number) => void;
-  setShadowMapEnabled: (enabled: boolean) => void;
-  setShadowMapType: (type: RendererSettings['shadowMapType']) => void;
-  setShadowMapAutoUpdate: (autoUpdate: boolean) => void;
+  setToneMappingExposure: (exposure: number, options?: { recordHistory?: boolean }) => void;
+  setShadowMapEnabled: (enabled: boolean, options?: { recordHistory?: boolean }) => void;
+  setShadowMapType: (type: RendererSettings['shadowMapType'], options?: { recordHistory?: boolean }) => void;
+  setShadowMapAutoUpdate: (autoUpdate: boolean, options?: { recordHistory?: boolean }) => void;
 
   setCameraFov: (fov: number) => void;
   setCameraNear: (near: number) => void;
@@ -93,6 +93,14 @@ type SceneSettingsContextValue = {
   setCameraPosition: (position: CameraPosition) => void;
   setCameraTarget: (target: CameraTarget) => void;
   resetCamera: () => void;
+
+  /** 允许 Inspector 组件以“预览/提交”方式更新 scene settings */
+  updateSceneSettings: (updater: (prev: SceneSettings) => SceneSettings, options?: { recordHistory?: boolean; operationName?: string }) => void;
+  /** 允许 Inspector 组件以“预览/提交”方式更新 renderer settings */
+  updateRendererSettings: (
+    updater: (prev: RendererSettings) => RendererSettings,
+    options?: { operationName?: string; recordHistory?: boolean }
+  ) => void;
 };
 
 export const SceneSettingsContext = createContext<SceneSettingsContextValue | null>(null);
@@ -190,15 +198,18 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
       }
 
       // OrbitControls 会直接修改 camera/orbit.target，这里把变更写回 core 的 sceneSettings.camera
-      update((prev) => ({
-        ...prev,
-        camera: {
-          ...prev.camera,
-          ...nextCamera,
-          position: nextCamera.position,
-          target: nextCamera.target
-        }
-      }));
+      update(
+        (prev) => ({
+          ...prev,
+          camera: {
+            ...prev.camera,
+            ...nextCamera,
+            position: nextCamera.position,
+            target: nextCamera.target
+          }
+        }),
+        { recordHistory: false }
+      );
 
       // 同步 UI（core apply 后也会再校准一次）
       setCameraSettings(nextCamera);
@@ -236,11 +247,14 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
   }, [rendererSettings]);
 
   const applyToCore = useCallback(
-    async (next: SceneSettings) => {
+    async (next: SceneSettings, options?: { recordHistory?: boolean; operationName?: string }) => {
       if (!editor) return;
       const seq = ++applySeqRef.current;
       try {
-        await editor.setSceneSettings(next);
+        await editor.setSceneSettings(next, {
+          recordHistory: options?.recordHistory ?? true,
+          operationName: options?.operationName
+        });
         // 只同步最后一次 apply 的 normalized 结果，避免竞态覆盖 UI
         if (seq === applySeqRef.current) {
           const fromCore = editor.getSceneSettings();
@@ -265,23 +279,37 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
   );
 
   const update = useCallback(
-    (updater: (prev: SceneSettings) => SceneSettings) => {
+    (updater: (prev: SceneSettings) => SceneSettings, options?: { recordHistory?: boolean; operationName?: string }) => {
       const next = updater(sceneSettingsRef.current);
+      if (options?.recordHistory === false) {
+        try {
+          if (JSON.stringify(next) === JSON.stringify(sceneSettingsRef.current)) return;
+        } catch {
+          // fallback: 无法序列化时仍继续
+        }
+      }
       setSceneSettings(next);
-      if (!syncFromCoreRef.current) void applyToCore(next);
+      if (!syncFromCoreRef.current) void applyToCore(next, options);
     },
     [applyToCore]
   );
 
   const updateRenderer = useCallback(
-    (updater: (prev: RendererSettings) => RendererSettings) => {
+    (updater: (prev: RendererSettings) => RendererSettings, options?: { operationName?: string; recordHistory?: boolean }) => {
       const next = updater(rendererSettingsRef.current);
+      if (options?.recordHistory === false) {
+        try {
+          if (JSON.stringify(next) === JSON.stringify(rendererSettingsRef.current)) return;
+        } catch {
+          // ignore
+        }
+      }
       if (!editor) {
         setRendererSettings(next);
         return;
       }
 
-      editor.setRendererSettings(next);
+      editor.setRendererSettings(next, { operationName: options?.operationName, recordHistory: options?.recordHistory ?? true });
       setRendererSettings(editor.getRendererSettings());
     },
     [editor]
@@ -293,7 +321,7 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
       update((prev) => ({
         ...prev,
         camera: { ...prev.camera, fov }
-      }));
+      }), { operationName: `修改场景属性-相机-FOV = ${Number(fov.toFixed(4))}` });
     },
     [update]
   );
@@ -304,7 +332,7 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
       update((prev) => ({
         ...prev,
         camera: { ...prev.camera, near }
-      }));
+      }), { operationName: `修改场景属性-相机-近平面 = ${Number(near.toFixed(4))}` });
     },
     [update]
   );
@@ -315,7 +343,7 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
       update((prev) => ({
         ...prev,
         camera: { ...prev.camera, far }
-      }));
+      }), { operationName: `修改场景属性-相机-远平面 = ${Number(far.toFixed(4))}` });
     },
     [update]
   );
@@ -325,7 +353,7 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
       update((prev) => ({
         ...prev,
         camera: { ...prev.camera, position: nextPos }
-      }));
+      }), { operationName: `修改场景属性-相机-位置 = (${Number(nextPos.x.toFixed(4))}, ${Number(nextPos.y.toFixed(4))}, ${Number(nextPos.z.toFixed(4))})` });
     },
     [update]
   );
@@ -335,7 +363,7 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
       update((prev) => ({
         ...prev,
         camera: { ...prev.camera, target: nextTarget }
-      }));
+      }), { operationName: `修改场景属性-相机-目标 = (${Number(nextTarget.x.toFixed(4))}, ${Number(nextTarget.y.toFixed(4))}, ${Number(nextTarget.z.toFixed(4))})` });
     },
     [update]
   );
@@ -345,7 +373,7 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
       update((prev) => ({
         ...prev,
         camera: { ...prev.camera, ...DEFAULT_CAMERA_SETTINGS }
-      }));
+      }), { operationName: '修改场景属性-相机-重置' });
     };
 
     if (!editor) {
@@ -382,76 +410,76 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
         update((prev) => ({
           ...prev,
           basic: { ...prev.basic, sceneName }
-        })),
+        }), { operationName: `修改场景属性-基础设置-场景名称 = ${sceneName || '""'}` }),
 
       setDescription: (description) =>
         update((prev) => ({
           ...prev,
           basic: { ...prev.basic, description }
-        })),
+        }), { operationName: `修改场景属性-基础设置-详细描述 = ${description || '""'}` }),
 
       setBackgroundMode: (mode) =>
         update((prev) => ({
           ...prev,
           environment: { ...prev.environment, backgroundMode: mode }
-        })),
+        }), { operationName: `修改场景属性-环境-背景模式 = ${mode}` }),
 
       setBackgroundColor: (color) =>
         update((prev) => ({
           ...prev,
           environment: { ...prev.environment, backgroundColor: color }
-        })),
+        }), { operationName: `修改场景属性-环境-背景颜色 = ${color}` }),
 
       setHdri: (hdri) =>
         update((prev) => ({
           ...prev,
           environment: { ...prev.environment, hdri }
-        })),
+        }), { operationName: `修改场景属性-环境-HDRI = ${hdri.type === 'none' ? 'none' : hdri.type}` }),
 
       setEnvironmentStrength: (strength) =>
         update((prev) => ({
           ...prev,
           environment: { ...prev.environment, environmentStrength: strength }
-        })),
+        }), { operationName: `修改场景属性-环境-环境强度 = ${Number(strength.toFixed(4))}` }),
 
       setFogEnabled: (enabled) =>
         update((prev) => ({
           ...prev,
           environment: { ...prev.environment, fog: { ...prev.environment.fog, enabled } }
-        })),
+        }), { operationName: `修改场景属性-环境-雾化开关 = ${enabled ? 'true' : 'false'}` }),
 
       setFogColor: (color) =>
         update((prev) => ({
           ...prev,
           environment: { ...prev.environment, fog: { ...prev.environment.fog, color } }
-        })),
+        }), { operationName: `修改场景属性-环境-雾颜色 = ${color}` }),
 
       setFogNear: (near) =>
         update((prev) => ({
           ...prev,
           environment: { ...prev.environment, fog: { ...prev.environment.fog, near } }
-        })),
+        }), { operationName: `修改场景属性-环境-雾近距 = ${Number(near.toFixed(4))}` }),
 
       setFogFar: (far) =>
         update((prev) => ({
           ...prev,
           environment: { ...prev.environment, fog: { ...prev.environment.fog, far } }
-        })),
+        }), { operationName: `修改场景属性-环境-雾远距 = ${Number(far.toFixed(4))}` }),
       setGridEnabled: (enabled) =>
         update((prev) => ({
           ...prev,
           grid: { ...prev.grid, enabled }
-        })),
+        }), { operationName: `修改场景属性-网格-显示开关 = ${enabled ? 'true' : 'false'}` }),
       setGridColor: (color) =>
         update((prev) => ({
           ...prev,
           grid: { ...prev.grid, color }
-        })),
+        }), { operationName: `修改场景属性-网格-颜色 = ${color}` }),
       setGridOpacity: (opacity) =>
         update((prev) => ({
           ...prev,
           grid: { ...prev.grid, opacity }
-        })),
+        }), { operationName: `修改场景属性-网格-透明度 = ${Number(opacity.toFixed(4))}` }),
       // grid.lineColor removed; keep legacy setter as noop (prevents accidental usage/loops).
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       setGridLineColor: (_lineColor: string) => {},
@@ -462,7 +490,7 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
             ...prev.helpers,
             axes: { ...prev.helpers.axes, enabled }
           }
-        })),
+        }), { operationName: `修改场景属性-辅助器-坐标轴开关 = ${enabled ? 'true' : 'false'}` }),
       setAxesSize: (size) =>
         update((prev) => ({
           ...prev,
@@ -470,26 +498,31 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
             ...prev.helpers,
             axes: { ...prev.helpers.axes, size: clamp(size, 0.1, 100) }
           }
-        })),
+        }), { operationName: `修改场景属性-辅助器-坐标轴尺寸 = ${Number(clamp(size, 0.1, 100).toFixed(4))}` }),
 
-      setAntialias: (enabled) => updateRenderer((prev) => ({ ...prev, antialias: enabled })),
-      setOutputColorSpace: (colorSpace) => updateRenderer((prev) => ({ ...prev, outputColorSpace: colorSpace })),
-      setToneMapping: (mapping) => updateRenderer((prev) => ({ ...prev, toneMapping: mapping })),
-      setToneMappingExposure: (exposure) =>
+      setAntialias: (enabled) => updateRenderer((prev) => ({ ...prev, antialias: enabled }), { operationName: `修改场景属性-渲染器-抗锯齿 = ${enabled ? 'true' : 'false'}` }),
+      setOutputColorSpace: (colorSpace) => updateRenderer((prev) => ({ ...prev, outputColorSpace: colorSpace }), { operationName: `修改场景属性-渲染器-输出色彩空间 = ${colorSpace}` }),
+      setToneMapping: (mapping) => updateRenderer((prev) => ({ ...prev, toneMapping: mapping }), { operationName: `修改场景属性-渲染器-色调映射 = ${mapping}` }),
+      setToneMappingExposure: (exposure, options) =>
         updateRenderer((prev) => ({
           ...prev,
           toneMappingExposure: exposure
-        })),
-      setShadowMapEnabled: (enabled) => updateRenderer((prev) => ({ ...prev, shadowMapEnabled: enabled })),
-      setShadowMapType: (type) => updateRenderer((prev) => ({ ...prev, shadowMapType: type })),
-      setShadowMapAutoUpdate: (autoUpdate) => updateRenderer((prev) => ({ ...prev, shadowMapAutoUpdate: autoUpdate })),
+        }), { operationName: `修改场景属性-渲染器-曝光 = ${Number(exposure.toFixed(4))}`, recordHistory: options?.recordHistory ?? true }),
+      setShadowMapEnabled: (enabled, options) =>
+        updateRenderer((prev) => ({ ...prev, shadowMapEnabled: enabled }), { operationName: `修改场景属性-渲染器-阴影开关 = ${enabled ? 'true' : 'false'}`, recordHistory: options?.recordHistory ?? true }),
+      setShadowMapType: (type, options) =>
+        updateRenderer((prev) => ({ ...prev, shadowMapType: type }), { operationName: `修改场景属性-渲染器-阴影类型 = ${type}`, recordHistory: options?.recordHistory ?? true }),
+      setShadowMapAutoUpdate: (autoUpdate, options) =>
+        updateRenderer((prev) => ({ ...prev, shadowMapAutoUpdate: autoUpdate }), { operationName: `修改场景属性-渲染器-阴影自动更新 = ${autoUpdate ? 'true' : 'false'}`, recordHistory: options?.recordHistory ?? true }),
 
       setCameraFov,
       setCameraNear,
       setCameraFar,
       setCameraPosition,
       setCameraTarget,
-      resetCamera
+      resetCamera,
+      updateSceneSettings: update,
+      updateRendererSettings: updateRenderer
     }),
     [
       editor,

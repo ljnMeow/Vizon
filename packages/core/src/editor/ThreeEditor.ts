@@ -18,6 +18,7 @@ import { SceneTreeController } from './controllers/SceneTreeController';
 import { StaticObjectFreezeController } from './controllers/StaticObjectFreezeController';
 import { ConduitEditController } from './controllers/ConduitEditController';
 import { isNonSelectableInHierarchy, isVisibleInHierarchy } from './picking/objectGuards';
+import { HistoryManager, type EditorHistoryOperation, type EditorHistoryRecord } from './HistoryManager';
 import {
   applyEditorOverlayLayer,
   configureRaycasterForScenePicking,
@@ -52,6 +53,7 @@ export type ViewTransitionOptions = {
 export type ThreeEditorEvents = {
   select: { object: THREE.Object3D | null };
   sceneTreeChange: { tree: SceneTreeNode[] };
+  historyChange: { records: EditorHistoryRecord[]; canUndo: boolean; canRedo: boolean };
 };
 
 /** 构造 `ThreeEditor` 时的选项：画布、初值、可选场景配置与实验开关 */
@@ -75,6 +77,8 @@ export type ThreeEditorOptions = {
    * 拖拽 gizmo 时会临时解冻当前选中节点。
    */
   freezeStaticObjects?: boolean;
+  /** 操作历史最多保留条数，默认 300 */
+  historyMaxEntries?: number;
 };
 
 /**
@@ -124,6 +128,12 @@ export class ThreeEditor {
   private freezeStaticObjects: boolean;
   /** freeze 模式下监听 `dragging-changed` 的句柄；dispose 时需移除 */
   private onTransformDraggingChanged: ((e: { value?: boolean }) => void) | null = null;
+  /** gizmo 拖拽起点快照，用于在结束时生成单条历史 */
+  private transformDragStartSnapshot: {
+    position: { x: number; y: number; z: number };
+    rotation: { x: number; y: number; z: number };
+    scale: { x: number; y: number; z: number };
+  } | null = null;
 
   // —— 视口投射 / 拖拽放置（复用向量，避免高频 new）——
   /** 地面求交：NDC 临时向量 */
@@ -168,6 +178,16 @@ export class ThreeEditor {
 
   /** 选中含子节点时包围盒预览；红框、overlay 层、不可拾取 */
   private selectionBoxHelper: THREE.BoxHelper | null = null;
+  /** 节点复制缓冲区（仅内存） */
+  private clipboardObject: THREE.Object3D | null = null;
+  /** 操作历史管理器：统一提供撤销/重做与记录列表 */
+  private history: HistoryManager;
+  /** 预览阶段暂存的对象属性“历史前值” */
+  private pendingObjectPropHistoryBefore = new Map<string, unknown>();
+  /** 预览阶段暂存的场景配置“历史前值” */
+  private pendingSceneHistoryBefore: SceneSettings | null = null;
+  /** 预览阶段暂存的渲染器配置“历史前值” */
+  private pendingRendererHistoryBefore: RendererSettings | null = null;
 
   constructor(options: ThreeEditorOptions) {
     // 保存宿主画布引用；后续 Renderer 与 Orbit 都挂在其上
@@ -240,6 +260,7 @@ export class ThreeEditor {
     // 数值/枚举兜底在 normalize 内完成，避免 UI 脏数据搞崩 WebGL
     this.sceneSettings = normalizeSceneSettings(patched);
     this.freezeStaticObjects = Boolean(options.freezeStaticObjects);
+    this.history = new HistoryManager(options.historyMaxEntries);
     // 以下控制器无构造参数或仅依赖后续 inject，保持顺序以可读性为主
     this.cameraController = new CameraController();
     this.environmentController = new EnvironmentController();
@@ -305,6 +326,188 @@ export class ThreeEditor {
 
   on = this.events.on.bind(this.events);
 
+  getHistoryRecords(): EditorHistoryRecord[] {
+    return this.history.getRecords();
+  }
+
+  canUndo() {
+    return this.history.canUndo();
+  }
+
+  canRedo() {
+    return this.history.canRedo();
+  }
+
+  async executeHistoryOperation(operation: EditorHistoryOperation) {
+    await this.history.execute(operation);
+    this.emitHistoryChange();
+  }
+
+  async undo() {
+    const ok = await this.history.undo();
+    if (!ok) return false;
+    this.emitHistoryChange();
+    this.syncSceneTreeState();
+    this.render();
+    return true;
+  }
+
+  async redo() {
+    const ok = await this.history.redo();
+    if (!ok) return false;
+    this.emitHistoryChange();
+    this.syncSceneTreeState();
+    this.render();
+    return true;
+  }
+
+  canPaste() {
+    return Boolean(this.clipboardObject);
+  }
+
+  copySelected() {
+    if (!this.selected || isNonSelectableInHierarchy(this.selected)) return false;
+    this.clipboardObject = this.selected.clone(true);
+    return true;
+  }
+
+  async pasteFromClipboard() {
+    if (!this.clipboardObject) return false;
+    const pasted = this.clipboardObject.clone(true);
+    await this.executeHistoryOperation({
+      name: `粘贴节点 - ${pasted.uuid}`,
+      do: () => {
+        this.add(pasted, { recordHistory: false });
+        this.select(pasted);
+      },
+      undo: () => {
+        this.detachObjectFromParent(pasted);
+        this.select(null);
+        this.syncSceneTreeState();
+        this.render();
+      }
+    });
+    return true;
+  }
+
+  async deleteSelected() {
+    const target = this.selected;
+    if (!target || !target.parent || isNonSelectableInHierarchy(target)) return false;
+    const parent = target.parent;
+    const index = parent.children.indexOf(target);
+    if (index < 0) return false;
+
+    await this.executeHistoryOperation({
+      name: `删除节点 - ${target.uuid}`,
+      do: () => {
+        this.detachObjectFromParent(target);
+        this.select(null);
+        this.syncSceneTreeState();
+        this.render();
+      },
+      undo: () => {
+        this.insertChildAt(parent, target, index);
+        this.syncSceneTreeState();
+        this.render();
+      }
+    });
+    return true;
+  }
+
+  async clearSceneNodes() {
+    const roots = this.scene.children.filter((child) => !isNonSelectableInHierarchy(child));
+    if (roots.length === 0) return false;
+    const snapshot = roots.map((node) => ({ node, parent: node.parent, index: node.parent ? node.parent.children.indexOf(node) : -1 }));
+    await this.executeHistoryOperation({
+      name: '清空场景节点',
+      do: () => {
+        for (const item of snapshot) this.detachObjectFromParent(item.node);
+        this.select(null);
+        this.syncSceneTreeState();
+        this.render();
+      },
+      undo: () => {
+        for (const item of snapshot) {
+          if (!item.parent || item.index < 0) continue;
+          this.insertChildAt(item.parent, item.node, item.index);
+        }
+        this.syncSceneTreeState();
+        this.render();
+      }
+    });
+    return true;
+  }
+
+  async resetWorkspace() {
+    const roots = this.scene.children.filter((child) => !isNonSelectableInHierarchy(child));
+    const snapshot = roots.map((node) => ({ node, parent: node.parent, index: node.parent ? node.parent.children.indexOf(node) : -1 }));
+    const prevSettings = this.getSceneSettings();
+    const nextSettings = createDefaultSceneSettings();
+
+    await this.executeHistoryOperation({
+      name: '重置画布',
+      do: async () => {
+        for (const item of snapshot) this.detachObjectFromParent(item.node);
+        this.select(null);
+        await this.setSceneSettings(nextSettings, { recordHistory: false });
+        this.syncSceneTreeState();
+        this.render();
+      },
+      undo: async () => {
+        for (const item of snapshot) {
+          if (!item.parent || item.index < 0) continue;
+          this.insertChildAt(item.parent, item.node, item.index);
+        }
+        await this.setSceneSettings(prevSettings, { recordHistory: false });
+        this.syncSceneTreeState();
+        this.render();
+      }
+    });
+    return true;
+  }
+
+  async setObjectPropertyByUuid(
+    uuid: string,
+    path: string,
+    nextValue: unknown,
+    options?: { operationName?: string; recordHistory?: boolean }
+  ): Promise<boolean> {
+    const obj = this.scene.getObjectByProperty('uuid', uuid);
+    if (!obj) return false;
+    const before = this.readNestedValue(obj, path);
+    const after = this.cloneForHistory(nextValue);
+    const pendingKey = `${uuid}::${path}`;
+
+    if (options?.recordHistory === false) {
+      if (!this.pendingObjectPropHistoryBefore.has(pendingKey)) {
+        this.pendingObjectPropHistoryBefore.set(pendingKey, this.cloneForHistory(before));
+      }
+      this.writeNestedValue(obj, path, this.cloneForHistory(after));
+      return true;
+    }
+
+    const historyBefore = this.pendingObjectPropHistoryBefore.has(pendingKey)
+      ? this.pendingObjectPropHistoryBefore.get(pendingKey)
+      : before;
+    this.pendingObjectPropHistoryBefore.delete(pendingKey);
+    if (this.isHistoryValueEqual(historyBefore, after)) return true;
+
+    const prop = path.split('.').filter(Boolean).slice(-1)[0] ?? path;
+    const valueText = this.formatHistoryValue(after);
+    await this.executeHistoryOperation({
+      name: options?.operationName ?? `修改物体属性 - ${uuid} - ${prop}${valueText ? ` = ${valueText}` : ''}`,
+      mergeKey: `object-prop:${uuid}:${path}`,
+      mergeWindowMs: 280,
+      do: () => {
+        this.writeNestedValue(obj, path, this.cloneForHistory(after));
+      },
+      undo: () => {
+        this.writeNestedValue(obj, path, this.cloneForHistory(historyBefore));
+      }
+    });
+    return true;
+  }
+
   /**
    * 获取当前 scene settings（core 内部维护的数据真相）。
    * UI 层不应原地修改返回对象。
@@ -348,7 +551,27 @@ export class ThreeEditor {
    * 替换 renderer 相关设置（仅处理 renderer 侧能即时生效的部分，
    * 如 antialias 变化会触发 renderer 重建）。
    */
-  setRendererSettings(next: RendererSettings) {
+  setRendererSettings(next: RendererSettings, options?: { recordHistory?: boolean; operationName?: string }) {
+    if (options?.recordHistory === false && !this.pendingRendererHistoryBefore) {
+      this.pendingRendererHistoryBefore = { ...this.sceneSettings.renderer };
+    }
+    if (options?.recordHistory ?? true) {
+      const prevRenderer = this.pendingRendererHistoryBefore ? { ...this.pendingRendererHistoryBefore } : { ...this.sceneSettings.renderer };
+      this.pendingRendererHistoryBefore = null;
+      try {
+        if (JSON.stringify(prevRenderer) === JSON.stringify(next)) return;
+      } catch {
+        // ignore serialization failure
+      }
+      void this.executeHistoryOperation({
+        name: options?.operationName ?? '修改渲染器设置',
+        mergeKey: 'renderer-settings',
+        mergeWindowMs: 280,
+        do: () => this.setRendererSettings(next, { recordHistory: false }),
+        undo: () => this.setRendererSettings(prevRenderer, { recordHistory: false })
+      });
+      return;
+    }
     const prevRenderer = this.sceneSettings.renderer;
     // 将 renderer 配置纳入版本化结构，保证导出/导入/一致性
     const nextScene = normalizeSceneSettings({
@@ -401,7 +624,30 @@ export class ThreeEditor {
    * 替换 scene settings 并把变更应用到 THREE.Scene。
    * 注意：HDRI 贴图属于异步加载项，该方法在应用完成后才 resolve。
    */
-  async setSceneSettings(next: SceneSettings): Promise<void> {
+  async setSceneSettings(
+    next: SceneSettings,
+    options?: { recordHistory?: boolean; operationName?: string }
+  ): Promise<void> {
+    if (options?.recordHistory === false && !this.pendingSceneHistoryBefore) {
+      this.pendingSceneHistoryBefore = this.getSceneSettings();
+    }
+    if (options?.recordHistory ?? true) {
+      const prev = this.pendingSceneHistoryBefore ? this.pendingSceneHistoryBefore : this.getSceneSettings();
+      this.pendingSceneHistoryBefore = null;
+      try {
+        if (JSON.stringify(prev) === JSON.stringify(next)) return;
+      } catch {
+        // ignore serialization failure
+      }
+      await this.executeHistoryOperation({
+        name: options?.operationName ?? '修改场景设置',
+        mergeKey: 'scene-settings',
+        mergeWindowMs: 280,
+        do: () => this.setSceneSettings(next, { recordHistory: false }),
+        undo: () => this.setSceneSettings(prev, { recordHistory: false })
+      });
+      return;
+    }
     const normalized = normalizeSceneSettings(next);
     const prev = this.sceneSettings;
     this.sceneSettings = normalized;
@@ -603,7 +849,27 @@ export class ThreeEditor {
     this.interactionController.setToolEnabled(enabled);
   }
 
-  add(object: THREE.Object3D) {
+  add(object: THREE.Object3D, options?: { recordHistory?: boolean; operationName?: string }) {
+    if (options?.recordHistory ?? true) {
+      const parent = object.parent;
+      void this.executeHistoryOperation({
+        name: options?.operationName ?? `添加物体 - ${object.uuid}`,
+        do: () => this.add(object, { recordHistory: false }),
+        undo: () => {
+          if (!object.parent) return;
+          object.parent.remove(object);
+          if (object === this.selected) this.select(null);
+          this.syncSceneTreeState();
+          this.render();
+        },
+        redo: () => this.add(object, { recordHistory: false })
+      });
+      // 若对象之前挂在其他父节点，执行 add 时会自动 re-parent；这里保持现有行为
+      if (parent && parent !== this.scene) {
+        // no-op，仅保留变量以表明语义
+      }
+      return;
+    }
     // 把外部创建的对象挂载到 three.Scene（不做额外校验）。
     this.scene.add(object);
     // 默认相机 helper：作为独立对象加入 scene，避免作为子节点导致二次变换偏移。
@@ -635,7 +901,30 @@ export class ThreeEditor {
     this.syncSceneTreeState();
   }
 
-  setObjectVisibleByUuid(uuid: string, visible: boolean): boolean {
+  setObjectVisibleByUuid(
+    uuid: string,
+    visible: boolean,
+    options?: { recordHistory?: boolean; operationName?: string }
+  ): boolean {
+    if (options?.recordHistory ?? true) {
+      const currentObj = this.scene.getObjectByProperty('uuid', uuid);
+      const prevVisible = Boolean(currentObj?.visible);
+      if (!currentObj || isNonSelectableInHierarchy(currentObj)) return false;
+      if (prevVisible === visible) return true;
+      const objectName = this.getObjectDisplayName(currentObj);
+      void this.executeHistoryOperation({
+        name: options?.operationName ?? `${visible ? '显示物体' : '隐藏物体'}-${objectName}`,
+        mergeKey: `object-visible:${uuid}`,
+        mergeWindowMs: 280,
+        do: () => {
+          this.setObjectVisibleByUuid(uuid, visible, { recordHistory: false });
+        },
+        undo: () => {
+          this.setObjectVisibleByUuid(uuid, prevVisible, { recordHistory: false });
+        }
+      });
+      return true;
+    }
     const obj = this.scene.getObjectByProperty('uuid', uuid);
     if (!obj || isNonSelectableInHierarchy(obj)) return false;
     obj.visible = visible;
@@ -738,6 +1027,52 @@ export class ThreeEditor {
     const n = Math.max(0, Math.min(index, parent.children.length));
     parent.children.splice(n, 0, child);
     child.parent = parent;
+    this.bindHelpersForSubtree(child);
+  }
+
+  private detachObjectFromParent(child: THREE.Object3D) {
+    this.unbindHelpersForSubtree(child);
+    child.parent?.remove(child);
+  }
+
+  private bindHelpersForSubtree(root: THREE.Object3D) {
+    root.traverse((node: any) => {
+      if (node?.isCamera) {
+        const helper = (node.userData as any)?.[VIZON_USER_DATA_KEYS.HELPERS.CAMERA_HELPER] as THREE.CameraHelper | undefined;
+        if (helper && !this.cameraHelpers.has(node.uuid)) {
+          this.cameraHelpers.set(node.uuid, helper);
+          this.scene.add(helper);
+          helper.update();
+          this.cameraHelpersDirty = true;
+        }
+      }
+      if (node?.isLight) {
+        const helper = (node.userData as any)?.[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] as THREE.Object3D | undefined;
+        if (helper && !this.lightHelpers.has(node.uuid)) {
+          this.lightHelpers.set(node.uuid, helper);
+          this.scene.add(helper);
+          (helper as any).update?.();
+          this.lightHelpersDirty = true;
+        }
+      }
+    });
+  }
+
+  private unbindHelpersForSubtree(root: THREE.Object3D) {
+    root.traverse((node: any) => {
+      const cameraHelper = this.cameraHelpers.get(node.uuid);
+      if (cameraHelper) {
+        cameraHelper.parent?.remove(cameraHelper);
+        this.cameraHelpers.delete(node.uuid);
+        this.cameraHelpersDirty = true;
+      }
+      const lightHelper = this.lightHelpers.get(node.uuid);
+      if (lightHelper) {
+        lightHelper.parent?.remove(lightHelper);
+        this.lightHelpers.delete(node.uuid);
+        this.lightHelpersDirty = true;
+      }
+    });
   }
 
   moveObjectByUuid(
@@ -922,6 +1257,7 @@ export class ThreeEditor {
     this.disposeSelectionBoxHelper();
     this.cameraHelpers.clear();
     this.lightHelpers.clear();
+    this.history.clear();
     this.disposeSceneResources();
     this.renderer.dispose();
   }
@@ -941,14 +1277,32 @@ export class ThreeEditor {
   }
 
   private bindTransformDragHooks() {
-    if (!this.freezeStaticObjects) return;
     this.unbindTransformDragHooks();
 
     this.onTransformDraggingChanged = (e) => {
       if (!this.selected) return;
       const dragging = Boolean(e?.value);
+      if (dragging) {
+        this.transformDragStartSnapshot = this.captureObjectTransform(this.selected);
+      } else if (this.transformDragStartSnapshot) {
+        const before = this.transformDragStartSnapshot;
+        this.transformDragStartSnapshot = null;
+        const target = this.selected;
+        const after = this.captureObjectTransform(target);
+        if (!this.isSameTransformSnapshot(before, after)) {
+          const actionLabel = this.getTransformActionLabel(this.transformMode);
+          void this.executeHistoryOperation({
+            name: `${actionLabel} - ${target.uuid}`,
+            mergeKey: `transform-object:${target.uuid}:${this.transformMode}`,
+            mergeWindowMs: 120,
+            do: () => this.applyObjectTransform(target, after),
+            undo: () => this.applyObjectTransform(target, before)
+          });
+        }
+      }
       if ((this.selected as any).isCamera) this.cameraHelpersDirty = true;
       if ((this.selected as any).isLight) this.lightHelpersDirty = true;
+      if (!this.freezeStaticObjects) return;
       if (dragging) {
         this.staticObjectFreezeController.unfreezeObjectTree(this.selected);
         return;
@@ -1050,6 +1404,154 @@ export class ThreeEditor {
       cur = cur.parent;
     }
     return false;
+  }
+
+  private captureObjectTransform(obj: THREE.Object3D) {
+    return {
+      position: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
+      rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
+      scale: { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z }
+    };
+  }
+
+  private applyObjectTransform(
+    obj: THREE.Object3D,
+    snapshot: {
+      position: { x: number; y: number; z: number };
+      rotation: { x: number; y: number; z: number };
+      scale: { x: number; y: number; z: number };
+    }
+  ) {
+    obj.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
+    obj.rotation.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z);
+    obj.scale.set(snapshot.scale.x, snapshot.scale.y, snapshot.scale.z);
+    obj.updateMatrixWorld(true);
+    this.syncSceneTreeState();
+    this.render();
+  }
+
+  private isSameTransformSnapshot(
+    a: {
+      position: { x: number; y: number; z: number };
+      rotation: { x: number; y: number; z: number };
+      scale: { x: number; y: number; z: number };
+    },
+    b: {
+      position: { x: number; y: number; z: number };
+      rotation: { x: number; y: number; z: number };
+      scale: { x: number; y: number; z: number };
+    }
+  ) {
+    const eps = 1e-6;
+    const close = (x: number, y: number) => Math.abs(x - y) <= eps;
+    return (
+      close(a.position.x, b.position.x) &&
+      close(a.position.y, b.position.y) &&
+      close(a.position.z, b.position.z) &&
+      close(a.rotation.x, b.rotation.x) &&
+      close(a.rotation.y, b.rotation.y) &&
+      close(a.rotation.z, b.rotation.z) &&
+      close(a.scale.x, b.scale.x) &&
+      close(a.scale.y, b.scale.y) &&
+      close(a.scale.z, b.scale.z)
+    );
+  }
+
+  private getObjectDisplayName(obj: THREE.Object3D | null | undefined) {
+    if (!obj) return '未命名对象';
+    const n = String(obj.name ?? '').trim();
+    if (n) return n;
+    return String(obj.type ?? 'Object');
+  }
+
+  private getTransformActionLabel(mode: TransformMode) {
+    if (mode === 'rotate') return '旋转物体';
+    if (mode === 'scale') return '缩放物体';
+    return '拖拽物体';
+  }
+
+  private formatHistoryValue(value: unknown) {
+    if (value == null) return '';
+    if (typeof value === 'string') {
+      const v = value.trim();
+      if (!v) return '""';
+      return v.length > 32 ? `${v.slice(0, 32)}…` : v;
+    }
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) return '';
+      // 尽量短：整数原样，小数最多 4 位
+      return Math.abs(value - Math.round(value)) < 1e-9 ? String(Math.round(value)) : String(Number(value.toFixed(4)));
+    }
+    if (typeof value === 'boolean') return value ? 'true' : 'false';
+    // 对象/数组不直接塞进标题，避免过长
+    return '';
+  }
+
+  private isHistoryValueEqual(a: unknown, b: unknown) {
+    if (Object.is(a, b)) return true;
+    if (typeof a !== typeof b) return false;
+    if (a == null || b == null) return false;
+    if (typeof a === 'object') {
+      try {
+        return JSON.stringify(a) === JSON.stringify(b);
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  private emitHistoryChange() {
+    this.events.emit('historyChange', {
+      records: this.history.getRecords(),
+      canUndo: this.history.canUndo(),
+      canRedo: this.history.canRedo()
+    });
+  }
+
+  private cloneForHistory<T>(value: T): T {
+    if (value == null) return value;
+    if (typeof value !== 'object') return value;
+    try {
+      return JSON.parse(JSON.stringify(value)) as T;
+    } catch {
+      return value;
+    }
+  }
+
+  private readNestedValue(source: any, path: string) {
+    if (!path) return source;
+    const keys = path.split('.');
+    let cur = source;
+    for (const key of keys) {
+      if (cur == null) return undefined;
+      cur = cur[key];
+    }
+    return this.cloneForHistory(cur);
+  }
+
+  private writeNestedValue(target: any, path: string, value: unknown) {
+    const keys = path.split('.');
+    if (keys.length === 0) return;
+    let cur = target;
+    for (let i = 0; i < keys.length - 1; i += 1) {
+      const key = keys[i];
+      if (cur[key] == null || typeof cur[key] !== 'object') cur[key] = {};
+      cur = cur[key];
+    }
+    cur[keys[keys.length - 1]] = value;
+    // 当对象树启用了静态矩阵冻结（matrixAutoUpdate=false）时，
+    // 直接写 position/rotation/scale 不会自动刷新矩阵，导致需要下一次交互才“看见变化”。
+    // 这里对 Object3D 做一次兜底更新，保证 Inspector 输入实时反馈。
+    const maybeObj3d = target as any;
+    if (maybeObj3d?.isObject3D) {
+      if (maybeObj3d.matrixAutoUpdate === false) {
+        maybeObj3d.updateMatrix?.();
+      }
+      maybeObj3d.updateMatrixWorld?.(true);
+    }
+    this.syncSceneTreeState();
+    this.render();
   }
 }
 

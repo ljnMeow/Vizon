@@ -54,13 +54,15 @@ function AxisNumberInput({
   value,
   disabled,
   step,
-  onChange
+  onPreviewChange,
+  onCommit
 }: {
   label: string;
   value: number;
   disabled: boolean;
   step?: number;
-  onChange: (next: number) => void;
+  onPreviewChange: (next: number) => void;
+  onCommit: (next: number) => void;
 }) {
   return (
     <div className="space-y-1">
@@ -73,7 +75,15 @@ function AxisNumberInput({
         onChange={(e) => {
           const next = Number(e.target.value);
           if (!Number.isFinite(next)) return;
-          onChange(next);
+          onPreviewChange(next);
+        }}
+        onBlur={(e) => {
+          const next = Number((e.target as HTMLInputElement).value);
+          if (!Number.isFinite(next)) return;
+          onCommit(next);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
         }}
         className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors disabled:opacity-60 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
       />
@@ -89,16 +99,22 @@ export function BaseSetting({
   visibilityPickFreeze,
   opacityState,
   renderOrderState,
-  onNameChange,
+  onNamePreviewChange,
+  onNameCommit,
   copyUuid,
-  updatePositionAxis,
-  updateRotationAxis,
-  updateScaleAxis,
+  previewPositionAxis,
+  commitPositionAxis,
+  previewRotationAxis,
+  commitRotationAxis,
+  previewScaleAxis,
+  commitScaleAxis,
   setVisible,
   setPickable,
   setFrozen,
-  setOpacity,
-  setRenderOrder,
+  previewOpacity,
+  commitOpacity,
+  previewRenderOrder,
+  commitRenderOrder,
   setCastShadow,
   setReceiveShadow,
   setFrustumCulled
@@ -110,16 +126,22 @@ export function BaseSetting({
   visibilityPickFreeze: VisibilityPickFreezeState | null;
   opacityState: OpacityState | null;
   renderOrderState: RenderOrderState | null;
-  onNameChange: (nextName: string) => void;
+  onNamePreviewChange: (nextName: string) => void;
+  onNameCommit: (nextName: string) => void;
   copyUuid: () => void | Promise<void>;
-  updatePositionAxis: (axis: AxisKey, next: number) => void;
-  updateRotationAxis: (axis: AxisKey, next: number) => void;
-  updateScaleAxis: (axis: AxisKey, next: number) => void;
+  previewPositionAxis: (axis: AxisKey, next: number) => void;
+  commitPositionAxis: (axis: AxisKey, next: number) => void;
+  previewRotationAxis: (axis: AxisKey, next: number) => void;
+  commitRotationAxis: (axis: AxisKey, next: number) => void;
+  previewScaleAxis: (axis: AxisKey, next: number) => void;
+  commitScaleAxis: (axis: AxisKey, next: number) => void;
   setVisible: (nextVisible: boolean) => void;
   setPickable: (nextPickable: boolean) => void;
   setFrozen: (nextFrozen: boolean) => void;
-  setOpacity: (nextOpacity: number) => void;
-  setRenderOrder: (nextRenderOrder: number) => void;
+  previewOpacity: (nextOpacity: number) => void;
+  commitOpacity: (nextOpacity: number) => void;
+  previewRenderOrder: (nextRenderOrder: number) => void;
+  commitRenderOrder: (nextRenderOrder: number) => void;
   setCastShadow: (nextCastShadow: boolean) => void;
   setReceiveShadow: (nextReceiveShadow: boolean) => void;
   setFrustumCulled: (nextFrustumCulled: boolean) => void;
@@ -167,7 +189,11 @@ export function BaseSetting({
         <label className="block text-[11px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.nameLabel}</label>
         <input
           value={selectedInfo?.name ?? ''}
-          onChange={(e) => onNameChange(e.target.value)}
+          onChange={(e) => onNamePreviewChange(e.target.value)}
+          onBlur={(e) => onNameCommit(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+          }}
           className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
           placeholder={labels.namePlaceholder}
           disabled={isDisabled}
@@ -182,19 +208,22 @@ export function BaseSetting({
             label={labels.xLabel}
             value={transform?.position.x ?? 0}
             disabled={isDisabled}
-            onChange={(v) => updatePositionAxis('x', v)}
+            onPreviewChange={(v) => previewPositionAxis('x', v)}
+            onCommit={(v) => commitPositionAxis('x', v)}
           />
           <AxisNumberInput
             label={labels.yLabel}
             value={transform?.position.y ?? 0}
             disabled={isDisabled}
-            onChange={(v) => updatePositionAxis('y', v)}
+            onPreviewChange={(v) => previewPositionAxis('y', v)}
+            onCommit={(v) => commitPositionAxis('y', v)}
           />
           <AxisNumberInput
             label={labels.zLabel}
             value={transform?.position.z ?? 0}
             disabled={isDisabled}
-            onChange={(v) => updatePositionAxis('z', v)}
+            onPreviewChange={(v) => previewPositionAxis('z', v)}
+            onCommit={(v) => commitPositionAxis('z', v)}
           />
         </div>
       </div>
@@ -207,19 +236,22 @@ export function BaseSetting({
             label={labels.xLabel}
             value={transform?.rotation.x ?? 0}
             disabled={isDisabled}
-            onChange={(v) => updateRotationAxis('x', v)}
+            onPreviewChange={(v) => previewRotationAxis('x', v)}
+            onCommit={(v) => commitRotationAxis('x', v)}
           />
           <AxisNumberInput
             label={labels.yLabel}
             value={transform?.rotation.y ?? 0}
             disabled={isDisabled}
-            onChange={(v) => updateRotationAxis('y', v)}
+            onPreviewChange={(v) => previewRotationAxis('y', v)}
+            onCommit={(v) => commitRotationAxis('y', v)}
           />
           <AxisNumberInput
             label={labels.zLabel}
             value={transform?.rotation.z ?? 0}
             disabled={isDisabled}
-            onChange={(v) => updateRotationAxis('z', v)}
+            onPreviewChange={(v) => previewRotationAxis('z', v)}
+            onCommit={(v) => commitRotationAxis('z', v)}
           />
         </div>
       </div>
@@ -233,21 +265,24 @@ export function BaseSetting({
             value={transform?.scale.x ?? 1}
             disabled={isDisabled}
             step={0.01}
-            onChange={(v) => updateScaleAxis('x', v)}
+            onPreviewChange={(v) => previewScaleAxis('x', v)}
+            onCommit={(v) => commitScaleAxis('x', v)}
           />
           <AxisNumberInput
             label={labels.yLabel}
             value={transform?.scale.y ?? 1}
             disabled={isDisabled}
             step={0.01}
-            onChange={(v) => updateScaleAxis('y', v)}
+            onPreviewChange={(v) => previewScaleAxis('y', v)}
+            onCommit={(v) => commitScaleAxis('y', v)}
           />
           <AxisNumberInput
             label={labels.zLabel}
             value={transform?.scale.z ?? 1}
             disabled={isDisabled}
             step={0.01}
-            onChange={(v) => updateScaleAxis('z', v)}
+            onPreviewChange={(v) => previewScaleAxis('z', v)}
+            onCommit={(v) => commitScaleAxis('z', v)}
           />
         </div>
       </div>
@@ -352,7 +387,10 @@ export function BaseSetting({
           step={0.01}
           value={opacityState?.opacity ?? 1}
           disabled={isDisabled || !opacityState?.canOpacity}
-          onChange={(e) => setOpacity(Number(e.target.value))}
+          onChange={(e) => previewOpacity(Number(e.target.value))}
+          onPointerUp={(e) => commitOpacity(Number((e.target as HTMLInputElement).value))}
+          onMouseUp={(e) => commitOpacity(Number((e.target as HTMLInputElement).value))}
+          onTouchEnd={(e) => commitOpacity(Number((e.target as HTMLInputElement).value))}
           className="w-full disabled:opacity-50"
         />
       </div>
@@ -372,7 +410,10 @@ export function BaseSetting({
           step={1}
           value={Math.max(0, Math.min(999, Math.round(renderOrderState?.renderOrder ?? 0)))}
           disabled={isDisabled || !renderOrderState?.canRenderOrder}
-          onChange={(e) => setRenderOrder(Number(e.target.value))}
+          onChange={(e) => previewRenderOrder(Number(e.target.value))}
+          onPointerUp={(e) => commitRenderOrder(Number((e.target as HTMLInputElement).value))}
+          onMouseUp={(e) => commitRenderOrder(Number((e.target as HTMLInputElement).value))}
+          onTouchEnd={(e) => commitRenderOrder(Number((e.target as HTMLInputElement).value))}
           className="w-full disabled:opacity-50"
         />
       </div>

@@ -11,6 +11,7 @@ import { message } from '../../../components/GlobalMessage';
 import { dialog } from '../../../components/GlobalDialog';
 import { updateCustomer } from '../../../api/customers';
 import { UpdateUserForm, type UpdateUserFormApi } from './UpdateUserForm';
+import { ActionBar } from './ActionBar';
 
 type StoredUser = {
   account_id?: string;
@@ -91,6 +92,7 @@ export function DesignHeader() {
       </div>
 
       <div ref={menuContainerRef} className="relative z-[2147483647] flex items-center gap-3">
+        <ActionBar />
         <button
           type="button"
           onClick={toggleTheme}

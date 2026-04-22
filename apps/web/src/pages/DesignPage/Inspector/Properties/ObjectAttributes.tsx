@@ -304,13 +304,24 @@ export function ObjectAttributes({
 
       if (!nextGeometry) return;
 
-      try {
-        obj.geometry = nextGeometry;
-      } finally {
-        oldGeometry?.dispose?.();
-      }
-      obj.updateMatrixWorld?.(true);
-      setRefreshKey((x) => x + 1);
+      const valueText = typeof nextValue === 'number' ? String(Number(nextValue.toFixed?.(4) ?? nextValue)) : String(nextValue);
+      const labelItem = attributes.find((it) => it.paramKey === paramKey);
+      const displayLabel = labelItem?.label ?? paramKey;
+      void editor.executeHistoryOperation({
+        name: `修改物体属性 - ${selectedInfo.uuid} - ${displayLabel} = ${valueText}`,
+        do: () => {
+          obj.geometry = nextGeometry;
+          obj.updateMatrixWorld?.(true);
+          setRefreshKey((x) => x + 1);
+          editor.render();
+        },
+        undo: () => {
+          obj.geometry = oldGeometry;
+          obj.updateMatrixWorld?.(true);
+          setRefreshKey((x) => x + 1);
+          editor.render();
+        }
+      });
     },
     [attributes, editor, modelKey, modelTitle, selectedInfo?.uuid]
   );
@@ -360,12 +371,23 @@ export function ObjectAttributes({
                 if (!editor || !selectedInfo?.uuid) return;
                 const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
                 if (!obj) return;
-                obj.userData = obj.userData ?? {};
-                obj.userData.__vizonConduitEditEnabled = e.target.checked;
-                // force rerender so toggle reflects immediately
-                setRefreshKey((x) => x + 1);
-                // re-emit selection sync (core controller listens on select)
-                editor.select(obj);
+                const next = e.target.checked;
+                const prev = Boolean(obj?.userData?.__vizonConduitEditEnabled);
+                void editor.executeHistoryOperation({
+                  name: `修改物体属性 - ${selectedInfo.uuid} - ${objAttrT.conduitEditToggleLabel} = ${next ? objAttrT.yesLabel : objAttrT.noLabel}`,
+                  do: () => {
+                    obj.userData = obj.userData ?? {};
+                    obj.userData.__vizonConduitEditEnabled = next;
+                    setRefreshKey((x) => x + 1);
+                    editor.select(obj);
+                  },
+                  undo: () => {
+                    obj.userData = obj.userData ?? {};
+                    obj.userData.__vizonConduitEditEnabled = prev;
+                    setRefreshKey((x) => x + 1);
+                    editor.select(obj);
+                  }
+                });
               }}
               className="h-4 w-4"
             />

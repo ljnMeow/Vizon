@@ -69,10 +69,12 @@ export interface AppMessages {
     systemTab: string;
     mineTab: string;
     structureTab: string;
+    historyTab: string;
     systemPlaceholder: string;
     minePlaceholder: string;
     structurePlaceholder: string;
     structureEmpty: string;
+    historyEmpty: string;
   };
   systemAssets: {
     modelsTab: string;
@@ -494,10 +496,12 @@ export const appMessages: Record<Locale, AppMessages> = {
       systemTab: '系统资源',
       mineTab: '我的资源',
       structureTab: '结构',
+      historyTab: '历史',
       systemPlaceholder: '系统预设资源将在这里展示。',
       minePlaceholder: '用户上传的资源将在这里展示。',
       structurePlaceholder: '场景结构树将在这里展示。',
-      structureEmpty: '场景树为空'
+      structureEmpty: '场景树为空',
+      historyEmpty: '暂无操作历史'
     },
     systemAssets: {
       modelsTab: '模型',
@@ -911,10 +915,12 @@ export const appMessages: Record<Locale, AppMessages> = {
       systemTab: 'System Assets',
       mineTab: 'My Assets',
       structureTab: 'Structure',
+      historyTab: 'History',
       systemPlaceholder: 'System presets will be displayed here.',
       minePlaceholder: 'Your uploaded assets will be displayed here.',
       structurePlaceholder: 'Scene structure tree will be displayed here.',
-      structureEmpty: 'Scene tree is empty'
+      structureEmpty: 'Scene tree is empty',
+      historyEmpty: 'No history records yet'
     },
     systemAssets: {
       modelsTab: 'Models',

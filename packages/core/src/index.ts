@@ -19,6 +19,7 @@ export type {
   ViewPreset,
   ViewTransitionOptions
 } from './editor/ThreeEditor';
+export type { EditorHistoryRecord, EditorHistoryOperation } from './editor/HistoryManager';
 /** 场景树节点类型：供结构面板、拖拽等 UI 使用 */
 export type { SceneTreeNode, SceneTreeNodeKind } from './settings/sceneTree';
 /** 轻量发布-订阅退订函数类型 */

@@ -1,5 +1,6 @@
 import { ColorPicker } from '../../../../components/ColorPicker';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
+import { useEffect, useState } from 'react';
 
 export type SceneSettingsHelpersLabels = {
   title: string;
@@ -16,8 +17,10 @@ export type SceneSettingsGridLabels = {
 };
 
 function GridHelperSettings({ labels }: { labels: SceneSettingsGridLabels }) {
-  const { sceneSettings, setGridEnabled, setGridColor, setGridOpacity } = useSceneSettings();
+  const { sceneSettings, updateSceneSettings, setGridEnabled, setGridColor, setGridOpacity } = useSceneSettings();
   const { enabled, color, opacity } = sceneSettings.grid;
+  const [draftOpacity, setDraftOpacity] = useState(opacity);
+  useEffect(() => setDraftOpacity(opacity), [opacity]);
 
   return (
     <div className="space-y-3">
@@ -59,8 +62,19 @@ function GridHelperSettings({ labels }: { labels: SceneSettingsGridLabels }) {
               min={0}
               max={1}
               step={0.01}
-              value={opacity}
-              onChange={(e) => setGridOpacity(Number(e.target.value))}
+              value={draftOpacity}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                if (!Number.isFinite(v)) return;
+                setDraftOpacity(v);
+                updateSceneSettings(
+                  (prev) => ({ ...prev, grid: { ...prev.grid, opacity: v } }),
+                  { recordHistory: false }
+                );
+              }}
+              onPointerUp={() => setGridOpacity(draftOpacity)}
+              onMouseUp={() => setGridOpacity(draftOpacity)}
+              onTouchEnd={() => setGridOpacity(draftOpacity)}
               className="w-full"
             />
           </div>
@@ -77,8 +91,10 @@ export function SceneSettingsHelpersItem({
   labels: SceneSettingsHelpersLabels;
   gridLabels: SceneSettingsGridLabels;
 }) {
-  const { sceneSettings, setAxesEnabled, setAxesSize } = useSceneSettings();
+  const { sceneSettings, updateSceneSettings, setAxesEnabled, setAxesSize } = useSceneSettings();
   const { axes } = sceneSettings.helpers;
+  const [draftAxesSize, setDraftAxesSize] = useState(axes.size);
+  useEffect(() => setDraftAxesSize(axes.size), [axes.size]);
 
   return (
     <div className="space-y-4">
@@ -107,8 +123,22 @@ export function SceneSettingsHelpersItem({
               min={0.1}
               max={100}
               step={0.1}
-              value={axes.size}
-              onChange={(e) => setAxesSize(Number(e.target.value))}
+              value={draftAxesSize}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                if (!Number.isFinite(v)) return;
+                setDraftAxesSize(v);
+                updateSceneSettings(
+                  (prev) => ({
+                    ...prev,
+                    helpers: { ...prev.helpers, axes: { ...prev.helpers.axes, size: v } }
+                  }),
+                  { recordHistory: false }
+                );
+              }}
+              onPointerUp={() => setAxesSize(draftAxesSize)}
+              onMouseUp={() => setAxesSize(draftAxesSize)}
+              onTouchEnd={() => setAxesSize(draftAxesSize)}
               disabled={!axes.enabled}
               className="w-full disabled:opacity-50"
             />

@@ -5,8 +5,9 @@ import { useLocale } from '../../../hooks/useLocale';
 import { appMessages } from '../../../i18n/messages';
 import { SystemAssets } from './SystemAssets/index';
 import { Structure } from './Structure/index';
+import { History } from './History/index';
 
-type AssetTab = 'system' | 'mine' | 'structure';
+type AssetTab = 'system' | 'mine' | 'structure' | 'history';
 
 /**
  * 左侧资产列表面板：
@@ -18,11 +19,13 @@ export function AssetPane({ visible }: { visible: boolean }) {
   const [activeTab, setActiveTab] = useState<AssetTab>('system');
   const { locale } = useLocale();
   const t = appMessages[locale].assetPane;
+  const historyTabLabel = (t as any).historyTab ?? (locale === 'zh-CN' ? '历史' : 'History');
 
   const tabs: TabItem<AssetTab>[] = [
     { key: 'system', label: t.systemTab },
     { key: 'mine', label: t.mineTab },
-    { key: 'structure', label: t.structureTab }
+    { key: 'structure', label: t.structureTab },
+    { key: 'history', label: historyTabLabel }
   ];
 
   return (
@@ -51,6 +54,9 @@ export function AssetPane({ visible }: { visible: boolean }) {
           }
           if (key === 'structure') {
             return <Structure />;
+          }
+          if (key === 'history') {
+            return <History />;
           }
         }}
       </Tabs>

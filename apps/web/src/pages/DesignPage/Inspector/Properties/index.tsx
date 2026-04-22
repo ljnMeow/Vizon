@@ -284,13 +284,18 @@ export function PropertiesSettings() {
     return typeof key === 'string' && BASIC_MODEL_KEYS.has(key);
   }, [editor, selectedInfo?.uuid]);
 
-  const onNameChange = (nextName: string) => {
+  const onNamePreviewChange = (nextName: string) => {
     if (!editor || !selectedInfo) return;
-    // 先直接修改 three 对象 name；sceneTree 的重绘/同步在后续接入。
-    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
-    if (!obj) return;
-    obj.name = nextName;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'name', nextName, { recordHistory: false });
     setSelectedInfo({ ...selectedInfo, name: nextName });
+  };
+
+  const onNameCommit = (nextName: string) => {
+    if (!editor || !selectedInfo) return;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'name', nextName, {
+      recordHistory: true,
+      operationName: `修改物体属性 - ${selectedInfo.uuid} - 名称 = ${nextName || '""'}`
+    });
   };
 
   const copyUuid = async () => {
@@ -304,33 +309,56 @@ export function PropertiesSettings() {
     void message.success(labels.copiedLabel);
   };
 
-  const updatePositionAxis = (axis: AxisKey, next: number) => {
+  const previewPositionAxis = (axis: AxisKey, next: number) => {
     if (!editor || !selectedInfo || !transform) return;
-    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
-    if (!obj) return;
-    obj.position[axis] = next;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, `position.${axis}`, next, { recordHistory: false });
     setTransform((prev) => (prev ? { ...prev, position: { ...prev.position, [axis]: next } } : prev));
   };
 
-  const updateRotationAxis = (axis: AxisKey, next: number) => {
+  const commitPositionAxis = (axis: AxisKey, next: number) => {
     if (!editor || !selectedInfo || !transform) return;
-    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
-    if (!obj) return;
-    obj.rotation[axis] = next;
+    const nextPos = { ...transform.position, [axis]: next };
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, `position.${axis}`, next, {
+      recordHistory: true,
+      operationName: `修改物体属性 - ${selectedInfo.uuid} - 位置 = (${Number(nextPos.x.toFixed(4))}, ${Number(nextPos.y.toFixed(4))}, ${Number(nextPos.z.toFixed(4))})`
+    });
+  };
+
+  const previewRotationAxis = (axis: AxisKey, next: number) => {
+    if (!editor || !selectedInfo || !transform) return;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, `rotation.${axis}`, next, { recordHistory: false });
     setTransform((prev) => (prev ? { ...prev, rotation: { ...prev.rotation, [axis]: next } } : prev));
   };
 
-  const updateScaleAxis = (axis: AxisKey, next: number) => {
+  const commitRotationAxis = (axis: AxisKey, next: number) => {
     if (!editor || !selectedInfo || !transform) return;
-    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
-    if (!obj) return;
-    obj.scale[axis] = next;
+    const nextRot = { ...transform.rotation, [axis]: next };
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, `rotation.${axis}`, next, {
+      recordHistory: true,
+      operationName: `修改物体属性 - ${selectedInfo.uuid} - 旋转 = (${Number(nextRot.x.toFixed(4))}, ${Number(nextRot.y.toFixed(4))}, ${Number(nextRot.z.toFixed(4))})`
+    });
+  };
+
+  const previewScaleAxis = (axis: AxisKey, next: number) => {
+    if (!editor || !selectedInfo || !transform) return;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, `scale.${axis}`, next, { recordHistory: false });
     setTransform((prev) => (prev ? { ...prev, scale: { ...prev.scale, [axis]: next } } : prev));
+  };
+
+  const commitScaleAxis = (axis: AxisKey, next: number) => {
+    if (!editor || !selectedInfo || !transform) return;
+    const nextScale = { ...transform.scale, [axis]: next };
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, `scale.${axis}`, next, {
+      recordHistory: true,
+      operationName: `修改物体属性 - ${selectedInfo.uuid} - 缩放 = (${Number(nextScale.x.toFixed(4))}, ${Number(nextScale.y.toFixed(4))}, ${Number(nextScale.z.toFixed(4))})`
+    });
   };
 
   const setVisible = (nextVisible: boolean) => {
     if (!editor || !selectedInfo) return;
-    const ok = editor.setObjectVisibleByUuid(selectedInfo.uuid, nextVisible);
+    const ok = editor.setObjectVisibleByUuid(selectedInfo.uuid, nextVisible, {
+      operationName: `修改物体属性 - ${selectedInfo.uuid} - 可见 = ${nextVisible ? 'true' : 'false'}`
+    });
     if (!ok) return;
     // 若 nextVisible=false 触发 select(null)，上面的 select 回调会把 state 清空；这里乐观更新即可。
     setVisibilityPickFreeze((prev) => (prev ? { ...prev, visible: nextVisible } : prev));
@@ -343,20 +371,30 @@ export function PropertiesSettings() {
     const canPickable = !hasNonSelectableAncestor(obj);
     if (!canPickable) return;
 
-    if (nextPickable) {
-      if (obj.userData) {
-        delete obj.userData.__vizonNonPickable;
-        // 兼容旧版本：之前错误地用 __vizonNonSelectable 控制 pickable
+    const prevUserData = { ...(obj.userData ?? {}) };
+    const applyPickable = (next: boolean) => {
+      if (next) {
+        if (obj.userData) {
+          delete obj.userData.__vizonNonPickable;
+          delete obj.userData.__vizonNonSelectable;
+        }
+      } else {
+        obj.userData = obj.userData ?? {};
+        obj.userData.__vizonNonPickable = true;
         delete obj.userData.__vizonNonSelectable;
       }
-    } else {
-      obj.userData = obj.userData ?? {};
-      obj.userData.__vizonNonPickable = true;
-      // 兼容旧版本：不要把它标记成 non-selectable（否则会在结构树消失）
-      delete obj.userData.__vizonNonSelectable;
-    }
-
-    setVisibilityPickFreeze(readSelectedVisibilityPickFreeze(obj));
+      setVisibilityPickFreeze(readSelectedVisibilityPickFreeze(obj));
+      editor.render();
+    };
+    void editor.executeHistoryOperation({
+      name: `修改物体属性 - ${selectedInfo.uuid} - 可拾取 = ${nextPickable ? 'true' : 'false'}`,
+      do: () => applyPickable(nextPickable),
+      undo: () => {
+        obj.userData = { ...prevUserData };
+        setVisibilityPickFreeze(readSelectedVisibilityPickFreeze(obj));
+        editor.render();
+      }
+    });
   };
 
   const setFrozen = (nextFrozen: boolean) => {
@@ -366,37 +404,54 @@ export function PropertiesSettings() {
 
     if (!computeFreezeCapability(obj)) return;
 
-    if (nextFrozen) {
-      // 让 core 的 freezeObjectTree 可以重新冻结
-      if (obj.userData) delete obj.userData.__vizonDynamic;
-      obj.traverse((node: any) => {
-        if ((node as any)?.isCamera) return;
-        if ((node as any)?.isLight) return;
-        if ((node as any)?.isBone) return;
-        if ((node as any)?.isSkinnedMesh) return;
-        if ((node as any)?.isTransformControls) return;
-        if (node?.type === 'TransformControlsGizmo' || node?.type === 'TransformControlsPlane') return;
-        if (Boolean(node?.userData?.__vizonNonSelectable)) return;
-        if (Boolean(node?.userData?.__vizonDynamic)) return;
-
-        node.matrixAutoUpdate = false;
-        node.updateMatrix();
-        node.updateMatrixWorld(true);
-      });
-    } else {
-      // 让 core 后续拖拽结束不会再把它冻结回来
-      obj.userData = obj.userData ?? {};
-      obj.userData.__vizonDynamic = true;
-      obj.traverse((node: any) => {
-        node.matrixAutoUpdate = true;
-        node.updateMatrixWorld(true);
-      });
-    }
-
-    setVisibilityPickFreeze(readSelectedVisibilityPickFreeze(obj));
+    const prevUserData = { ...(obj.userData ?? {}) };
+    const prevStates: Array<{ node: any; matrixAutoUpdate: boolean }> = [];
+    obj.traverse((node: any) => {
+      prevStates.push({ node, matrixAutoUpdate: Boolean(node.matrixAutoUpdate) });
+    });
+    const applyFrozen = (next: boolean) => {
+      if (next) {
+        if (obj.userData) delete obj.userData.__vizonDynamic;
+        obj.traverse((node: any) => {
+          if ((node as any)?.isCamera) return;
+          if ((node as any)?.isLight) return;
+          if ((node as any)?.isBone) return;
+          if ((node as any)?.isSkinnedMesh) return;
+          if ((node as any)?.isTransformControls) return;
+          if (node?.type === 'TransformControlsGizmo' || node?.type === 'TransformControlsPlane') return;
+          if (Boolean(node?.userData?.__vizonNonSelectable)) return;
+          if (Boolean(node?.userData?.__vizonDynamic)) return;
+          node.matrixAutoUpdate = false;
+          node.updateMatrix();
+          node.updateMatrixWorld(true);
+        });
+      } else {
+        obj.userData = obj.userData ?? {};
+        obj.userData.__vizonDynamic = true;
+        obj.traverse((node: any) => {
+          node.matrixAutoUpdate = true;
+          node.updateMatrixWorld(true);
+        });
+      }
+      setVisibilityPickFreeze(readSelectedVisibilityPickFreeze(obj));
+      editor.render();
+    };
+    void editor.executeHistoryOperation({
+      name: `修改物体属性 - ${selectedInfo.uuid} - 冻结 = ${nextFrozen ? 'true' : 'false'}`,
+      do: () => applyFrozen(nextFrozen),
+      undo: () => {
+        obj.userData = { ...prevUserData };
+        for (const item of prevStates) {
+          item.node.matrixAutoUpdate = item.matrixAutoUpdate;
+          item.node.updateMatrixWorld?.(true);
+        }
+        setVisibilityPickFreeze(readSelectedVisibilityPickFreeze(obj));
+        editor.render();
+      }
+    });
   };
 
-  const setOpacity = (nextOpacity: number) => {
+  const previewOpacity = (nextOpacity: number) => {
     if (!editor || !selectedInfo) return;
     const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
     if (!obj) return;
@@ -411,6 +466,38 @@ export function PropertiesSettings() {
       m.needsUpdate = true;
     }
     setOpacityState({ opacity: clamped, canOpacity: true });
+    editor.render();
+  };
+
+  const commitOpacity = (nextOpacity: number) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
+    if (!obj) return;
+    const materials = getObjectMaterials(obj);
+    if (materials.length === 0) return;
+    const clamped = Math.max(0, Math.min(1, nextOpacity));
+    const before = materials.map((m) => ({ m, opacity: m.opacity, transparent: m.transparent }));
+    void editor.executeHistoryOperation({
+      name: `修改物体属性 - ${selectedInfo.uuid} - 透明度 = ${Number(clamped.toFixed(4))}`,
+      do: () => {
+        for (const m of materials) {
+          m.transparent = clamped < 1;
+          m.opacity = clamped;
+          m.needsUpdate = true;
+        }
+        setOpacityState({ opacity: clamped, canOpacity: true });
+        editor.render();
+      },
+      undo: () => {
+        for (const item of before) {
+          item.m.opacity = item.opacity;
+          item.m.transparent = item.transparent;
+          item.m.needsUpdate = true;
+        }
+        setOpacityState({ opacity: before[0]?.opacity ?? clamped, canOpacity: true });
+        editor.render();
+      }
+    });
   };
 
   const setRenderOrder = (nextRenderOrder: number) => {
@@ -419,7 +506,26 @@ export function PropertiesSettings() {
     if (!obj) return;
 
     const next = Math.max(0, Math.min(999, Math.round(nextRenderOrder)));
-    (obj as any).renderOrder = next;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'renderOrder', next, {
+      operationName: `修改物体属性 - ${selectedInfo.uuid} - 渲染层级 = ${next}`
+    });
+    setRenderOrderState({ renderOrder: next, canRenderOrder: true });
+  };
+
+  const previewRenderOrder = (nextRenderOrder: number) => {
+    if (!editor || !selectedInfo) return;
+    const next = Math.max(0, Math.min(999, Math.round(nextRenderOrder)));
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'renderOrder', next, { recordHistory: false });
+    setRenderOrderState({ renderOrder: next, canRenderOrder: true });
+  };
+
+  const commitRenderOrder = (nextRenderOrder: number) => {
+    if (!editor || !selectedInfo) return;
+    const next = Math.max(0, Math.min(999, Math.round(nextRenderOrder)));
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'renderOrder', next, {
+      recordHistory: true,
+      operationName: `修改物体属性 - ${selectedInfo.uuid} - 渲染层级 = ${next}`
+    });
     setRenderOrderState({ renderOrder: next, canRenderOrder: true });
   };
 
@@ -428,7 +534,9 @@ export function PropertiesSettings() {
     const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
     if (!obj) return;
     if (typeof (obj as any).castShadow !== 'boolean') return;
-    (obj as any).castShadow = nextCastShadow;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'castShadow', nextCastShadow, {
+      operationName: `修改物体属性 - ${selectedInfo.uuid} - 产生阴影 = ${nextCastShadow ? 'true' : 'false'}`
+    });
     setShadow((prev) => (prev ? { ...prev, castShadow: nextCastShadow, canCastShadow: true } : prev));
   };
 
@@ -437,7 +545,9 @@ export function PropertiesSettings() {
     const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
     if (!obj) return;
     if (typeof (obj as any).receiveShadow !== 'boolean') return;
-    (obj as any).receiveShadow = nextReceiveShadow;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'receiveShadow', nextReceiveShadow, {
+      operationName: `修改物体属性 - ${selectedInfo.uuid} - 接收阴影 = ${nextReceiveShadow ? 'true' : 'false'}`
+    });
     setShadow((prev) => (prev ? { ...prev, receiveShadow: nextReceiveShadow, canReceiveShadow: true } : prev));
   };
 
@@ -446,7 +556,9 @@ export function PropertiesSettings() {
     const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
     if (!obj) return;
     if (typeof (obj as any).frustumCulled !== 'boolean') return;
-    (obj as any).frustumCulled = nextFrustumCulled;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'frustumCulled', nextFrustumCulled, {
+      operationName: `修改物体属性 - ${selectedInfo.uuid} - 视锥裁剪 = ${nextFrustumCulled ? 'true' : 'false'}`
+    });
     setShadow((prev) => (prev ? { ...prev, frustumCulled: nextFrustumCulled, canFrustumCulled: true } : prev));
   };
 
@@ -467,16 +579,22 @@ export function PropertiesSettings() {
               visibilityPickFreeze={visibilityPickFreeze}
               opacityState={opacityState}
               renderOrderState={renderOrderState}
-              onNameChange={onNameChange}
+              onNamePreviewChange={onNamePreviewChange}
+              onNameCommit={onNameCommit}
               copyUuid={copyUuid}
-              updatePositionAxis={updatePositionAxis}
-              updateRotationAxis={updateRotationAxis}
-              updateScaleAxis={updateScaleAxis}
+              previewPositionAxis={previewPositionAxis}
+              commitPositionAxis={commitPositionAxis}
+              previewRotationAxis={previewRotationAxis}
+              commitRotationAxis={commitRotationAxis}
+              previewScaleAxis={previewScaleAxis}
+              commitScaleAxis={commitScaleAxis}
               setVisible={setVisible}
               setPickable={setPickable}
               setFrozen={setFrozen}
-              setOpacity={setOpacity}
-              setRenderOrder={setRenderOrder}
+              previewOpacity={previewOpacity}
+              commitOpacity={commitOpacity}
+              previewRenderOrder={previewRenderOrder}
+              commitRenderOrder={commitRenderOrder}
               setCastShadow={setCastShadow}
               setReceiveShadow={setReceiveShadow}
               setFrustumCulled={setFrustumCulled}

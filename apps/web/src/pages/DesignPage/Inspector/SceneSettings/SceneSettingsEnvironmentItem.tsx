@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { ColorPicker } from '../../../../components/ColorPicker';
 import { ImagePreviewDialog } from '../../../../components/ImagePreviewDialog';
@@ -41,14 +41,12 @@ export function SceneSettingsEnvironmentItem({
 }) {
   const {
     sceneSettings,
-    setBackgroundMode,
+    updateSceneSettings,
     setBackgroundColor,
     setHdri,
     setEnvironmentStrength,
     setFogEnabled,
     setFogColor,
-    setFogNear,
-    setFogFar
   } = useSceneSettings();
 
   const settings = sceneSettings.environment;
@@ -59,6 +57,15 @@ export function SceneSettingsEnvironmentItem({
     fog: { enabled: fogEnabled, color: fogColor, near: fogNear, far: fogFar },
     hdri
   } = settings;
+
+  const [draftStrength, setDraftStrength] = useState(environmentStrength);
+  useEffect(() => setDraftStrength(environmentStrength), [environmentStrength]);
+
+  const [draftFogNear, setDraftFogNear] = useState(fogNear);
+  const [draftFogFar, setDraftFogFar] = useState(fogFar);
+
+  useEffect(() => setDraftFogNear(fogNear), [fogNear]);
+  useEffect(() => setDraftFogFar(fogFar), [fogFar]);
 
   const hdrObjectUrl = hdri.type === 'uploaded' ? hdri.url : null;
   const hdrFileName = hdri.type === 'uploaded' ? hdri.fileName ?? null : null;
@@ -90,7 +97,13 @@ export function SceneSettingsEnvironmentItem({
             value={backgroundMode}
             onChange={(v) => {
               const next = v as typeof backgroundMode;
-              setBackgroundMode(next);
+              updateSceneSettings(
+                (prev) => ({ ...prev, environment: { ...prev.environment, backgroundMode: next } }),
+                {
+                  recordHistory: true,
+                  operationName: `修改场景属性-环境-背景模式 = ${env.backgroundModeOptions[next]}`
+                }
+              );
               // 切到纯色模式时，不允许继续预览/配置贴图
               if (next === 'solid') setPreviewOpen(false);
             }}
@@ -188,8 +201,19 @@ export function SceneSettingsEnvironmentItem({
             min={0}
             max={5}
             step={0.01}
-            value={environmentStrength}
-            onChange={(e) => setEnvironmentStrength(Number(e.target.value))}
+            value={draftStrength}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (!Number.isFinite(v)) return;
+              setDraftStrength(v);
+              updateSceneSettings(
+                (prev) => ({ ...prev, environment: { ...prev.environment, environmentStrength: v } }),
+                  { recordHistory: false }
+              );
+            }}
+            onPointerUp={() => setEnvironmentStrength(draftStrength)}
+            onMouseUp={() => setEnvironmentStrength(draftStrength)}
+            onTouchEnd={() => setEnvironmentStrength(draftStrength)}
             className="w-full"
           />
         </div>
@@ -231,8 +255,28 @@ export function SceneSettingsEnvironmentItem({
                   min={0}
                   max={50}
                   step={0.1}
-                  value={fogNear}
-                  onChange={(e) => setFogNear(Number(e.target.value))}
+                  value={draftFogNear}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    if (!Number.isFinite(v)) return;
+                    setDraftFogNear(v);
+                    updateSceneSettings(
+                      (prev) => ({
+                        ...prev,
+                        environment: { ...prev.environment, fog: { ...prev.environment.fog, near: v } }
+                      }),
+                      { recordHistory: false }
+                    );
+                  }}
+                  onBlur={() => {
+                    updateSceneSettings(
+                      (prev) => ({
+                        ...prev,
+                        environment: { ...prev.environment, fog: { ...prev.environment.fog, near: draftFogNear } }
+                      }),
+                      { recordHistory: true, operationName: `修改场景属性-环境-雾近距 = ${Number(draftFogNear.toFixed(4))}` }
+                    );
+                  }}
                   className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
                 />
               </div>
@@ -246,8 +290,28 @@ export function SceneSettingsEnvironmentItem({
                   min={0}
                   max={200}
                   step={0.1}
-                  value={fogFar}
-                  onChange={(e) => setFogFar(Number(e.target.value))}
+                  value={draftFogFar}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    if (!Number.isFinite(v)) return;
+                    setDraftFogFar(v);
+                    updateSceneSettings(
+                      (prev) => ({
+                        ...prev,
+                        environment: { ...prev.environment, fog: { ...prev.environment.fog, far: v } }
+                      }),
+                      { recordHistory: false }
+                    );
+                  }}
+                  onBlur={() => {
+                    updateSceneSettings(
+                      (prev) => ({
+                        ...prev,
+                        environment: { ...prev.environment, fog: { ...prev.environment.fog, far: draftFogFar } }
+                      }),
+                      { recordHistory: true, operationName: `修改场景属性-环境-雾远距 = ${Number(draftFogFar.toFixed(4))}` }
+                    );
+                  }}
                   className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
                 />
               </div>

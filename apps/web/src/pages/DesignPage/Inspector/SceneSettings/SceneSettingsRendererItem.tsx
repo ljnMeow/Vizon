@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Select } from '../../../../components/Select';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 
@@ -48,6 +49,8 @@ export function SceneSettingsRendererItem({ labels }: { labels: SceneSettingsRen
 
   const { antialias, outputColorSpace, toneMapping, toneMappingExposure, shadowMapEnabled } = rendererSettings;
   const { shadowMapType, shadowMapAutoUpdate } = rendererSettings;
+  const [draftExposure, setDraftExposure] = useState(toneMappingExposure);
+  useEffect(() => setDraftExposure(toneMappingExposure), [toneMappingExposure]);
 
   return (
     <div className="space-y-3">
@@ -117,10 +120,25 @@ export function SceneSettingsRendererItem({ labels }: { labels: SceneSettingsRen
           min={0}
           max={10}
           step={0.01}
-          value={toneMappingExposure}
+          value={draftExposure}
           onChange={(e) => {
             if (toneMapping === 'NoToneMapping') return;
-            setToneMappingExposure(Number(e.target.value));
+            const v = Number(e.target.value);
+            if (!Number.isFinite(v)) return;
+            setDraftExposure(v);
+            setToneMappingExposure(v, { recordHistory: false });
+          }}
+          onPointerUp={() => {
+            if (toneMapping === 'NoToneMapping') return;
+            setToneMappingExposure(draftExposure, { recordHistory: true });
+          }}
+          onMouseUp={() => {
+            if (toneMapping === 'NoToneMapping') return;
+            setToneMappingExposure(draftExposure, { recordHistory: true });
+          }}
+          onTouchEnd={() => {
+            if (toneMapping === 'NoToneMapping') return;
+            setToneMappingExposure(draftExposure, { recordHistory: true });
           }}
           disabled={toneMapping === 'NoToneMapping'}
           className="w-full disabled:opacity-50"

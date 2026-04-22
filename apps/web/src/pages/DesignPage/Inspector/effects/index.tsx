@@ -136,33 +136,59 @@ export function EffectsSettings() {
   }, [editor, syncFromSelection]);
 
   const applyPatchToSelection = useCallback(
-    (patch: Partial<EffectsState>) => {
+    (patch: Partial<EffectsState>, operationName: string, options?: { recordHistory?: boolean }) => {
       if (!editor) return;
       const root = editor.getSelected();
       if (!root) return;
 
-      let patchedAnyMesh = false;
+      const selectedName = String(root.name ?? '').trim() || String(root.type ?? 'Object');
+      const operations: Array<{ mesh: any; prev: EffectsState; next: EffectsState }> = [];
       forEachMesh(root, (mesh) => {
-        patchedAnyMesh = true;
         const prev = readEffectsFromMesh(mesh);
         const next = normalizeEffectsState({ ...prev, ...patch });
+        operations.push({ mesh, prev, next });
+      });
 
+      if (operations.length === 0) return;
+      const applyToMesh = (mesh: any, state: EffectsState) => {
         mesh.userData ??= {};
-        mesh.userData[EFFECTS_USERDATA_KEY] = next;
-
-        // 如果后续渲染逻辑依赖材质重新编译/刷新，这里提前标记。
+        mesh.userData[EFFECTS_USERDATA_KEY] = state;
         const mat = mesh.material as any;
         if (Array.isArray(mat)) {
           for (const m of mat) if (m) (m as any).needsUpdate = true;
         } else if (mat) {
           (mat as any).needsUpdate = true;
         }
-      });
+      };
 
-      if (!patchedAnyMesh) return;
-      setEffects((prev) => normalizeEffectsState({ ...prev, ...patch }));
-      // 允许在非 RAF 场景（例如暂停循环）下也立即看到特效变化
-      editor.render();
+      const recordHistory = options?.recordHistory ?? true;
+      if (!recordHistory) {
+        for (const item of operations) applyToMesh(item.mesh, item.next);
+        setEffects((prev) => normalizeEffectsState({ ...prev, ...patch }));
+        editor.render();
+        return;
+      }
+
+      void editor.executeHistoryOperation({
+        name: `${operationName}-${selectedName}`,
+        mergeKey: `effects:${root.uuid}:${operationName}`,
+        mergeWindowMs: 280,
+        do: () => {
+          for (const item of operations) applyToMesh(item.mesh, item.next);
+          setEffects((prev) => normalizeEffectsState({ ...prev, ...patch }));
+          editor.render();
+        },
+        undo: () => {
+          for (const item of operations) applyToMesh(item.mesh, item.prev);
+          setEffects((prev) =>
+            normalizeEffectsState({
+              ...prev,
+              ...Object.fromEntries(Object.keys(patch).map((k) => [k, (operations[0].prev as any)[k]]))
+            })
+          );
+          editor.render();
+        }
+      });
     },
     [editor]
   );
@@ -175,10 +201,14 @@ export function EffectsSettings() {
             borderWidth: effects.borderWidth,
             borderColor: effects.borderColor
           }
-        : { borderEnabled: false }
+        : { borderEnabled: false },
+      '修改物体属性-特效-边框开关'
     );
-  const onBorderWidthChange = (next: number) => applyPatchToSelection({ borderWidth: clamp(next, 1, 20) });
-  const onBorderColorChange = (hex: string) => applyPatchToSelection({ borderColor: hex });
+  const onBorderWidthPreviewChange = (next: number) =>
+    applyPatchToSelection({ borderWidth: clamp(next, 1, 20) }, '修改物体属性-特效-边框宽度', { recordHistory: false });
+  const onBorderWidthCommit = (next: number) =>
+    applyPatchToSelection({ borderWidth: clamp(next, 1, 20) }, '修改物体属性-特效-边框宽度', { recordHistory: true });
+  const onBorderColorChange = (hex: string) => applyPatchToSelection({ borderColor: hex }, '修改物体属性-特效-边框颜色');
 
   const onGlowEnabledChange = (checked: boolean) =>
     applyPatchToSelection(
@@ -189,11 +219,18 @@ export function EffectsSettings() {
             glowRange: effects.glowRange,
             glowBrightness: effects.glowBrightness
           }
-        : { glowEnabled: false }
+        : { glowEnabled: false },
+      '修改物体属性-特效-辉光开关'
     );
-  const onGlowColorChange = (hex: string) => applyPatchToSelection({ glowColor: hex });
-  const onGlowRangeChange = (next: number) => applyPatchToSelection({ glowRange: next });
-  const onGlowBrightnessChange = (next: number) => applyPatchToSelection({ glowBrightness: next });
+  const onGlowColorChange = (hex: string) => applyPatchToSelection({ glowColor: hex }, '修改物体属性-特效-辉光颜色');
+  const onGlowRangePreviewChange = (next: number) =>
+    applyPatchToSelection({ glowRange: next }, '修改物体属性-特效-辉光范围', { recordHistory: false });
+  const onGlowRangeCommit = (next: number) =>
+    applyPatchToSelection({ glowRange: next }, '修改物体属性-特效-辉光范围', { recordHistory: true });
+  const onGlowBrightnessPreviewChange = (next: number) =>
+    applyPatchToSelection({ glowBrightness: next }, '修改物体属性-特效-辉光亮度', { recordHistory: false });
+  const onGlowBrightnessCommit = (next: number) =>
+    applyPatchToSelection({ glowBrightness: next }, '修改物体属性-特效-辉光亮度', { recordHistory: true });
 
   return (
     <div className="space-y-4">
@@ -223,7 +260,10 @@ export function EffectsSettings() {
                   step={1}
                   value={effects.borderWidth}
                   disabled={!hasMeshSelection}
-                  onChange={(e) => onBorderWidthChange(Number(e.target.value))}
+                  onChange={(e) => onBorderWidthPreviewChange(Number(e.target.value))}
+                  onPointerUp={(e) => onBorderWidthCommit(Number((e.target as HTMLInputElement).value))}
+                  onMouseUp={(e) => onBorderWidthCommit(Number((e.target as HTMLInputElement).value))}
+                  onTouchEnd={(e) => onBorderWidthCommit(Number((e.target as HTMLInputElement).value))}
                   aria-label="边框宽度"
                   className="w-full"
                 />
@@ -264,7 +304,10 @@ export function EffectsSettings() {
                   step={1}
                   value={effects.glowRange}
                   disabled={!hasMeshSelection}
-                  onChange={(e) => onGlowRangeChange(Number(e.target.value))}
+                  onChange={(e) => onGlowRangePreviewChange(Number(e.target.value))}
+                  onPointerUp={(e) => onGlowRangeCommit(Number((e.target as HTMLInputElement).value))}
+                  onMouseUp={(e) => onGlowRangeCommit(Number((e.target as HTMLInputElement).value))}
+                  onTouchEnd={(e) => onGlowRangeCommit(Number((e.target as HTMLInputElement).value))}
                   aria-label="辉光范围"
                   className="w-full"
                 />
@@ -282,7 +325,10 @@ export function EffectsSettings() {
                   step={0.01}
                   value={effects.glowBrightness}
                   disabled={!hasMeshSelection}
-                  onChange={(e) => onGlowBrightnessChange(Number(e.target.value))}
+                  onChange={(e) => onGlowBrightnessPreviewChange(Number(e.target.value))}
+                  onPointerUp={(e) => onGlowBrightnessCommit(Number((e.target as HTMLInputElement).value))}
+                  onMouseUp={(e) => onGlowBrightnessCommit(Number((e.target as HTMLInputElement).value))}
+                  onTouchEnd={(e) => onGlowBrightnessCommit(Number((e.target as HTMLInputElement).value))}
                   aria-label="辉光亮度"
                   className="w-full"
                 />
