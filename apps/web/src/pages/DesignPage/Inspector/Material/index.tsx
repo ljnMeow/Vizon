@@ -38,6 +38,11 @@ import {
 } from './materialUtils';
 import type { TextureMapItemLabels } from './TextureMapItem';
 
+/**
+ * 材质设置面板。
+ * 订阅 editor 的 select 事件，从选中对象的第一个 Mesh 材质同步 UI 状态，
+ * 并通过 historyOperation 提交可撤销的材质变更。
+ */
 export function MaterialSettings() {
   const TEXTURE_EFFECT_DISABLED_KEY = WEB_USER_DATA_KEYS.MATERIAL.TEXTURE_EFFECT_DISABLED;
   // 编辑器实例：所有材质读写都通过当前选中对象进行

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Select } from '../../../../components/Select';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 
+/** 渲染器设置项的 i18n 文案 */
 export type SceneSettingsRendererLabels = {
   title: string;
 
@@ -35,6 +36,10 @@ export type SceneSettingsRendererLabels = {
   shadowMapAutoUpdateLabel: string;
 };
 
+/**
+ * 渲染器参数设置项（抗锯齿、色彩空间、色调映射、阴影类型等）。
+ * 曝光值（toneMappingExposure）采用 range + dragEnd 提交历史的模式。
+ */
 export function SceneSettingsRendererItem({ labels }: { labels: SceneSettingsRendererLabels }) {
   const {
     rendererSettings,

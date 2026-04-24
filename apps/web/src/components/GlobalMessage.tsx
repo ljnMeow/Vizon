@@ -59,12 +59,17 @@ const messageConfig: MessageConfig = {
   }
 };
 
+/**
+ * 从 localStorage 读取当前语言，供 GlobalMessage 独立使用（不依赖 Context）。
+ * 因为 message.loading 可能在 Provider 渲染前被调用。
+ */
 function getLocaleFromStorage(): Locale {
   if (typeof window === 'undefined') return 'zh-CN';
   const stored = window.localStorage.getItem(STORAGE_KEYS.LOCALE);
   return stored === 'en-US' ? 'en-US' : 'zh-CN';
 }
 
+/** 返回本地化的默认 loading 文案（'加载中...' 或 'Loading...'）。 */
 function getDefaultLoadingText(): string {
   return appMessages[getLocaleFromStorage()].common.loading;
 }

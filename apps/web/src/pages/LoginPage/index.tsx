@@ -12,7 +12,8 @@ import LoginHeader from './LoginHeader';
 import LoginHeroSection from './LoginHeroSection';
 
 interface LoginPageProps {
-  onLoginSuccess?: () => void; // 保留扩展点（例如后续触发全局状态）
+  /** 登录成功后的扩展回调，例如同步全局登录态。 */
+  onLoginSuccess?: () => void;
 }
 
 /**
@@ -41,6 +42,7 @@ function LoginPage({ onLoginSuccess }: LoginPageProps) {
   // 根据当前语言选择对应的文案集合
   const t = loginMessages[locale];
 
+  // 避免异步流程中闭包拿到过期文案，统一通过 ref 读取最新翻译。
   const tRef = useRef(t);
   useEffect(() => {
     tRef.current = t;
@@ -49,6 +51,7 @@ function LoginPage({ onLoginSuccess }: LoginPageProps) {
   useEffect(() => {
     const controller = new AbortController();
     void (async () => {
+      // 页面初始化时先探测登录态，已登录则直接跳过登录页。
       const checking = message.loading(tRef.current.toastCheckingLogin, { blockInteraction: false });
       try {
         const res = await isLogin({ signal: controller.signal });

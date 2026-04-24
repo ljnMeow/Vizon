@@ -1,18 +1,40 @@
+/**
+ * 历史操作名称的国际化工具模块。
+ *
+ * 设计思路：
+ * - 历史记录（undo/redo）的操作名在写入时为中文原始字符串
+ * - 需要在 UI 展示时按当前语言动态翻译
+ * - 提供两种编码格式：
+ *   1. I18N_PREFIX 格式：将 {zh-CN, en-US} 序列化为 JSON 嵌入名称，精确翻译
+ *   2. OP_PREFIX 格式：结构化操作描述（op/action/targetKind 等），按语言重新拼接
+ * - 若两种格式均不匹配，回退到正则替换映射表（translateHistoryNameToEn）
+ */
 import type { Locale } from '../hooks/useLocale';
 import { VIZON_HISTORY_KEYS } from './keys';
 
+/** 历史操作名称的双语结构（存储格式） */
 export type HistoryI18nName = {
   'zh-CN': string;
   'en-US': string;
 };
 
+/** 带语言前缀的历史名称标识，用于区分编码格式 */
 const HISTORY_I18N_PREFIX = VIZON_HISTORY_KEYS.I18N_PREFIX;
+/** 带操作结构前缀的历史名称标识，用于区分编码格式 */
 const HISTORY_OP_PREFIX = VIZON_HISTORY_KEYS.OP_PREFIX;
 
+/**
+ * 将双语名称对象编码为带前缀的字符串，用于写入历史记录。
+ * 解码时使用 decodeHistoryI18nName()。
+ */
 export function encodeHistoryI18nName(name: HistoryI18nName): string {
   return `${HISTORY_I18N_PREFIX}${JSON.stringify(name)}`;
 }
 
+/**
+ * 将中文历史操作名通过正则映射表翻译为英文。
+ * 此映射表覆盖常见的场景操作词汇，作为精确编码不可用时的兜底翻译。
+ */
 function translateHistoryNameToEn(zhName: string): string {
   const map: Array<[RegExp, string]> = [
     [/修改场景属性/g, 'Modify scene property'],
@@ -116,7 +138,7 @@ function translateHistoryNameToEn(zhName: string): string {
   for (const [regex, replacement] of map) {
     result = result.replace(regex, replacement);
   }
-  // 兜底修复：处理历史上已出现的中英混合文本
+  // 兜底修复：处理历史上已出现的中英混合（旧版本写入时未完整翻译）
   result = result.replace(/Environment强度/g, 'Environment Strength');
   result = result.replace(/阴影Type/g, 'Shadow Type');
   result = result.replace(/PCF软阴影（柔和）/g, 'PCF Soft');
@@ -124,6 +146,10 @@ function translateHistoryNameToEn(zhName: string): string {
   return result;
 }
 
+/**
+ * 将历史名称规范化为纯中文（修复旧版混入英文片段的情况）。
+ * 用于展示中文 UI 时，保证文本统一可读。
+ */
 function normalizeHistoryNameToZh(name: string): string {
   let result = name;
   result = result.replace(/Environment强度/g, '环境强度');
@@ -134,6 +160,11 @@ function normalizeHistoryNameToZh(name: string): string {
   return result;
 }
 
+/**
+ * 自动将中文操作名编码为双语 I18N 格式。
+ * - 若已是编码格式则直接返回，避免重复编码
+ * - 英文版本由 translateHistoryNameToEn() 自动生成
+ */
 export function encodeHistoryI18nNameAuto(zhName: string): string {
   if (zhName.startsWith(HISTORY_I18N_PREFIX)) return zhName;
   return encodeHistoryI18nName({
@@ -142,6 +173,17 @@ export function encodeHistoryI18nNameAuto(zhName: string): string {
   });
 }
 
+/**
+ * 将编码后的历史操作名解码为当前语言的可读文本。
+ *
+ * 支持三种格式：
+ * 1. OP_PREFIX 格式（结构化操作，如 transform/update_property）
+ * 2. I18N_PREFIX 格式（双语 JSON 嵌入）
+ * 3. 裸中文字符串（旧格式，通过映射表翻译或规范化）
+ *
+ * @param name   - 编码后的历史操作名
+ * @param locale - 当前语言（'zh-CN' | 'en-US'）
+ */
 export function decodeHistoryI18nName(name: string, locale: Locale): string {
   if (name.startsWith(HISTORY_OP_PREFIX)) {
     const raw = name.slice(HISTORY_OP_PREFIX.length);

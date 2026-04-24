@@ -12,6 +12,10 @@ import { updateCustomer } from '../../../api/customers';
 import { UpdateUserForm, type UpdateUserFormApi } from './UpdateUserForm';
 import { ActionBar } from './ActionBar';
 
+/**
+ * 从 authStorage 读取的本地用户信息。
+ * account_id 用于调用 updateCustomer；nickname/username 用于页面展示。
+ */
 type StoredUser = {
   account_id?: string;
   username?: string;
@@ -33,6 +37,9 @@ export function DesignHeader() {
 
   const menuContainerRef = useRef<HTMLDivElement | null>(null);
 
+  /**
+   * 退出登录：无论后端是否成功均清除本地凭据，保证用户能正常切出。
+   */
   const handleLogout = async () => {
     try {
       await logout();
@@ -46,6 +53,10 @@ export function DesignHeader() {
     }
   };
 
+  /**
+   * 打开修改用户资料的 dialog。
+   * 通过 UpdateUserForm 的 onRegister 回调将表单 API 与 dialog 确认按钮绑定。
+   */
   const openProfileDialog = () => {
     setMenuOpen(false);
 

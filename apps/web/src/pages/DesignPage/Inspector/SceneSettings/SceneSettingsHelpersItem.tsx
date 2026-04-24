@@ -2,6 +2,7 @@ import { ColorPicker } from '../../../../components/ColorPicker';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { useEffect, useState } from 'react';
 
+/** 坐标轴辅助显示的 i18n 文案 */
 export type SceneSettingsHelpersLabels = {
   title: string;
   axisTitle: string;
@@ -9,6 +10,7 @@ export type SceneSettingsHelpersLabels = {
   axisSizeLabel: string;
 };
 
+/** 网格辅助显示的 i18n 文案 */
 export type SceneSettingsGridLabels = {
   title: string;
   enabledLabel: string;
@@ -16,6 +18,10 @@ export type SceneSettingsGridLabels = {
   opacityLabel: string;
 };
 
+/**
+ * 网格辅助线设置子组件（颜色 / 透明度）。
+ * 仅在 enabled=true 时展开颜色和透明度控制，减少视觉干扰。
+ */
 function GridHelperSettings({ labels }: { labels: SceneSettingsGridLabels }) {
   const { sceneSettings, updateSceneSettings, setGridEnabled, setGridColor, setGridOpacity } = useSceneSettings();
   const { enabled, color, opacity } = sceneSettings.grid;
@@ -84,6 +90,9 @@ function GridHelperSettings({ labels }: { labels: SceneSettingsGridLabels }) {
   );
 }
 
+/**
+ * 辅助显示面板，包含网格和坐标轴两个子项。
+ */
 export function SceneSettingsHelpersItem({
   labels,
   gridLabels

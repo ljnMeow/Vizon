@@ -9,8 +9,15 @@ import { PropertiesSettings } from './Properties/index';
 import { MaterialSettings } from './Material/index';
 import { EffectsSettings } from './effects/index';
 
+/** 检视器顶部标签页的合法 key 值 */
 type InspectorTab = 'scene' | 'data' | 'interaction' | 'properties' | 'materials' | 'effects';
 
+/**
+ * 当前选中对象类型：
+ * - none：未选中任何对象，展示场景/数据/交互三标签
+ * - mesh：选中的是 Mesh，额外展示材质与特效标签
+ * - other：选中非 Mesh 对象（灯光/相机等），只展示属性标签
+ */
 type InspectorMode = 'none' | 'mesh' | 'other';
 
 function isThreeMesh(obj: unknown): boolean {
@@ -20,6 +27,11 @@ function isThreeMesh(obj: unknown): boolean {
   return Boolean(o?.isMesh) || o?.type === 'Mesh';
 }
 
+/**
+ * 右侧检视器面板。
+ * 根据当前选中对象类型（Mesh/非Mesh/无选中）动态调整标签页，
+ * 并在每次模式切换时自动跳转到第一个标签。
+ */
 export function InspectorPanel({ visible }: { visible: boolean }) {
   const { locale } = useLocale();
   const t = appMessages[locale].designPage.inspector;

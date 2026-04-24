@@ -13,6 +13,11 @@ import { SceneSettingsRendererItem, type SceneSettingsRendererLabels } from './S
 
 type SceneSettingsAccordionKey = 'basic' | 'environment' | 'renderer' | 'camera' | 'helpers';
 
+/**
+ * 场景设置面板。
+ * 将基础、环境、渲染器、相机、辅助显示各子项组织为 Accordion，
+ * 并负责将 i18n 文案组装为各子组件所需的 labels prop。
+ */
 export function SceneSettings() {
   const { locale } = useLocale();
   const t = appMessages[locale].designPage.inspector.sceneSettings as typeof appMessages['zh-CN']['designPage']['inspector']['sceneSettings'];

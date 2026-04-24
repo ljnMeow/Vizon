@@ -1,9 +1,14 @@
 import { ReactNode, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+/** 单个折叠面板条目。 */
 export type AccordionItem<T extends string = string> = {
+  /** 面板的唯一标识 key。 */
   key: T;
+  /** 面板头部内容（始终可见）。 */
   header: ReactNode;
+  /** 面板展开后显示的内容。 */
   content: ReactNode;
+  /** 是否禁用展开/收起交互。 */
   disabled?: boolean;
 };
 
@@ -21,11 +26,19 @@ export interface AccordionProps<T extends string = string> {
   itemClassName?: string;
 }
 
+/** 将单个 key 或 key 数组统一转换为数组形式，简化受控/非受控逻辑。 */
 function normalizeKeys<T extends string>(value: T | T[] | undefined): T[] {
   if (!value) return [];
   return Array.isArray(value) ? value : [value];
 }
 
+/**
+ * 折叠面板（Accordion）：
+ * - 支持受控/非受控两种模式
+ * - 支持单展开/多展开
+ * - 内容高度通过 MutationObserver 动态测量，支持内容变化后自动修正 max-height
+ * - 满足 ARIA accordion 规范（aria-expanded / aria-controls）
+ */
 export function Accordion<T extends string = string>({
   items,
   allowMultiple = false,
@@ -60,6 +73,8 @@ export function Accordion<T extends string = string>({
   const itemKeysSignature = useMemo(() => items.map((i) => String(i.key)).join('|'), [items]);
   const openKeysSignature = useMemo(() => Array.from(openSet).sort().join('|'), [openSet]);
 
+  // 通过 MutationObserver 监听面板内容变化，动态修正 max-height。
+  // 避免首次展开后内容变高时被截断。
   useLayoutEffect(() => {
     const measureAll = () => items.map((_, i) => panelRefs.current[i]?.scrollHeight ?? 0);
 

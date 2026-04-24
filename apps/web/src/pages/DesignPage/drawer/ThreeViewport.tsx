@@ -14,6 +14,10 @@ import { ViewPresetToolbar } from './tools/ViewPresetToolbar';
 import { DATA_TRANSFER_KEYS } from '../../../utils/keys';
 import { encodeHistoryI18nName } from '../../../utils/historyI18n';
 
+/**
+ * 生成添加相机操作的国际化历史记录名称。
+ * uuid 用于追踪同一类相机的多次添加记录。
+ */
 function getAddCameraHistoryName(cameraKey: DefaultCameraKey, uuid: string) {
   const cameraName =
     cameraKey === 'orthographic'
@@ -25,6 +29,9 @@ function getAddCameraHistoryName(cameraKey: DefaultCameraKey, uuid: string) {
   });
 }
 
+/**
+ * 生成添加灯光操作的国际化历史记录名称。
+ */
 function getAddLightHistoryName(lightKey: DefaultLightKey, uuid: string) {
   const lightNameMap: Record<DefaultLightKey, { 'zh-CN': string; 'en-US': string }> = {
     ambientLight: { 'zh-CN': '环境光', 'en-US': 'Ambient Light' },
@@ -41,6 +48,11 @@ function getAddLightHistoryName(lightKey: DefaultLightKey, uuid: string) {
   });
 }
 
+/**
+ * Three.js 三维视口组件。
+ * 负责初始化 ThreeEditor 实例，处理视口工具切换、视角预设，
+ * 以及将拖拽放置的模型/相机/灯光插入到场景中。
+ */
 export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: ThreeEditor) => void }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);

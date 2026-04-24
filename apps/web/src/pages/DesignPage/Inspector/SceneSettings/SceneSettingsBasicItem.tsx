@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 
+/** 场景基础设置项的 i18n 文案 */
 export type SceneSettingsBasicLabels = {
   title: string;
   sceneNameLabel: string;
@@ -9,6 +10,10 @@ export type SceneSettingsBasicLabels = {
   descriptionPlaceholder: string;
 };
 
+/**
+ * 场景基础信息设置项。
+ * 输入框采用"即时更新、失焦提交历史"双通道策略，避免每次按键都产生历史记录。
+ */
 export function SceneSettingsBasicItem({ labels }: { labels: SceneSettingsBasicLabels }) {
   const { sceneSettings, updateSceneSettings } = useSceneSettings();
   const { sceneName, description } = sceneSettings.basic;

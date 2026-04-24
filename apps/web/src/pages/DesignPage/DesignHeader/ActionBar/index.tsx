@@ -5,6 +5,10 @@ import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { useTheme } from '../../../../hooks/useTheme';
 import { appMessages } from '../../../../i18n/messages';
 
+/**
+ * 判断快捷键事件是否来自可编辑输入控件。
+ * 若用户正在输入文本，则不拦截系统常见按键行为。
+ */
 function isEditableTarget(target: EventTarget | null) {
   const el = target as HTMLElement | null;
   if (!el) return false;
@@ -14,6 +18,10 @@ function isEditableTarget(target: EventTarget | null) {
   return false;
 }
 
+/**
+ * 设计器顶部操作栏。
+ * 聚合撤销/重做、复制粘贴、删除、清空、重置以及语言/主题切换入口。
+ */
 export function ActionBar() {
   const { editor } = useSceneSettings();
   const { locale, setLocale } = useLocale();
@@ -28,6 +36,7 @@ export function ActionBar() {
   const labels = useMemo(() => appMessages[locale].designPage.actionBar, [locale]);
   const loginT = appMessages[locale].auth.login;
 
+  // 根据编辑器实时状态刷新菜单项的可用性，避免按钮状态与底层能力不一致。
   useEffect(() => {
     if (!editor) {
       setCanUndo(false);
@@ -51,6 +60,7 @@ export function ActionBar() {
     };
   }, [editor]);
 
+  // 注册全局快捷键：仅在非输入态下代理常见编辑操作给 ThreeEditor。
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!editor) return;
@@ -87,6 +97,7 @@ export function ActionBar() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [editor]);
 
+  // 头部操作栏沿用登录页的中英文切换策略。
   const onToggleLocale = () => {
     setLocale(locale === 'zh-CN' ? 'en-US' : 'zh-CN');
   };

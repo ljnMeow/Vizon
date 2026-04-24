@@ -1,16 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
 
+/** 图片预览弹窗属性。 */
 export type ImagePreviewDialogProps = {
+  /** 是否显示弹窗。 */
   open: boolean;
+  /** 要预览的图片 URL；为 null 时展示"不支持"提示。 */
   fileUrl: string | null;
+  /** 弹窗标题（同时作为图片 alt）。 */
   title: string;
+  /** 图片加载中时显示的文案。 */
   loadingText: string;
+  /** 文件类型不支持时的提示文案。 */
   unsupportedText?: string;
+  /** 图片加载失败时的错误文案。 */
   errorText?: string;
+  /** 关闭按钮文案。 */
   closeText: string;
+  /** 关闭弹窗的回调。 */
   onClose: () => void;
 };
 
+/**
+ * 图片预览弹窗：
+ * - 支持加载中 / 加载成功 / 加载失败 / 不支持等状态展示
+ * - 点击遮罩层可关闭
+ */
 export function ImagePreviewDialog({
   open,
   fileUrl,
@@ -24,9 +38,11 @@ export function ImagePreviewDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // fileUrl 有效时才展示图片
   const isValid = useMemo(() => Boolean(open && fileUrl), [open, fileUrl]);
 
   useEffect(() => {
+    // fileUrl 变化时重置加载状态
     if (!isValid || !fileUrl) return;
     setLoading(true);
     setError(null);

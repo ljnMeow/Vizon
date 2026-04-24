@@ -5,6 +5,7 @@ import { ImagePreviewDialog } from '../../../../components/ImagePreviewDialog';
 import { Select } from '../../../../components/Select';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 
+/** 环境设置项的 i18n 文案（背景模式、HDRI、雾效等） */
 export type SceneSettingsEnvironmentLabels = {
   title: string;
 
@@ -32,6 +33,10 @@ export type SceneSettingsEnvironmentLabels = {
   environmentHdriPreviewUnsupported?: string;
 };
 
+/**
+ * 环境设置项（背景颜色/天空盒 HDRI、雾效、环境强度）。
+ * HDRI 支持本地上传，上传后可在 skybox 模式下预览缩略图。
+ */
 export function SceneSettingsEnvironmentItem({
   env,
   cancelText

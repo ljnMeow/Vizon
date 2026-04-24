@@ -1,6 +1,7 @@
 import { loadEquirectEnvMapTextureFromFile, loadImageTextureFromFile } from 'vizon-3d-core';
 import { TextureMapItem, type TextureMapItemLabels } from './TextureMapItem';
 
+/** 局部声明的贴图字段 key 类型（与 materialConstants.ts 保持同步，避免循环依赖） */
 type TextureFieldKey =
   | 'map' | 'envMap' | 'alphaMap' | 'lightMap' | 'aoMap' | 'specularMap' | 'emissiveMap'
   | 'bumpMap' | 'normalMap' | 'displacementMap' | 'roughnessMap' | 'metalnessMap'
@@ -11,6 +12,10 @@ type TextureFieldKey =
 
 type TextureSupport = Partial<Record<TextureFieldKey, true>>;
 
+/**
+ * 贴图区 Section 的 props 定义。
+ * 贴图按 Basic / Lighting / Normal / PBR / Advanced 五组渲染，每组按材质类型的白名单控制可见性。
+ */
 type MaterialTextureMapsSectionProps = {
   p: any; tf: any; textureSupport: TextureSupport; textureMapLabels: TextureMapItemLabels;
   hasTextureGroupBasic: boolean; hasTextureGroupLighting: boolean; hasTextureGroupNormal: boolean; hasTextureGroupPbr: boolean; hasTextureGroupAdvanced: boolean;
@@ -25,6 +30,10 @@ type MaterialTextureMapsSectionProps = {
   onPropertyChange: (key: string, value: any) => void;
 };
 
+/**
+ * 材质贴图映射区，包含 BaseColor、环境贴图、光照贴图、法线贴图、PBR 及物理扩展贴图。
+ * 仅在当前材质支持对应贴图槽时才渲染该组（white-list 由 textureSupportByMaterialType 提供）。
+ */
 export function MaterialTextureMapsSection({
   p, tf, textureSupport, textureMapLabels, hasTextureGroupBasic, hasTextureGroupLighting, hasTextureGroupNormal, hasTextureGroupPbr, hasTextureGroupAdvanced,
   selectedEnvMapIntensity, setSelectedEnvMapIntensity, selectedAoMapIntensity, setSelectedAoMapIntensity,

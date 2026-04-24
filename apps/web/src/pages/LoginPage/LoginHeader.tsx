@@ -8,6 +8,7 @@ interface LoginHeaderProps {
   onToggleTheme: () => void;
 }
 
+/** 登录页头部：展示品牌信息，并提供语言/主题切换。 */
 function LoginHeader({ t, theme, locale, onToggleLocale, onToggleTheme }: LoginHeaderProps) {
   return (
     <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
@@ -30,7 +31,7 @@ function LoginHeader({ t, theme, locale, onToggleLocale, onToggleTheme }: LoginH
           {t.localeSwitcher} ({locale})
         </button>
 
-        {/* 主题切换按钮 */}
+        {/* 主题切换按钮：根据当前主题显示即将切换到的视觉模式名称。 */}
         <button
           type="button"
           onClick={onToggleTheme}

@@ -5,15 +5,22 @@ import { useLocale } from '../../../../hooks/useLocale';
 import { getAssetUrl } from '../../../../utils/utils';
 import { DATA_TRANSFER_KEYS } from '../../../../utils/keys';
 
+/** 可在系统资产面板中拖拽到视口的相机预设类型 */
 type CameraPresetKey = 'orthographic' | 'perspective';
 
+/** 各相机类型对应的缩略图路径（构建期 hash 化） */
 const CAMERA_ICON_SRC: Record<CameraPresetKey, string> = {
   orthographic: getAssetUrl('../../../../assets/img/orthographicCamera.png', import.meta.url),
   perspective: getAssetUrl('../../../../assets/img/perspectiveCamera.png', import.meta.url)
 };
 
+/** 两种相机类型的展示顺序 */
 const CAMERA_PRESET_KEYS: CameraPresetKey[] = ['orthographic', 'perspective'];
 
+/**
+ * 相机资产列表。
+ * 支持将相机拖拽到三维视口，拖拽数据携带 CAMERA_MIME 标识供视口 drop 处理。
+ */
 export function CameraList() {
   const { locale } = useLocale();
   const t = appMessages[locale].systemAssets.cameraNames;

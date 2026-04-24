@@ -4,6 +4,10 @@ import { appMessages } from '../../../../i18n/messages';
 import { getAssetUrl } from '../../../../utils/utils';
 import type { ViewPreset } from 'vizon-3d-core';
 
+/**
+ * 视口角度预设工具栏，悬浮于视口左上角。
+ * 支持切换正面、背面、左、右、顶、底及默认透视角度。
+ */
 export function ViewPresetToolbar({ value, onChange }: { value: ViewPreset; onChange: (next: ViewPreset) => void }) {
   const { locale } = useLocale();
   const t = appMessages[locale];

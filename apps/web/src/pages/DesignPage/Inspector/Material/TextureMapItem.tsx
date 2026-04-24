@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Tooltip } from '../../../../components/Tooltip';
 
+/**
+ * 贴图强度参数类型：
+ * - none：无强度控制
+ * - number：单数值（如 envMapIntensity / aoMapIntensity）
+ * - vector2：二维向量（如 normalScale / clearcoatNormalScale）
+ */
 export type TextureMapItemIntensity =
   | { type: 'none' }
   | {
@@ -30,6 +36,7 @@ export type TextureMapItemIntensity =
       onDragStart?: (axis: 'x' | 'y') => void;
     };
 
+/** TextureMapItem 的通用操作文案 */
 export type TextureMapItemLabels = {
   upload: string;
   clear: string;
@@ -37,6 +44,7 @@ export type TextureMapItemLabels = {
   textureFallback: string;
 };
 
+/** 单个贴图槽组件的 props */
 export type TextureMapItemProps = {
   title: string;
   labels: TextureMapItemLabels;
@@ -61,6 +69,9 @@ function tryGetPreviewUrl(texture: any | null): string | null {
   return null;
 }
 
+/**
+ * 单个贴图槽组件：展示缩略图、支持上传/清除，并根据 intensity 类型可选展示强度控制滑杆。
+ */
 export function TextureMapItem({
   title,
   labels,

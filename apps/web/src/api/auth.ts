@@ -46,6 +46,12 @@ export async function isLogin(opts?: { signal?: AbortSignal }) {
 
 export type LogoutResponse = { logged_out: boolean };
 
+/**
+ * 退出登录：
+ * - 将 refresh_token 传给后端，使其在服务端失效（Redis revoke）
+ * - 后端设计为幂等，不传 refresh_token 也会返回 200
+ * - 调用方通常还需配合 clearAuthTokens() / clearUserInfo() 清理本地状态
+ */
 export async function logout() {
   const refreshToken = getRefreshToken();
   // 后端 logout 设计为幂等：不传 refresh_token 也会 200

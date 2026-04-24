@@ -1,15 +1,21 @@
 import { ReactNode, useRef, useEffect, useState, useCallback } from 'react';
 import { Tooltip } from './Tooltip';
 
+/** 单个 Tab 选项条目。 */
 export type TabItem<T extends string = string> = {
+  /** Tab 的唯一标识，同时作为 onChange 回调的参数。 */
   key: T;
+  /** Tab 栏展示的内容（支持 ReactNode）。 */
   label: ReactNode;
 };
 
 export interface TabsProps<T extends string = string> {
   tabs: TabItem<T>[];
+  /** 当前激活的 Tab key（受控）。 */
   activeKey: T;
+  /** Tab 切换回调。 */
   onChange: (key: T) => void;
+  /** 内容渲染函数，参数为当前激活的 key。 */
   children: (key: T) => ReactNode;
   className?: string;
   contentClassName?: string;
@@ -65,7 +71,7 @@ export function Tabs<T extends string = string>({
   const navRef = useRef<HTMLElement | null>(null);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0, top: 0, height: 0 });
 
-  // 拖拽滚动状态
+  // Tab 栏支持鼠标拖拽横向/纵向滚动，以下 ref 用于记录拖拽起始点
   const isDragging = useRef(false);
   const startX = useRef(0);
   const startY = useRef(0);

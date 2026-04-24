@@ -1,21 +1,26 @@
 import type { AppMessages } from '../../../../i18n/messages';
 
+/** 属性设置面板使用的 i18n 文案类型 */
 type PropertiesLabels = AppMessages['designPage']['inspector']['propertiesSettings'];
 
+/** 三维坐标轴 key */
 type AxisKey = 'x' | 'y' | 'z';
 
+/** 通用三维向量结构 */
 type Vec3 = {
   x: number;
   y: number;
   z: number;
 };
 
+/** 当前选中对象的位移 / 旋转 / 缩放状态 */
 type TransformState = {
   position: Vec3;
   rotation: Vec3;
   scale: Vec3;
 };
 
+/** 阴影与裁剪相关状态 */
 type ShadowState = {
   castShadow: boolean;
   receiveShadow: boolean;
@@ -25,6 +30,7 @@ type ShadowState = {
   canFrustumCulled: boolean;
 };
 
+/** 可见性、可拾取性与冻结状态 */
 type VisibilityPickFreezeState = {
   visible: boolean;
   pickable: boolean;
@@ -33,22 +39,29 @@ type VisibilityPickFreezeState = {
   canFreeze: boolean;
 };
 
+/** 透明度编辑状态 */
 type OpacityState = {
   opacity: number;
   canOpacity: boolean;
 };
 
+/** 渲染顺序编辑状态 */
 type RenderOrderState = {
   renderOrder: number;
   canRenderOrder: boolean;
 };
 
+/** 当前选中对象的基础信息 */
 type SelectedObjectInfo = {
   uuid: string;
   type: string;
   name: string;
 } | null;
 
+/**
+ * 单轴数值输入框。
+ * 用于 position / rotation / scale 等三轴属性的重复 UI 复用。
+ */
 function AxisNumberInput({
   label,
   value,
@@ -91,6 +104,9 @@ function AxisNumberInput({
   );
 }
 
+/**
+ * 基础属性设置面板：类型、uuid、名称、变换、可见性、阴影、透明度等通用属性。
+ */
 export function BaseSetting({
   labels,
   selectedInfo,

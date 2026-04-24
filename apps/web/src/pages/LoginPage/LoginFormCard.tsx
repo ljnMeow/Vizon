@@ -14,6 +14,7 @@ interface LoginFormCardProps {
   onTogglePasswordVisible: () => void;
 }
 
+/** 登录表单卡片，负责账号密码输入与提交交互。 */
 function LoginFormCard({
   t,
   username,
@@ -50,6 +51,7 @@ function LoginFormCard({
             {t.passwordLabel}
           </label>
           <div className="relative">
+            {/* 密码可见性切换按钮覆盖在输入框右侧，减少额外布局占位。 */}
             <input
               type={passwordVisible ? 'text' : 'password'}
               autoComplete="current-password"
@@ -71,6 +73,7 @@ function LoginFormCard({
         </div>
 
         <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+          {/* 左侧记住账号，右侧预留“忘记密码”动作入口。 */}
           <label className="inline-flex items-center gap-2">
             <input
               type="checkbox"

@@ -1,6 +1,10 @@
 import { ColorPicker } from '../../../../components/ColorPicker';
 import type { MaterialBlendingKey, MaterialSideKey, MaterialTypeKey } from './materialConstants';
 
+/**
+ * 材质主控区的 props 定义，由 MaterialSettings 父组件组装后传入。
+ * 所有 onChange 回调负责将 UI 变更同步回 three.js 材质对象并更新历史记录。
+ */
 type MaterialMainControlsSectionProps = {
   p: any;
   selectedMaterialType: MaterialTypeKey;
@@ -39,6 +43,9 @@ type MaterialMainControlsSectionProps = {
   onVertexColorChange: (next: string) => void;
 };
 
+/**
+ * 材质主控区：涵盖类型、面剔除、混合模式、颜色、透明度、线框、深度及顶点色等基础设置。
+ */
 export function MaterialMainControlsSection(props: MaterialMainControlsSectionProps) {
   const {
     p,

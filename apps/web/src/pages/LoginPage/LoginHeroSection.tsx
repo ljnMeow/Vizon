@@ -2,6 +2,7 @@ interface LoginHeroSectionProps {
   t: any;
 }
 
+/** 登录页左侧品牌说明区，用于承载产品卖点与品牌语气。 */
 function LoginHeroSection({ t }: LoginHeroSectionProps) {
   return (
     <section className="relative flex-1 space-y-6">

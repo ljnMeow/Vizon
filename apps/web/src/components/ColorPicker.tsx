@@ -1,12 +1,23 @@
+/** 颜色拾取器属性。 */
 export type ColorPickerProps = {
+  /** 当前颜色值（CSS color 字符串，如 `#ff0000`）。 */
   value: string;
+  /** 颜色变化回调，参数为新的颜色值。 */
   onChange: (next: string) => void;
+  /** 是否禁用。 */
   disabled?: boolean;
   className?: string;
+  /** 无障碍标签。 */
   ariaLabel?: string;
+  /** 是否在色块旁展示十六进制色值文本。 */
   showValue?: boolean;
 };
 
+/**
+ * 颜色选择器：
+ * - 使用原生 `<input type="color">` 实现，保证跨平台一致性
+ * - 色块展示覆盖在输入框上方，`opacity-0` 隐藏原生控件，实现自定义外观
+ */
 export function ColorPicker({
   value,
   onChange,

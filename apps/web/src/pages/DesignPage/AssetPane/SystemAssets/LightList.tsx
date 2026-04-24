@@ -4,8 +4,10 @@ import { appMessages } from '../../../../i18n/messages';
 import { DATA_TRANSFER_KEYS } from '../../../../utils/keys';
 import { getAssetUrl } from '../../../../utils/utils';
 
+/** 可在系统资产面板中拖拽到视口的灯光预设类型 */
 type LightPresetKey = 'ambientLight' | 'directionalLight' | 'pointLight' | 'spotLight' | 'hemisphereLight' | 'rectAreaLight';
 
+/** 各灯光类型对应的缩略图路径（构建期 hash 化） */
 const ICONS: Record<LightPresetKey, string> = {
   ambientLight: getAssetUrl('../../../../assets/img/ambientLight.png', import.meta.url),
   directionalLight: getAssetUrl('../../../../assets/img/directionalLight.png', import.meta.url),
@@ -15,6 +17,7 @@ const ICONS: Record<LightPresetKey, string> = {
   rectAreaLight: getAssetUrl('../../../../assets/img/rectAreaLight.png', import.meta.url)
 };
 
+/** 渲染顺序与系统资产面板保持一致 */
 const LIGHT_KEYS: LightPresetKey[] = [
   'ambientLight',
   'directionalLight',
@@ -24,6 +27,10 @@ const LIGHT_KEYS: LightPresetKey[] = [
   'rectAreaLight'
 ];
 
+/**
+ * 灯光资产列表。
+ * 支持将灯光拖拽到三维视口，拖拽数据携带 LIGHT_MIME 标识供视口 drop 处理。
+ */
 export function LightList() {
   const { locale } = useLocale();
   const t = appMessages[locale];

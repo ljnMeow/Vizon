@@ -26,10 +26,18 @@ export const STORAGE_KEYS = {
 
 export type StorageKeyName = keyof typeof STORAGE_KEYS;
 
+/**
+ * 拖拽操作的 DataTransfer MIME type 标识。
+ * 用于在 drag & drop 事件中区分拖拽来源的资源类型，避免与系统/第三方 MIME 冲突。
+ */
 export const DATA_TRANSFER_KEYS = {
+  /** 模型资源拖拽标识 */
   MODEL_MIME: 'application/x-vizon-model-key',
+  /** 相机资源拖拽标识 */
   CAMERA_MIME: 'application/x-vizon-camera-key',
+  /** 灯光资源拖拽标识 */
   LIGHT_MIME: 'application/x-vizon-light-key',
+  /** 场景节点 UUID 拖拽标识（用于场景树排序/移动） */
   SCENE_NODE_UUID_MIME: 'application/x-vizon-scene-node-uuid'
 } as const;
 

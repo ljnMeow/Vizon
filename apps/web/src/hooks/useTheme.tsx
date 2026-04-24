@@ -15,6 +15,7 @@ export interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
+/** localStorage 中保存主题偏好的 key。 */
 const THEME_STORAGE_KEY = STORAGE_KEYS.THEME;
 
 /**
@@ -23,6 +24,7 @@ const THEME_STORAGE_KEY = STORAGE_KEYS.THEME;
  * - 负责同步 html[data-theme] 与 Tailwind 的 dark class
  */
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // 初始主题解析顺序：用户本地设置 > 系统 prefers-color-scheme > 默认浅色。
   const [theme, setTheme] = useState<Theme>(() => {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
 
@@ -35,6 +37,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   useEffect(() => {
+    // 同步到 DOM：
+    // 1. `data-theme` 便于 CSS 变量方案读取
+    // 2. `dark` class 便于 Tailwind 暗色模式生效
     document.documentElement.dataset.theme = theme;
 
     if (theme === 'dark') {

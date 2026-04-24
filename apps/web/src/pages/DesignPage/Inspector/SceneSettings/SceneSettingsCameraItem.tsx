@@ -2,6 +2,7 @@ import { createDefaultSceneSettings } from 'vizon-3d-core';
 import { useEffect, useState } from 'react';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 
+/** 相机设置项的 i18n 文案 */
 export type SceneSettingsCameraLabels = {
   title: string;
   fovLabel: string;
@@ -12,6 +13,7 @@ export type SceneSettingsCameraLabels = {
   resetCameraLabel: string;
 };
 
+/** 默认相机参数，用于检测是否有变更从而决定是否显示重置按钮 */
 const DEFAULT_CAMERA_SETTINGS = createDefaultSceneSettings().camera;
 
 function almostEqual(a: number, b: number, eps = 1e-6) {
@@ -54,6 +56,10 @@ function AxisInput({
   );
 }
 
+/**
+ * 相机参数设置项（FOV / near / far / 位置 / 目标点）。
+ * FOV 使用 range 拖动实时更新，失去焦点或松手时提交历史。
+ */
 export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCameraLabels }) {
   const {
     cameraSettings,

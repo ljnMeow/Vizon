@@ -3,8 +3,13 @@ import { useLocale } from '../../../../hooks/useLocale';
 import { appMessages } from '../../../../i18n/messages';
 import { getAssetUrl } from '../../../../utils/utils';
 
+/** 视口变换工具类型：移动、缩放、旋转 */
 export type ViewportTool = 'translate' | 'scale' | 'rotate';
 
+/**
+ * 视口变换工具栏，居中悬浮于视口顶部。
+ * 点击已激活的工具按钮可关闭工具（此时视口进入纯相机交互模式）。
+ */
 export function TransformToolbar({
   value,
   onChange

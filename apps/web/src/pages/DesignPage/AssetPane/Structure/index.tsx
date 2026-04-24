@@ -9,11 +9,18 @@ import { getAssetUrl } from '../../../../utils/utils';
 const TREE_DRAG_MIME = DATA_TRANSFER_KEYS.SCENE_NODE_UUID_MIME;
 type DropPlacement = 'before' | 'after' | 'inside';
 
+/**
+ * 当前拖拽命中的落点预览。
+ * 用于在树节点上高亮展示“插入到前 / 后 / 内部”的目标位置。
+ */
 type DragPreview = {
   targetUuid: string;
   placement: DropPlacement;
 } | null;
 
+/**
+ * 读取当前每一行节点的布局矩形，用于 FLIP 动画计算位移差。
+ */
 function captureRects(map: Map<string, HTMLDivElement>) {
   const rects = new Map<string, DOMRect>();
   for (const [uuid, el] of map) {
@@ -22,6 +29,9 @@ function captureRects(map: Map<string, HTMLDivElement>) {
   return rects;
 }
 
+/**
+ * 根据场景树节点类型返回对应图标资源。
+ */
 function nodeIcon(kind: SceneTreeNode['kind']) {
   if (kind === 'scene') return getAssetUrl('../../../../assets/svg/scene.svg', import.meta.url);
   if (kind === 'group') return getAssetUrl('../../../../assets/svg/group.svg', import.meta.url);
@@ -29,12 +39,18 @@ function nodeIcon(kind: SceneTreeNode['kind']) {
   return getAssetUrl('../../../../assets/svg/mesh.svg', import.meta.url);
 }
 
+/**
+ * 返回节点操作按钮图标：显隐切换或删除。
+ */
 function actionIcon(kind: 'visible' | 'hidden' | 'delete') {
   if (kind === 'visible') return getAssetUrl('../../../../assets/svg/eye.svg', import.meta.url);
   if (kind === 'hidden') return getAssetUrl('../../../../assets/svg/close_eyes.svg', import.meta.url);
   return getAssetUrl('../../../../assets/svg/delete.svg', import.meta.url);
 }
 
+/**
+ * 递归渲染单个场景树节点，并处理展开、选择、显隐、删除与拖拽排序。
+ */
 function SceneTreeItem({
   node,
   depth,
@@ -80,6 +96,9 @@ function SceneTreeItem({
   const isBeforePreview = dragPreview?.targetUuid === node.uuid && dragPreview.placement === 'before';
   const isAfterPreview = dragPreview?.targetUuid === node.uuid && dragPreview.placement === 'after';
 
+  /**
+   * 根据鼠标在当前行中的垂直相对位置，推导拖拽落点是前、后还是内部。
+   */
   const calcPlacement = (e: React.DragEvent<HTMLDivElement>): DropPlacement => {
     const rect = e.currentTarget.getBoundingClientRect();
     const ratio = (e.clientY - rect.top) / Math.max(1, rect.height);
@@ -262,6 +281,10 @@ function SceneTreeItem({
   );
 }
 
+/**
+ * 场景结构树面板。
+ * 负责展示节点层级、同步编辑器选中状态，并支持拖拽重排与基础节点操作。
+ */
 export function Structure() {
   const { locale } = useLocale();
   const t = appMessages[locale].assetPane;
@@ -285,6 +308,9 @@ export function Structure() {
     m.set(uuid, el);
   };
 
+  /**
+   * 展平整棵树的 uuid 集合，用于在树变化时补齐默认展开状态。
+   */
   const allNodeIds = useMemo(() => {
     const ids = new Set<string>();
     const walk = (nodes: SceneTreeNode[]) => {
@@ -358,6 +384,10 @@ export function Structure() {
     return off;
   }, [editor]);
 
+  /**
+   * 根据 uuid 从编辑器中取回对象并设为当前选中项。
+   * 主相机不在 scene 树内，因此需要单独从 editor.camera 读取。
+   */
   const selectNode = (uuid: string) => {
     if (!editor) return;
     const obj = uuid === editor.camera.uuid ? editor.camera : (editor.scene.getObjectByProperty('uuid', uuid) ?? null);
@@ -374,6 +404,10 @@ export function Structure() {
     editor.removeObjectByUuid(uuid);
   };
 
+  /**
+   * 执行节点移动。
+   * 真实树结构会在 core 侧变更后通过 sceneTreeChange 再同步回 React 状态。
+   */
   const moveNode = (sourceUuid: string, targetUuid: string, placement: DropPlacement) => {
     if (!editor) return;
     editor.moveObjectByUuid(sourceUuid, targetUuid, placement);
@@ -382,11 +416,17 @@ export function Structure() {
     setDragPreview(null);
   };
 
+  /**
+   * 预判当前拖拽落点是否合法，避免向编辑器提交无效移动。
+   */
   const canMove = (sourceUuid: string, targetUuid: string, placement: DropPlacement) => {
     if (!editor) return false;
     return editor.canMoveObjectByUuid(sourceUuid, targetUuid, placement);
   };
 
+  /**
+   * 清除拖拽目标预览，避免拖拽结束后残留高亮样式。
+   */
   const clearDragPreview = () => {
     setDragPreview((prev) => {
       if (!prev) return prev;

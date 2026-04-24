@@ -8,6 +8,7 @@ import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 import { VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '../../../../utils/keys';
 
 // 写入 mesh.userData 的键名，渲染侧通过同一 key 读取特效配置
+/** 存储在 mesh.userData 上的特效配置键名 */
 const EFFECTS_USERDATA_KEY = VIZON_STORAGE_KEYS.EFFECTS;
 
 // 描边 + 辉光两套特效的状态定义
@@ -103,6 +104,10 @@ function forEachMesh(root: any, fn: (mesh: any) => void) {
   });
 }
 
+/**
+ * 特效设置面板。
+ * 当前支持描边与辉光两套效果，并将配置写入 mesh.userData，供渲染侧读取。
+ */
 export function EffectsSettings() {
   const { editor } = useSceneSettings();
   const { locale } = useLocale();
@@ -118,6 +123,10 @@ export function EffectsSettings() {
   const [effects, setEffects] = useState<EffectsState>(DEFAULT_EFFECTS);
   const [hasMeshSelection, setHasMeshSelection] = useState(false);
 
+  /**
+   * 从当前选中对象同步特效状态。
+   * 若选中的是组合节点，则读取其第一 个可配置 Mesh 的效果参数作为面板展示值。
+   */
   const syncFromSelection = useCallback(() => {
     if (!editor) {
       setEffects(DEFAULT_EFFECTS);
@@ -148,6 +157,10 @@ export function EffectsSettings() {
     return off;
   }, [editor, syncFromSelection]);
 
+  /**
+   * 将局部特效变更批量应用到当前选中对象下的所有可配置 Mesh。
+   * 支持通过 historyOperation 记录撤销/重做。
+   */
   const applyPatchToSelection = useCallback(
     (patch: Partial<EffectsState>, operationName: string, options?: { recordHistory?: boolean }) => {
       if (!editor) return;

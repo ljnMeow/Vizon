@@ -5,6 +5,10 @@ import { appMessages } from '../../../../i18n/messages';
 import { useLocale } from '../../../../hooks/useLocale';
 import { DATA_TRANSFER_KEYS } from '../../../../utils/keys';
 
+/**
+ * 模型资产列表，按类别分组显示为 Accordion 折叠面板。
+ * 每个模型卡片支持拖拽到视口，通过 MODEL_MIME DataTransfer key 传递模型 key。
+ */
 export function ModelList() {
   const { locale } = useLocale();
   const t = appMessages[locale];

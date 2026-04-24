@@ -12,8 +12,10 @@ import { VIZON_USER_DATA_KEYS } from '../../../../utils/keys';
 import { copyToClipboard } from '../../../../utils/utils';
 import { basicModels } from '../../../../utils/models';
 
+/** 内置基础模型 key 集合，用于判断当前对象是否支持参数化几何属性编辑 */
 const BASIC_MODEL_KEYS = new Set(basicModels.map((m) => m.key));
 
+/** 三维坐标轴 key */
 type AxisKey = 'x' | 'y' | 'z';
 
 type Vec3 = {
@@ -61,6 +63,7 @@ type SelectedObjectInfo = {
   name: string;
 } | null;
 
+/** 从当前选中对象读取基础信息 */
 function readSelectedInfo(obj: any): SelectedObjectInfo {
   if (!obj) return null;
   return {
@@ -70,6 +73,7 @@ function readSelectedInfo(obj: any): SelectedObjectInfo {
   };
 }
 
+/** 从当前选中对象读取变换属性，统一转成可编辑的数值结构 */
 function readSelectedTransform(obj: any): TransformState {
   return {
     position: {
@@ -90,6 +94,10 @@ function readSelectedTransform(obj: any): TransformState {
   };
 }
 
+/**
+ * 根据 three 对象类型推导历史记录分类前缀，
+ * 让属性修改在撤销/重做面板中更易识别。
+ */
 function getHistoryCategoryByObjectType(type?: string): string {
   if (!type) return '修改物体属性';
   if (type === 'OrthographicCamera') return '修改正交相机属性';
@@ -105,6 +113,7 @@ function getHistoryCategoryByObjectType(type?: string): string {
   return '修改物体属性';
 }
 
+/** 读取阴影与视锥裁剪能力及当前值 */
 function readSelectedShadow(obj: any): ShadowState | null {
   if (!obj) return null;
 
@@ -122,6 +131,7 @@ function readSelectedShadow(obj: any): ShadowState | null {
   };
 }
 
+/** 判断对象及其祖先中是否存在“不可选择”标记 */
 function computeIsNonSelectableInHierarchy(obj: any): boolean {
   let cur: any = obj;
   while (cur) {
@@ -131,6 +141,7 @@ function computeIsNonSelectableInHierarchy(obj: any): boolean {
   return false;
 }
 
+/** 判断对象及其祖先中是否存在“不可拾取”标记 */
 function computeIsNonPickableInHierarchy(obj: any): boolean {
   let cur: any = obj;
   while (cur) {
@@ -140,6 +151,7 @@ function computeIsNonPickableInHierarchy(obj: any): boolean {
   return false;
 }
 
+/** 判断祖先链上是否存在不可选择节点，用于限制某些交互开关 */
 function hasNonSelectableAncestor(obj: any): boolean {
   let cur: any = obj?.parent;
   while (cur) {
@@ -149,6 +161,7 @@ function hasNonSelectableAncestor(obj: any): boolean {
   return false;
 }
 
+/** 计算对象是否允许进入冻结态，避免对相机/灯光/控制器等特殊对象误操作 */
 function computeFreezeCapability(obj: any): boolean {
   if ((obj as any)?.isCamera) return false;
   if ((obj as any)?.isLight) return false;
@@ -160,6 +173,7 @@ function computeFreezeCapability(obj: any): boolean {
   return true;
 }
 
+/** 读取可见、可拾取与冻结相关状态 */
 function readSelectedVisibilityPickFreeze(obj: any): VisibilityPickFreezeState | null {
   if (!obj) return null;
 

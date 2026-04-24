@@ -12,6 +12,7 @@ type SelectedObjectInfo = {
   name: string;
 } | null;
 
+/** 单个几何体参数项的元数据定义 */
 type AttributeItem = {
   label: string;
   paramKey: string;
@@ -19,8 +20,10 @@ type AttributeItem = {
   format?: (v: unknown) => string;
 };
 
+/** 支持在属性面板中编辑参数的内置模型 key 集合 */
 const BASIC_MODEL_KEYS = new Set(basicModels.map((m) => m.key));
 
+/** 参数输入约束：最小值、最大值、步长与是否整数 */
 type ParamMeta = { min: number; max: number; step: number; integer: boolean };
 
 /**
@@ -50,10 +53,12 @@ const PARAM_META: Record<string, ParamMeta> = {
   arc: { min: 0.0, max: Math.PI * 2, step: 0.01, integer: false }
 };
 
+/** 将几何参数限制在合法区间内，避免退化或过重的几何体重建 */
 function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
 
+/** 将属性值格式化为适合 UI 展示的文本 */
 function formatNumber(n: unknown) {
   if (typeof n === 'number') {
     if (!Number.isFinite(n)) return String(n);
@@ -62,6 +67,10 @@ function formatNumber(n: unknown) {
   return String(n);
 }
 
+/**
+ * 对象几何属性面板。
+ * 仅对内置基础模型开放参数化编辑，例如 Box/Sphere/Cone/Torus 等。
+ */
 export function ObjectAttributes({
   editor,
   selectedInfo

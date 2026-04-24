@@ -10,6 +10,7 @@ interface LocaleContextValue {
 
 const LocaleContext = createContext<LocaleContextValue | undefined>(undefined);
 
+/** localStorage 中保存语言偏好的 key。 */
 const LOCALE_STORAGE_KEY = STORAGE_KEYS.LOCALE;
 
 /**
@@ -19,7 +20,8 @@ const LOCALE_STORAGE_KEY = STORAGE_KEYS.LOCALE;
  * - 最后回退到 zh-CN
  */
 export const LocaleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // 懒加载初始化：优先 localStorage，其次系统语言，最后回退到 zh-CN
+  // 懒加载初始化：避免每次渲染都重复访问 localStorage / navigator。
+  // 优先读取用户显式选择，其次根据系统语言推断默认值。
   const [locale, setLocale] = useState<Locale>(() => {
     const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY) as Locale | null;
     if (stored === 'zh-CN' || stored === 'en-US') {
@@ -46,7 +48,8 @@ export const LocaleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [locale]);
 
   /**
-   * 外部调用的设置语言方法，统一收敛到内部 state。
+   * 对外暴露统一的语言切换入口。
+   * 单独包装一层，便于后续在切换时插入埋点、服务端同步等附加逻辑。
    */
   const handleSetLocale = (next: Locale) => {
     setLocale(next);

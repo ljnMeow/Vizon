@@ -12,9 +12,12 @@ import {
 import type { ThreeEditor } from 'vizon-3d-core';
 import { encodeHistoryI18nNameAuto } from '../utils/historyI18n';
 
+/** 相机位置向量（世界坐标）。 */
 type CameraPosition = { x: number; y: number; z: number };
+/** OrbitControls 观察目标点。 */
 type CameraTarget = { x: number; y: number; z: number };
 
+/** Inspector 中可编辑的相机参数快照。 */
 type CameraSettings = {
   fov: number;
   near: number;
@@ -23,6 +26,7 @@ type CameraSettings = {
   target: CameraTarget;
 };
 
+/** Web 侧默认相机参数，需要与 core 中的初始值保持一致。 */
 const DEFAULT_CAMERA_SETTINGS: CameraSettings = {
   fov: 50,
   near: 0.01,
@@ -31,14 +35,17 @@ const DEFAULT_CAMERA_SETTINGS: CameraSettings = {
   target: { x: 0, y: 0.8, z: 0 }
 };
 
+/** 将数值约束在给定区间内，避免 UI 输入越界。 */
 function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
+/** 浮点数近似比较，避免 Three.js / 表单联动产生微小误差导致误判。 */
 function almostEqual(a: number, b: number, eps = 1e-6) {
   return Math.abs(a - b) <= eps;
 }
 
+/** 判断两份相机配置是否等价，用于减少重复同步与无意义 history 记录。 */
 function isSameCamera(a: CameraSettings, b: CameraSettings) {
   return (
     almostEqual(a.fov, b.fov) &&
@@ -53,16 +60,19 @@ function isSameCamera(a: CameraSettings, b: CameraSettings) {
   );
 }
 
+/** 将渲染器阴影类型转换为中文标签，供历史记录文案使用。 */
 function shadowMapTypeLabelZh(type: RendererSettings['shadowMapType']) {
   if (type === 'BasicShadowMap') return '基础';
   if (type === 'PCFShadowMap') return 'PCF软阴影';
   return 'PCF软阴影（柔和）';
 }
 
+/** 将场景背景模式转换为中文标签，供历史记录与 UI 展示。 */
 function backgroundModeLabelZh(mode: SceneSettingsBackgroundMode) {
   return mode === 'skybox' ? '天空盒' : '纯色';
 }
 
+/** 场景设置上下文：统一暴露编辑器实例、当前设置快照与更新方法。 */
 type SceneSettingsContextValue = {
   editor: ThreeEditor | null;
   sceneSettings: SceneSettings;
@@ -116,6 +126,12 @@ type SceneSettingsContextValue = {
 
 export const SceneSettingsContext = createContext<SceneSettingsContextValue | null>(null);
 
+/**
+ * 场景设置 Provider：
+ * - 作为 React Inspector 与 ThreeEditor 之间的桥梁
+ * - 负责双向同步场景/渲染器/相机设置
+ * - 统一封装 history 文案与更新节流逻辑
+ */
 export function SceneSettingsProvider({ children }: { children: React.ReactNode }) {
   const [editor, setEditor] = useState<ThreeEditor | null>(null);
   const [sceneSettings, setSceneSettings] = useState<SceneSettings>(() => createDefaultSceneSettings());
