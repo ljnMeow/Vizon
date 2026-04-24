@@ -42,6 +42,7 @@ export function SceneSettingsEnvironmentItem({
   const {
     sceneSettings,
     updateSceneSettings,
+    setBackgroundMode,
     setBackgroundColor,
     setHdri,
     setEnvironmentStrength,
@@ -97,13 +98,7 @@ export function SceneSettingsEnvironmentItem({
             value={backgroundMode}
             onChange={(v) => {
               const next = v as typeof backgroundMode;
-              updateSceneSettings(
-                (prev) => ({ ...prev, environment: { ...prev.environment, backgroundMode: next } }),
-                {
-                  recordHistory: true,
-                  operationName: `修改场景属性-环境-背景模式 = ${env.backgroundModeOptions[next]}`
-                }
-              );
+              setBackgroundMode(next);
               // 切到纯色模式时，不允许继续预览/配置贴图
               if (next === 'solid') setPreviewOpen(false);
             }}

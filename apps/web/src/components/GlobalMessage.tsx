@@ -10,7 +10,7 @@ import { createPortal } from 'react-dom';
 
 import { appMessages } from '../i18n/messages';
 import type { Locale } from '../hooks/useLocale';
-import { STORAGE_KEYS } from '../utils/storageKeys';
+import { STORAGE_KEYS } from '../utils/keys';
 
 type MessageType = 'success' | 'info' | 'warning' | 'error' | 'loading';
 

@@ -3,9 +3,10 @@ import type { SceneTreeNode } from 'vizon-3d-core';
 import { useLocale } from '../../../../hooks/useLocale';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { appMessages } from '../../../../i18n/messages';
+import { DATA_TRANSFER_KEYS } from '../../../../utils/keys';
 import { getAssetUrl } from '../../../../utils/utils';
 
-const TREE_DRAG_MIME = 'application/x-vizon-scene-node-uuid';
+const TREE_DRAG_MIME = DATA_TRANSFER_KEYS.SCENE_NODE_UUID_MIME;
 type DropPlacement = 'before' | 'after' | 'inside';
 
 type DragPreview = {

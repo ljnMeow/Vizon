@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../../../hooks/useTheme';
 import { useLocale } from '../../../hooks/useLocale';
 import { appMessages } from '../../../i18n/messages';
 import LogoMark from '../../../components/LogoMark';
@@ -20,7 +19,6 @@ type StoredUser = {
 };
 
 export function DesignHeader() {
-  const { theme, toggleTheme } = useTheme();
   const { locale } = useLocale();
   const t = appMessages[locale];
   const [menuOpen, setMenuOpen] = useState(false);
@@ -93,14 +91,6 @@ export function DesignHeader() {
 
       <div ref={menuContainerRef} className="relative z-[2147483647] flex items-center gap-3">
         <ActionBar />
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-xs text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
-        >
-          <span className="inline-block h-2 w-2 rounded-full bg-[var(--accent)]" />
-          <span>{theme === 'dark' ? t.auth.login.themeDark : t.auth.login.themeLight}</span>
-        </button>
 
         {/* 头像 + 昵称按钮：放在头部导航中 */}
         <button

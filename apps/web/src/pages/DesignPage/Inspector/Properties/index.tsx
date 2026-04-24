@@ -7,6 +7,8 @@ import { message } from '../../../../components/GlobalMessage';
 import { useLocale } from '../../../../hooks/useLocale';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { appMessages } from '../../../../i18n/messages';
+import { encodeHistoryI18nNameAuto } from '../../../../utils/historyI18n';
+import { VIZON_USER_DATA_KEYS } from '../../../../utils/keys';
 import { copyToClipboard } from '../../../../utils/utils';
 import { basicModels } from '../../../../utils/models';
 
@@ -88,6 +90,21 @@ function readSelectedTransform(obj: any): TransformState {
   };
 }
 
+function getHistoryCategoryByObjectType(type?: string): string {
+  if (!type) return '修改物体属性';
+  if (type === 'OrthographicCamera') return '修改正交相机属性';
+  if (type === 'PerspectiveCamera') return '修改透视相机属性';
+  if (type.endsWith('Camera')) return '修改相机属性';
+  if (type === 'DirectionalLight') return '修改平行光属性';
+  if (type === 'PointLight') return '修改点光源属性';
+  if (type === 'SpotLight') return '修改聚光灯属性';
+  if (type === 'AmbientLight') return '修改环境光属性';
+  if (type === 'HemisphereLight') return '修改半球光属性';
+  if (type === 'RectAreaLight') return '修改矩形光属性';
+  if (type.endsWith('Light')) return '修改灯光属性';
+  return '修改物体属性';
+}
+
 function readSelectedShadow(obj: any): ShadowState | null {
   if (!obj) return null;
 
@@ -108,7 +125,7 @@ function readSelectedShadow(obj: any): ShadowState | null {
 function computeIsNonSelectableInHierarchy(obj: any): boolean {
   let cur: any = obj;
   while (cur) {
-    if (Boolean(cur?.userData?.__vizonNonSelectable)) return true;
+    if (Boolean(cur?.userData?.[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE])) return true;
     cur = cur.parent;
   }
   return false;
@@ -117,7 +134,7 @@ function computeIsNonSelectableInHierarchy(obj: any): boolean {
 function computeIsNonPickableInHierarchy(obj: any): boolean {
   let cur: any = obj;
   while (cur) {
-    if (Boolean(cur?.userData?.__vizonNonPickable)) return true;
+    if (Boolean(cur?.userData?.[VIZON_USER_DATA_KEYS.COMMON.NON_PICKABLE])) return true;
     cur = cur.parent;
   }
   return false;
@@ -126,7 +143,7 @@ function computeIsNonPickableInHierarchy(obj: any): boolean {
 function hasNonSelectableAncestor(obj: any): boolean {
   let cur: any = obj?.parent;
   while (cur) {
-    if (Boolean(cur?.userData?.__vizonNonSelectable)) return true;
+    if (Boolean(cur?.userData?.[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE])) return true;
     cur = cur.parent;
   }
   return false;
@@ -139,7 +156,7 @@ function computeFreezeCapability(obj: any): boolean {
   if ((obj as any)?.isSkinnedMesh) return false;
   if ((obj as any)?.isTransformControls) return false;
   if (obj?.type === 'TransformControlsGizmo' || obj?.type === 'TransformControlsPlane') return false;
-  if (Boolean(obj?.userData?.__vizonNonSelectable)) return false;
+  if (Boolean(obj?.userData?.[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE])) return false;
   return true;
 }
 
@@ -148,7 +165,7 @@ function readSelectedVisibilityPickFreeze(obj: any): VisibilityPickFreezeState |
 
   const visible = Boolean(obj.visible);
   const pickable = !computeIsNonPickableInHierarchy(obj);
-  const frozen = !Boolean(obj?.userData?.__vizonDynamic) && obj?.matrixAutoUpdate === false;
+  const frozen = !Boolean(obj?.userData?.[VIZON_USER_DATA_KEYS.COMMON.DYNAMIC]) && obj?.matrixAutoUpdate === false;
   const canPickable = !hasNonSelectableAncestor(obj);
   const canFreeze = computeFreezeCapability(obj);
 
@@ -276,11 +293,13 @@ export function PropertiesSettings() {
   }, [editor, selectedInfo?.uuid]);
 
   const labels = useMemo(() => t.propertiesSettings, [t.propertiesSettings]);
+  const historyName = (zhName: string) => encodeHistoryI18nNameAuto(zhName);
+  const historyCategory = useMemo(() => getHistoryCategoryByObjectType(selectedInfo?.type), [selectedInfo?.type]);
 
   const showObjectAttributes = useMemo(() => {
     if (!editor || !selectedInfo?.uuid) return false;
     const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
-    const key = obj?.userData?.__vizonDefaultModelKey;
+    const key = obj?.userData?.[VIZON_USER_DATA_KEYS.DEFAULTS.DEFAULT_MODEL_KEY];
     return typeof key === 'string' && BASIC_MODEL_KEYS.has(key);
   }, [editor, selectedInfo?.uuid]);
 
@@ -294,7 +313,7 @@ export function PropertiesSettings() {
     if (!editor || !selectedInfo) return;
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'name', nextName, {
       recordHistory: true,
-      operationName: `修改物体属性 - ${selectedInfo.uuid} - 名称 = ${nextName || '""'}`
+      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 名称 = ${nextName || '""'}`)
     });
   };
 
@@ -320,7 +339,7 @@ export function PropertiesSettings() {
     const nextPos = { ...transform.position, [axis]: next };
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, `position.${axis}`, next, {
       recordHistory: true,
-      operationName: `修改物体属性 - ${selectedInfo.uuid} - 位置 = (${Number(nextPos.x.toFixed(4))}, ${Number(nextPos.y.toFixed(4))}, ${Number(nextPos.z.toFixed(4))})`
+      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 位置 = (${Number(nextPos.x.toFixed(4))}, ${Number(nextPos.y.toFixed(4))}, ${Number(nextPos.z.toFixed(4))})`)
     });
   };
 
@@ -335,7 +354,7 @@ export function PropertiesSettings() {
     const nextRot = { ...transform.rotation, [axis]: next };
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, `rotation.${axis}`, next, {
       recordHistory: true,
-      operationName: `修改物体属性 - ${selectedInfo.uuid} - 旋转 = (${Number(nextRot.x.toFixed(4))}, ${Number(nextRot.y.toFixed(4))}, ${Number(nextRot.z.toFixed(4))})`
+      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 旋转 = (${Number(nextRot.x.toFixed(4))}, ${Number(nextRot.y.toFixed(4))}, ${Number(nextRot.z.toFixed(4))})`)
     });
   };
 
@@ -350,14 +369,14 @@ export function PropertiesSettings() {
     const nextScale = { ...transform.scale, [axis]: next };
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, `scale.${axis}`, next, {
       recordHistory: true,
-      operationName: `修改物体属性 - ${selectedInfo.uuid} - 缩放 = (${Number(nextScale.x.toFixed(4))}, ${Number(nextScale.y.toFixed(4))}, ${Number(nextScale.z.toFixed(4))})`
+      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 缩放 = (${Number(nextScale.x.toFixed(4))}, ${Number(nextScale.y.toFixed(4))}, ${Number(nextScale.z.toFixed(4))})`)
     });
   };
 
   const setVisible = (nextVisible: boolean) => {
     if (!editor || !selectedInfo) return;
     const ok = editor.setObjectVisibleByUuid(selectedInfo.uuid, nextVisible, {
-      operationName: `修改物体属性 - ${selectedInfo.uuid} - 可见 = ${nextVisible ? 'true' : 'false'}`
+      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 可见 = ${nextVisible ? 'true' : 'false'}`)
     });
     if (!ok) return;
     // 若 nextVisible=false 触发 select(null)，上面的 select 回调会把 state 清空；这里乐观更新即可。
@@ -375,19 +394,19 @@ export function PropertiesSettings() {
     const applyPickable = (next: boolean) => {
       if (next) {
         if (obj.userData) {
-          delete obj.userData.__vizonNonPickable;
-          delete obj.userData.__vizonNonSelectable;
+          delete obj.userData[VIZON_USER_DATA_KEYS.COMMON.NON_PICKABLE];
+          delete obj.userData[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE];
         }
       } else {
         obj.userData = obj.userData ?? {};
-        obj.userData.__vizonNonPickable = true;
-        delete obj.userData.__vizonNonSelectable;
+        obj.userData[VIZON_USER_DATA_KEYS.COMMON.NON_PICKABLE] = true;
+        delete obj.userData[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE];
       }
       setVisibilityPickFreeze(readSelectedVisibilityPickFreeze(obj));
       editor.render();
     };
     void editor.executeHistoryOperation({
-      name: `修改物体属性 - ${selectedInfo.uuid} - 可拾取 = ${nextPickable ? 'true' : 'false'}`,
+      name: historyName(`${historyCategory} - ${selectedInfo.uuid} - 可拾取 = ${nextPickable ? 'true' : 'false'}`),
       do: () => applyPickable(nextPickable),
       undo: () => {
         obj.userData = { ...prevUserData };
@@ -411,7 +430,7 @@ export function PropertiesSettings() {
     });
     const applyFrozen = (next: boolean) => {
       if (next) {
-        if (obj.userData) delete obj.userData.__vizonDynamic;
+        if (obj.userData) delete obj.userData[VIZON_USER_DATA_KEYS.COMMON.DYNAMIC];
         obj.traverse((node: any) => {
           if ((node as any)?.isCamera) return;
           if ((node as any)?.isLight) return;
@@ -419,15 +438,15 @@ export function PropertiesSettings() {
           if ((node as any)?.isSkinnedMesh) return;
           if ((node as any)?.isTransformControls) return;
           if (node?.type === 'TransformControlsGizmo' || node?.type === 'TransformControlsPlane') return;
-          if (Boolean(node?.userData?.__vizonNonSelectable)) return;
-          if (Boolean(node?.userData?.__vizonDynamic)) return;
+          if (Boolean(node?.userData?.[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE])) return;
+          if (Boolean(node?.userData?.[VIZON_USER_DATA_KEYS.COMMON.DYNAMIC])) return;
           node.matrixAutoUpdate = false;
           node.updateMatrix();
           node.updateMatrixWorld(true);
         });
       } else {
         obj.userData = obj.userData ?? {};
-        obj.userData.__vizonDynamic = true;
+        obj.userData[VIZON_USER_DATA_KEYS.COMMON.DYNAMIC] = true;
         obj.traverse((node: any) => {
           node.matrixAutoUpdate = true;
           node.updateMatrixWorld(true);
@@ -437,7 +456,7 @@ export function PropertiesSettings() {
       editor.render();
     };
     void editor.executeHistoryOperation({
-      name: `修改物体属性 - ${selectedInfo.uuid} - 冻结 = ${nextFrozen ? 'true' : 'false'}`,
+      name: historyName(`${historyCategory} - ${selectedInfo.uuid} - 冻结 = ${nextFrozen ? 'true' : 'false'}`),
       do: () => applyFrozen(nextFrozen),
       undo: () => {
         obj.userData = { ...prevUserData };
@@ -478,7 +497,7 @@ export function PropertiesSettings() {
     const clamped = Math.max(0, Math.min(1, nextOpacity));
     const before = materials.map((m) => ({ m, opacity: m.opacity, transparent: m.transparent }));
     void editor.executeHistoryOperation({
-      name: `修改物体属性 - ${selectedInfo.uuid} - 透明度 = ${Number(clamped.toFixed(4))}`,
+      name: historyName(`${historyCategory} - ${selectedInfo.uuid} - 透明度 = ${Number(clamped.toFixed(4))}`),
       do: () => {
         for (const m of materials) {
           m.transparent = clamped < 1;
@@ -507,7 +526,7 @@ export function PropertiesSettings() {
 
     const next = Math.max(0, Math.min(999, Math.round(nextRenderOrder)));
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'renderOrder', next, {
-      operationName: `修改物体属性 - ${selectedInfo.uuid} - 渲染层级 = ${next}`
+      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 渲染层级 = ${next}`)
     });
     setRenderOrderState({ renderOrder: next, canRenderOrder: true });
   };
@@ -524,7 +543,7 @@ export function PropertiesSettings() {
     const next = Math.max(0, Math.min(999, Math.round(nextRenderOrder)));
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'renderOrder', next, {
       recordHistory: true,
-      operationName: `修改物体属性 - ${selectedInfo.uuid} - 渲染层级 = ${next}`
+      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 渲染层级 = ${next}`)
     });
     setRenderOrderState({ renderOrder: next, canRenderOrder: true });
   };
@@ -535,7 +554,7 @@ export function PropertiesSettings() {
     if (!obj) return;
     if (typeof (obj as any).castShadow !== 'boolean') return;
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'castShadow', nextCastShadow, {
-      operationName: `修改物体属性 - ${selectedInfo.uuid} - 产生阴影 = ${nextCastShadow ? 'true' : 'false'}`
+      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 产生阴影 = ${nextCastShadow ? 'true' : 'false'}`)
     });
     setShadow((prev) => (prev ? { ...prev, castShadow: nextCastShadow, canCastShadow: true } : prev));
   };
@@ -546,7 +565,7 @@ export function PropertiesSettings() {
     if (!obj) return;
     if (typeof (obj as any).receiveShadow !== 'boolean') return;
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'receiveShadow', nextReceiveShadow, {
-      operationName: `修改物体属性 - ${selectedInfo.uuid} - 接收阴影 = ${nextReceiveShadow ? 'true' : 'false'}`
+      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 接收阴影 = ${nextReceiveShadow ? 'true' : 'false'}`)
     });
     setShadow((prev) => (prev ? { ...prev, receiveShadow: nextReceiveShadow, canReceiveShadow: true } : prev));
   };
@@ -557,7 +576,7 @@ export function PropertiesSettings() {
     if (!obj) return;
     if (typeof (obj as any).frustumCulled !== 'boolean') return;
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'frustumCulled', nextFrustumCulled, {
-      operationName: `修改物体属性 - ${selectedInfo.uuid} - 视锥裁剪 = ${nextFrustumCulled ? 'true' : 'false'}`
+      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 视锥裁剪 = ${nextFrustumCulled ? 'true' : 'false'}`)
     });
     setShadow((prev) => (prev ? { ...prev, frustumCulled: nextFrustumCulled, canFrustumCulled: true } : prev));
   };

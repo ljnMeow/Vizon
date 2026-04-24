@@ -6,7 +6,7 @@
  * - 让调用方只关心“读/写 token 或用户信息”，而不关心具体存储实现
  * - 后续如果需要从 localStorage 迁移到 cookie / IndexedDB，只需改动本模块
  */
-import { STORAGE_KEYS } from './storageKeys';
+import { STORAGE_KEYS } from './keys';
 
 const ACCESS_TOKEN_KEY = STORAGE_KEYS.ACCESS_TOKEN;
 const REFRESH_TOKEN_KEY = STORAGE_KEYS.REFRESH_TOKEN;

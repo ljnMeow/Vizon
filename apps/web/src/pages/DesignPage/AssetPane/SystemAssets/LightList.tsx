@@ -1,7 +1,7 @@
 import { Tooltip } from '../../../../components/Tooltip';
 import { useLocale } from '../../../../hooks/useLocale';
 import { appMessages } from '../../../../i18n/messages';
-import { DATA_TRANSFER_KEYS } from '../../../../utils/storageKeys';
+import { DATA_TRANSFER_KEYS } from '../../../../utils/keys';
 import { getAssetUrl } from '../../../../utils/utils';
 
 type LightPresetKey = 'ambientLight' | 'directionalLight' | 'pointLight' | 'spotLight' | 'hemisphereLight' | 'rectAreaLight';

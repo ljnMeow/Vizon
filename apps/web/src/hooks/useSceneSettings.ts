@@ -10,6 +10,7 @@ import {
   type SceneSettingsHdri
 } from 'vizon-3d-core';
 import type { ThreeEditor } from 'vizon-3d-core';
+import { encodeHistoryI18nNameAuto } from '../utils/historyI18n';
 
 type CameraPosition = { x: number; y: number; z: number };
 type CameraTarget = { x: number; y: number; z: number };
@@ -50,6 +51,16 @@ function isSameCamera(a: CameraSettings, b: CameraSettings) {
     almostEqual(a.target.y, b.target.y) &&
     almostEqual(a.target.z, b.target.z)
   );
+}
+
+function shadowMapTypeLabelZh(type: RendererSettings['shadowMapType']) {
+  if (type === 'BasicShadowMap') return '基础';
+  if (type === 'PCFShadowMap') return 'PCF软阴影';
+  return 'PCF软阴影（柔和）';
+}
+
+function backgroundModeLabelZh(mode: SceneSettingsBackgroundMode) {
+  return mode === 'skybox' ? '天空盒' : '纯色';
 }
 
 type SceneSettingsContextValue = {
@@ -253,7 +264,7 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
       try {
         await editor.setSceneSettings(next, {
           recordHistory: options?.recordHistory ?? true,
-          operationName: options?.operationName
+          operationName: options?.operationName ? encodeHistoryI18nNameAuto(options.operationName) : undefined
         });
         // 只同步最后一次 apply 的 normalized 结果，避免竞态覆盖 UI
         if (seq === applySeqRef.current) {
@@ -309,7 +320,10 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
         return;
       }
 
-      editor.setRendererSettings(next, { operationName: options?.operationName, recordHistory: options?.recordHistory ?? true });
+      editor.setRendererSettings(next, {
+        operationName: options?.operationName ? encodeHistoryI18nNameAuto(options.operationName) : undefined,
+        recordHistory: options?.recordHistory ?? true
+      });
       setRendererSettings(editor.getRendererSettings());
     },
     [editor]
@@ -422,7 +436,7 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
         update((prev) => ({
           ...prev,
           environment: { ...prev.environment, backgroundMode: mode }
-        }), { operationName: `修改场景属性-环境-背景模式 = ${mode}` }),
+        }), { operationName: `修改场景属性-环境-背景模式 = ${backgroundModeLabelZh(mode)}` }),
 
       setBackgroundColor: (color) =>
         update((prev) => ({
@@ -511,7 +525,10 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
       setShadowMapEnabled: (enabled, options) =>
         updateRenderer((prev) => ({ ...prev, shadowMapEnabled: enabled }), { operationName: `修改场景属性-渲染器-阴影开关 = ${enabled ? 'true' : 'false'}`, recordHistory: options?.recordHistory ?? true }),
       setShadowMapType: (type, options) =>
-        updateRenderer((prev) => ({ ...prev, shadowMapType: type }), { operationName: `修改场景属性-渲染器-阴影类型 = ${type}`, recordHistory: options?.recordHistory ?? true }),
+        updateRenderer((prev) => ({ ...prev, shadowMapType: type }), {
+          operationName: `修改场景属性-渲染器-阴影类型 = ${shadowMapTypeLabelZh(type)}`,
+          recordHistory: options?.recordHistory ?? true
+        }),
       setShadowMapAutoUpdate: (autoUpdate, options) =>
         updateRenderer((prev) => ({ ...prev, shadowMapAutoUpdate: autoUpdate }), { operationName: `修改场景属性-渲染器-阴影自动更新 = ${autoUpdate ? 'true' : 'false'}`, recordHistory: options?.recordHistory ?? true }),
 

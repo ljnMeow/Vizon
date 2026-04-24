@@ -12,6 +12,7 @@
  * - `infra/`：事件、数学等基础设施。
  */
 export { ThreeEditor } from './editor/ThreeEditor';
+export { VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS, VIZON_HISTORY_KEYS } from './infra/utils';
 export type {
   ThreeEditorEvents,
   ThreeEditorOptions,

@@ -11,7 +11,35 @@ import {
 } from 'vizon-3d-core';
 import { TransformToolbar, type ViewportTool } from './tools/TransformToolbar';
 import { ViewPresetToolbar } from './tools/ViewPresetToolbar';
-import { DATA_TRANSFER_KEYS } from '../../../utils/storageKeys';
+import { DATA_TRANSFER_KEYS } from '../../../utils/keys';
+import { encodeHistoryI18nName } from '../../../utils/historyI18n';
+
+function getAddCameraHistoryName(cameraKey: DefaultCameraKey, uuid: string) {
+  const cameraName =
+    cameraKey === 'orthographic'
+      ? { 'zh-CN': '正交相机', 'en-US': 'Orthographic Camera' }
+      : { 'zh-CN': '透视相机', 'en-US': 'Perspective Camera' };
+  return encodeHistoryI18nName({
+    'zh-CN': `添加${cameraName['zh-CN']} - ${uuid}`,
+    'en-US': `Add ${cameraName['en-US']} - ${uuid}`
+  });
+}
+
+function getAddLightHistoryName(lightKey: DefaultLightKey, uuid: string) {
+  const lightNameMap: Record<DefaultLightKey, { 'zh-CN': string; 'en-US': string }> = {
+    ambientLight: { 'zh-CN': '环境光', 'en-US': 'Ambient Light' },
+    directionalLight: { 'zh-CN': '平行光', 'en-US': 'Directional Light' },
+    pointLight: { 'zh-CN': '点光源', 'en-US': 'Point Light' },
+    spotLight: { 'zh-CN': '聚光灯', 'en-US': 'Spot Light' },
+    hemisphereLight: { 'zh-CN': '半球光', 'en-US': 'Hemisphere Light' },
+    rectAreaLight: { 'zh-CN': '矩形光', 'en-US': 'Rect Area Light' }
+  };
+  const lightName = lightNameMap[lightKey];
+  return encodeHistoryI18nName({
+    'zh-CN': `添加${lightName['zh-CN']} - ${uuid}`,
+    'en-US': `Add ${lightName['en-US']} - ${uuid}`
+  });
+}
 
 export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: ThreeEditor) => void }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -119,7 +147,12 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
     if (modelKey) {
       const typedKey = modelKey as DefaultModelKey;
       const obj = createDefaultModel(typedKey, { position: point });
-      inst.add(obj);
+      inst.add(obj, {
+        operationName: encodeHistoryI18nName({
+          'zh-CN': `添加物体 - ${obj.uuid}`,
+          'en-US': `Add object - ${obj.uuid}`
+        })
+      });
       inst.select(obj);
       return;
     }
@@ -128,7 +161,9 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
     if (cameraKey) {
       const typedKey = cameraKey as DefaultCameraKey;
       const cam = createDefaultCamera(typedKey, { position: point });
-      inst.add(cam);
+      inst.add(cam, {
+        operationName: getAddCameraHistoryName(typedKey, cam.uuid)
+      });
       inst.select(cam);
       return;
     }
@@ -137,7 +172,9 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
     if (lightKey) {
       const typedKey = lightKey as DefaultLightKey;
       const light = createDefaultLight(typedKey, { position: point, target: { x: 0, y: 0, z: 0 } });
-      inst.add(light);
+      inst.add(light, {
+        operationName: getAddLightHistoryName(typedKey, light.uuid)
+      });
       inst.select(light);
     }
   };

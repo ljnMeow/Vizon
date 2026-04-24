@@ -3,7 +3,7 @@ import { Tooltip } from '../../../../components/Tooltip';
 import { appMessages } from '../../../../i18n/messages';
 import { useLocale } from '../../../../hooks/useLocale';
 import { getAssetUrl } from '../../../../utils/utils';
-import { DATA_TRANSFER_KEYS } from '../../../../utils/storageKeys';
+import { DATA_TRANSFER_KEYS } from '../../../../utils/keys';
 
 type CameraPresetKey = 'orthographic' | 'perspective';
 

@@ -1,5 +1,6 @@
 .cursor
 .vscode
+.tocodex
 node_modules
 
 # ignore all build outputs

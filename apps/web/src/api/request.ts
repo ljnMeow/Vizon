@@ -8,7 +8,7 @@
  */
 
 import { clearAuthTokens, clearUserInfo, getAccessToken, getRefreshToken, setAuthTokens } from '../utils/authStorage';
-import { STORAGE_KEYS } from '../utils/storageKeys';
+import { STORAGE_KEYS } from '../utils/keys';
 import type { Locale } from '../hooks/useLocale';
 import { appMessages } from '../i18n/messages';
 

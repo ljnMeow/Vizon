@@ -3,6 +3,8 @@ import type { DefaultModelKey, ThreeEditor } from 'vizon-3d-core';
 import { useLocale } from '../../../../hooks/useLocale';
 import { basicModels } from '../../../../utils/models';
 import { appMessages } from '../../../../i18n/messages';
+import { encodeHistoryI18nNameAuto } from '../../../../utils/historyI18n';
+import { VIZON_USER_DATA_KEYS } from '../../../../utils/keys';
 
 type SelectedObjectInfo = {
   uuid: string;
@@ -72,6 +74,7 @@ export function ObjectAttributes({
   const objAttrT = inspectorT.objectAttributes;
 
   const [refreshKey, setRefreshKey] = useState(0);
+  const historyName = (zhName: string) => encodeHistoryI18nNameAuto(zhName);
 
   const { modelKey, modelTitle, geometryType, attributes } = useMemo(() => {
     if (!editor || !selectedInfo?.uuid) {
@@ -79,7 +82,7 @@ export function ObjectAttributes({
     }
 
     const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
-    const key = obj?.userData?.__vizonDefaultModelKey as DefaultModelKey | undefined;
+    const key = obj?.userData?.[VIZON_USER_DATA_KEYS.DEFAULTS.DEFAULT_MODEL_KEY] as DefaultModelKey | undefined;
     if (key && !BASIC_MODEL_KEYS.has(key)) {
       return { modelKey: null as DefaultModelKey | null, modelTitle: '', geometryType: '', attributes: null as AttributeItem[] | null };
     }
@@ -308,7 +311,7 @@ export function ObjectAttributes({
       const labelItem = attributes.find((it) => it.paramKey === paramKey);
       const displayLabel = labelItem?.label ?? paramKey;
       void editor.executeHistoryOperation({
-        name: `修改物体属性 - ${selectedInfo.uuid} - ${displayLabel} = ${valueText}`,
+        name: historyName(`修改物体属性 - ${selectedInfo.uuid} - ${displayLabel} = ${valueText}`),
         do: () => {
           obj.geometry = nextGeometry;
           obj.updateMatrixWorld?.(true);
@@ -340,7 +343,7 @@ export function ObjectAttributes({
   const conduitEditEnabled = (() => {
     if (!editor || !selectedInfo?.uuid) return false;
     const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
-    return Boolean(obj?.userData?.__vizonConduitEditEnabled);
+    return Boolean(obj?.userData?.[VIZON_USER_DATA_KEYS.CONDUIT.EDIT_ENABLED]);
   })();
 
   return (
@@ -372,18 +375,18 @@ export function ObjectAttributes({
                 const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
                 if (!obj) return;
                 const next = e.target.checked;
-                const prev = Boolean(obj?.userData?.__vizonConduitEditEnabled);
+                const prev = Boolean(obj?.userData?.[VIZON_USER_DATA_KEYS.CONDUIT.EDIT_ENABLED]);
                 void editor.executeHistoryOperation({
-                  name: `修改物体属性 - ${selectedInfo.uuid} - ${objAttrT.conduitEditToggleLabel} = ${next ? objAttrT.yesLabel : objAttrT.noLabel}`,
+                  name: historyName(`修改物体属性 - ${selectedInfo.uuid} - ${objAttrT.conduitEditToggleLabel} = ${next ? objAttrT.yesLabel : objAttrT.noLabel}`),
                   do: () => {
                     obj.userData = obj.userData ?? {};
-                    obj.userData.__vizonConduitEditEnabled = next;
+                    obj.userData[VIZON_USER_DATA_KEYS.CONDUIT.EDIT_ENABLED] = next;
                     setRefreshKey((x) => x + 1);
                     editor.select(obj);
                   },
                   undo: () => {
                     obj.userData = obj.userData ?? {};
-                    obj.userData.__vizonConduitEditEnabled = prev;
+                    obj.userData[VIZON_USER_DATA_KEYS.CONDUIT.EDIT_ENABLED] = prev;
                     setRefreshKey((x) => x + 1);
                     editor.select(obj);
                   }

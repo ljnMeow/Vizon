@@ -130,6 +130,16 @@ export interface AppMessages {
         rotate: string;
       };
     };
+    actionBar: {
+      title: string;
+      undoWithShortcut: string;
+      redoWithShortcut: string;
+      copyWithShortcut: string;
+      pasteWithShortcut: string;
+      deleteWithShortcut: string;
+      clear: string;
+      reset: string;
+    };
     inspector: {
       tabs: {
         scene: string;
@@ -146,6 +156,30 @@ export interface AppMessages {
         properties: string;
         materials: string;
         effects: string;
+      };
+      effectsSettings: {
+        noMeshSelection: string;
+        borderTitle: string;
+        glowTitle: string;
+        enableLabel: string;
+        colorLabel: string;
+        borderWidthLabel: string;
+        glowRangeLabel: string;
+        glowBrightnessLabel: string;
+        borderWidthAriaLabel: string;
+        borderColorAriaLabel: string;
+        glowColorAriaLabel: string;
+        glowRangeAriaLabel: string;
+        glowBrightnessAriaLabel: string;
+        history: {
+          borderEnabled: string;
+          borderWidth: string;
+          borderColor: string;
+          glowEnabled: string;
+          glowColor: string;
+          glowRange: string;
+          glowBrightness: string;
+        };
       };
       propertiesSettings: {
         baseSettingTitle: string;
@@ -557,6 +591,16 @@ export const appMessages: Record<Locale, AppMessages> = {
           rotate: '旋转'
         }
       },
+      actionBar: {
+        title: '操作',
+        undoWithShortcut: '撤销（Ctrl+Z / Command+Z）',
+        redoWithShortcut: '恢复（Ctrl+Shift+Z / Command+Shift+Z）',
+        copyWithShortcut: '复制（Ctrl+C / Command+C）',
+        pasteWithShortcut: '粘贴（Ctrl+V / Command+V）',
+        deleteWithShortcut: '删除（Delete）',
+        clear: '清空',
+        reset: '重置'
+      },
       inspector: {
         tabs: {
           scene: '场景',
@@ -573,6 +617,30 @@ export const appMessages: Record<Locale, AppMessages> = {
           properties: '这里将来是属性（Properties）',
           materials: '这里将来是材质（Materials）',
           effects: '这里将来是特效（Effects）'
+        },
+        effectsSettings: {
+          noMeshSelection: '当前选中对象没有可配置特效的 Mesh。',
+          borderTitle: '边框',
+          glowTitle: '辉光',
+          enableLabel: '开启',
+          colorLabel: '颜色',
+          borderWidthLabel: '大小',
+          glowRangeLabel: '范围',
+          glowBrightnessLabel: '亮度',
+          borderWidthAriaLabel: '边框宽度',
+          borderColorAriaLabel: '边框颜色',
+          glowColorAriaLabel: '辉光颜色',
+          glowRangeAriaLabel: '辉光范围',
+          glowBrightnessAriaLabel: '辉光亮度',
+          history: {
+            borderEnabled: '修改物体属性-特效-边框开关',
+            borderWidth: '修改物体属性-特效-边框宽度',
+            borderColor: '修改物体属性-特效-边框颜色',
+            glowEnabled: '修改物体属性-特效-辉光开关',
+            glowColor: '修改物体属性-特效-辉光颜色',
+            glowRange: '修改物体属性-特效-辉光范围',
+            glowBrightness: '修改物体属性-特效-辉光亮度'
+          }
         },
         propertiesSettings: {
           baseSettingTitle: '通用属性',
@@ -976,6 +1044,16 @@ export const appMessages: Record<Locale, AppMessages> = {
           rotate: 'Rotate'
         }
       },
+      actionBar: {
+        title: 'Actions',
+        undoWithShortcut: 'Undo (Ctrl+Z / Command+Z)',
+        redoWithShortcut: 'Redo (Ctrl+Shift+Z / Command+Shift+Z)',
+        copyWithShortcut: 'Copy (Ctrl+C / Command+C)',
+        pasteWithShortcut: 'Paste (Ctrl+V / Command+V)',
+        deleteWithShortcut: 'Delete (Delete)',
+        clear: 'Clear',
+        reset: 'Reset'
+      },
       inspector: {
         tabs: {
           scene: 'Scene',
@@ -992,6 +1070,30 @@ export const appMessages: Record<Locale, AppMessages> = {
           properties: 'Properties will appear here.',
           materials: 'Materials will appear here.',
           effects: 'Effects will appear here.'
+        },
+        effectsSettings: {
+          noMeshSelection: 'The selected object has no mesh with configurable effects.',
+          borderTitle: 'Border',
+          glowTitle: 'Glow',
+          enableLabel: 'Enable',
+          colorLabel: 'Color',
+          borderWidthLabel: 'Size',
+          glowRangeLabel: 'Range',
+          glowBrightnessLabel: 'Brightness',
+          borderWidthAriaLabel: 'Border width',
+          borderColorAriaLabel: 'Border color',
+          glowColorAriaLabel: 'Glow color',
+          glowRangeAriaLabel: 'Glow range',
+          glowBrightnessAriaLabel: 'Glow brightness',
+          history: {
+            borderEnabled: 'Modify object property - effects - border enabled',
+            borderWidth: 'Modify object property - effects - border width',
+            borderColor: 'Modify object property - effects - border color',
+            glowEnabled: 'Modify object property - effects - glow enabled',
+            glowColor: 'Modify object property - effects - glow color',
+            glowRange: 'Modify object property - effects - glow range',
+            glowBrightness: 'Modify object property - effects - glow brightness'
+          }
         },
         propertiesSettings: {
           baseSettingTitle: 'Common Properties',

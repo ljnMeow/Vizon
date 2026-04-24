@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { OrbitControls, TransformControls } from 'three-stdlib';
 import { Emitter } from '../infra/events';
-import { VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '../infra/utils';
+import { VIZON_HISTORY_KEYS, VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '../infra/utils';
 import type { RendererSettings, SceneSettings } from '../settings/sceneSettings';
 import type { SceneTreeNode } from '../settings/sceneTree';
 import { createDefaultSceneSettings, normalizeSceneSettings } from '../settings/sceneSettings';
@@ -90,6 +90,7 @@ export type ThreeEditorOptions = {
  * - 不依赖 React；上层通过 `events` 与 getter 拉取状态。
  */
 export class ThreeEditor {
+  private static readonly HISTORY_OP_PREFIX = VIZON_HISTORY_KEYS.OP_PREFIX;
   /** 与 WebGLRenderer 绑定的同一个 canvas 引用 */
   readonly canvas: HTMLCanvasElement;
   /** 所有可编辑内容的根；主相机不在其子树中（见 `canAttachTransformTarget`） */
@@ -494,8 +495,17 @@ export class ThreeEditor {
 
     const prop = path.split('.').filter(Boolean).slice(-1)[0] ?? path;
     const valueText = this.formatHistoryValue(after);
+    const targetKind = this.getHistoryTargetKind(obj);
     await this.executeHistoryOperation({
-      name: options?.operationName ?? `修改物体属性 - ${uuid} - ${prop}${valueText ? ` = ${valueText}` : ''}`,
+      name:
+        options?.operationName ??
+        this.encodeHistoryOp({
+          op: 'update_property',
+          targetKind,
+          uuid,
+          prop,
+          valueText: valueText || undefined
+        }),
       mergeKey: `object-prop:${uuid}:${path}`,
       mergeWindowMs: 280,
       do: () => {
@@ -1291,8 +1301,14 @@ export class ThreeEditor {
         const after = this.captureObjectTransform(target);
         if (!this.isSameTransformSnapshot(before, after)) {
           const actionLabel = this.getTransformActionLabel(this.transformMode);
+          const targetKind = this.getHistoryTargetKind(target);
           void this.executeHistoryOperation({
-            name: `${actionLabel} - ${target.uuid}`,
+            name: this.encodeHistoryOp({
+              op: 'transform',
+              action: actionLabel,
+              targetKind,
+              uuid: target.uuid
+            }),
             mergeKey: `transform-object:${target.uuid}:${this.transformMode}`,
             mergeWindowMs: 120,
             do: () => this.applyObjectTransform(target, after),
@@ -1465,9 +1481,29 @@ export class ThreeEditor {
   }
 
   private getTransformActionLabel(mode: TransformMode) {
-    if (mode === 'rotate') return '旋转物体';
-    if (mode === 'scale') return '缩放物体';
-    return '拖拽物体';
+    if (mode === 'rotate') return 'rotate';
+    if (mode === 'scale') return 'scale';
+    return 'move';
+  }
+
+  private encodeHistoryOp(payload: Record<string, unknown>) {
+    return `${ThreeEditor.HISTORY_OP_PREFIX}${JSON.stringify(payload)}`;
+  }
+
+  private getHistoryTargetKind(obj: THREE.Object3D | null | undefined) {
+    if (!obj) return 'object';
+    const anyObj = obj as any;
+    if (anyObj?.isOrthographicCamera) return 'orthographic_camera';
+    if (anyObj?.isPerspectiveCamera) return 'perspective_camera';
+    if (anyObj?.isCamera) return 'camera';
+    if (anyObj?.isDirectionalLight) return 'directional_light';
+    if (anyObj?.isPointLight) return 'point_light';
+    if (anyObj?.isSpotLight) return 'spot_light';
+    if (anyObj?.isAmbientLight) return 'ambient_light';
+    if (anyObj?.isHemisphereLight) return 'hemisphere_light';
+    if (anyObj?.isRectAreaLight) return 'rect_area_light';
+    if (anyObj?.isLight) return 'light';
+    return 'object';
   }
 
   private formatHistoryValue(value: unknown) {

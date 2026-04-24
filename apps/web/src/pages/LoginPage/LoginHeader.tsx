@@ -25,7 +25,7 @@ function LoginHeader({ t, theme, locale, onToggleLocale, onToggleTheme }: LoginH
         <button
           type="button"
           onClick={onToggleLocale}
-          className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
+          className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
         >
           {t.localeSwitcher} ({locale})
         </button>
@@ -34,7 +34,7 @@ function LoginHeader({ t, theme, locale, onToggleLocale, onToggleTheme }: LoginH
         <button
           type="button"
           onClick={onToggleTheme}
-          className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
+          className="inline-flex items-center gap-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
         >
           <span className="inline-block h-2 w-2 rounded-full bg-[var(--accent)]" />
           <span>{theme === 'dark' ? t.themeDark : t.themeLight}</span>

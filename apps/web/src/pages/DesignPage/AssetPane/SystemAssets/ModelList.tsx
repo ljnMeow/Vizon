@@ -3,7 +3,7 @@ import { Tooltip } from '../../../../components/Tooltip';
 import { basicModels, type ModelCategoryKey } from '../../../../utils/models';
 import { appMessages } from '../../../../i18n/messages';
 import { useLocale } from '../../../../hooks/useLocale';
-import { DATA_TRANSFER_KEYS } from '../../../../utils/storageKeys';
+import { DATA_TRANSFER_KEYS } from '../../../../utils/keys';
 
 export function ModelList() {
   const { locale } = useLocale();

@@ -6,7 +6,7 @@ import { loginMessages } from '../../i18n/messages';
 import { ApiError } from '../../api/request';
 import { isLogin, login } from '../../api/auth';
 import { message } from '../../components/GlobalMessage';
-import { STORAGE_KEYS } from '../../utils/storageKeys';
+import { STORAGE_KEYS } from '../../utils/keys';
 import LoginFormCard from './LoginFormCard';
 import LoginHeader from './LoginHeader';
 import LoginHeroSection from './LoginHeroSection';

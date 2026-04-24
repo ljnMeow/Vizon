@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { STORAGE_KEYS } from '../utils/storageKeys';
+import { STORAGE_KEYS } from '../utils/keys';
 
 export type Locale = 'zh-CN' | 'en-US';
 

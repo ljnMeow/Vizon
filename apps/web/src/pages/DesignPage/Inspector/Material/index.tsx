@@ -5,6 +5,8 @@ import { switchMaterialTypeOnObject } from 'vizon-3d-core';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { useLocale } from '../../../../hooks/useLocale';
 import { appMessages, type AppMessages } from '../../../../i18n/messages';
+import { encodeHistoryI18nNameAuto } from '../../../../utils/historyI18n';
+import { WEB_USER_DATA_KEYS } from '../../../../utils/keys';
 import { MaterialMainControlsSection } from './MaterialMainControlsSection';
 import { MaterialTextureMapsSection } from './MaterialTextureMapsSection';
 import {
@@ -37,6 +39,7 @@ import {
 import type { TextureMapItemLabels } from './TextureMapItem';
 
 export function MaterialSettings() {
+  const TEXTURE_EFFECT_DISABLED_KEY = WEB_USER_DATA_KEYS.MATERIAL.TEXTURE_EFFECT_DISABLED;
   // 编辑器实例：所有材质读写都通过当前选中对象进行
   const { editor } = useSceneSettings();
   // 当前语言环境：用于读取 i18n 文案
@@ -64,6 +67,7 @@ export function MaterialSettings() {
   const blendingOptions = p.materialBlendingOptions;
   // 混合模式说明文案（下拉框下方解释）
   const blendingDescriptions = p.materialBlendingDescriptions;
+  const historyName = (zhName: string) => encodeHistoryI18nNameAuto(zhName);
 
   // 面板状态与 three 材质数据保持“受控同步”
   // 当前材质类型（用于主控区渲染与贴图支持判断）
@@ -380,7 +384,7 @@ export function MaterialSettings() {
             ? value
             : '';
     void editor.executeHistoryOperation({
-      name: `修改物体属性 - ${root.uuid} - 材质-${key}${valueText ? ` = ${valueText}` : ''}`,
+      name: historyName(`修改物体属性 - ${root.uuid} - 材质-${key}${valueText ? ` = ${valueText}` : ''}`),
       mergeKey: `material-prop:${root.uuid}:${key}`,
       mergeWindowMs: 280,
       do: () => applyValue(value),
@@ -424,7 +428,7 @@ export function MaterialSettings() {
           [fieldKey]: prev,
         };
         const u = ((m as any).userData ??= {});
-        const disabledMap = (u.__vizonTextureEffectDisabled ??= {});
+        const disabledMap = (u[TEXTURE_EFFECT_DISABLED_KEY] ??= {});
         disabledMap[fieldKey] = true;
         (m as any)[fieldKey] = null;
         (m as any).needsUpdate = true;
@@ -435,7 +439,7 @@ export function MaterialSettings() {
         const id = (m as any)?.uuid;
         if (!id) continue;
         const u = ((m as any).userData ??= {});
-        const disabledMap = (u.__vizonTextureEffectDisabled ??= {});
+        const disabledMap = (u[TEXTURE_EFFECT_DISABLED_KEY] ??= {});
         delete disabledMap[fieldKey];
         const snap = textureDebugCacheRef.current[id];
         if (!snap || !(fieldKey in snap)) continue;
@@ -451,7 +455,7 @@ export function MaterialSettings() {
     (fieldKey: TextureFieldKey) => {
       const mat: any = firstMeshMaterial as any;
       if (!mat) return false;
-      const disabledMap = (mat?.userData?.__vizonTextureEffectDisabled ?? {}) as Partial<Record<TextureFieldKey, boolean>>;
+      const disabledMap = (mat?.userData?.[TEXTURE_EFFECT_DISABLED_KEY] ?? {}) as Partial<Record<TextureFieldKey, boolean>>;
       if (disabledMap[fieldKey] === true) return true;
       const id = mat?.uuid;
       const hasActiveTexture = Boolean(mat?.[fieldKey]);
@@ -544,7 +548,7 @@ export function MaterialSettings() {
       const mat: any = firstMeshMaterial as any;
       return {
         label: materialTextureDebugDisableOneLabel,
-        checked: !Boolean(mat?.userData?.__vizonTextureEffectDisabled?.[fieldKey]),
+        checked: !Boolean(mat?.userData?.[TEXTURE_EFFECT_DISABLED_KEY]?.[fieldKey]),
         onChange: (checked: boolean) => {
           // checked=true 表示“开启效果”
           setTextureFieldEffectEnabled(fieldKey, checked);
@@ -610,7 +614,7 @@ export function MaterialSettings() {
       editor.render();
     };
     void editor.executeHistoryOperation({
-      name: `修改物体属性 - ${root.uuid} - 材质-材质类型 = ${materialLabels[nextType] ?? nextType}`,
+      name: historyName(`修改物体属性 - ${root.uuid} - 材质-材质类型 = ${materialLabels[nextType] ?? nextType}`),
       do: () => applyType(nextType),
       undo: () => applyType(prevType)
     });
@@ -630,7 +634,7 @@ export function MaterialSettings() {
     const nextValue = materialSideKeyToValue[next];
     const before = mats.map((m) => ({ material: m, value: (m as any).side }));
     void editor.executeHistoryOperation({
-      name: `修改物体属性 - ${root.uuid} - 材质-面 = ${materialSideOptions[next] ?? next}`,
+      name: historyName(`修改物体属性 - ${root.uuid} - 材质-面 = ${materialSideOptions[next] ?? next}`),
       do: () => {
         for (const m of mats) {
           (m as any).side = nextValue;
@@ -662,7 +666,7 @@ export function MaterialSettings() {
     const nextValue = blendingKeyToValue[next];
     const before = mats.map((m) => ({ material: m, blending: (m as any).blending, premultipliedAlpha: (m as any).premultipliedAlpha }));
     void editor.executeHistoryOperation({
-      name: `修改物体属性 - ${root.uuid} - 材质-混合模式 = ${blendingOptions[next] ?? next}`,
+      name: historyName(`修改物体属性 - ${root.uuid} - 材质-混合模式 = ${blendingOptions[next] ?? next}`),
       do: () => {
         for (const m of mats) {
           (m as any).blending = nextValue;
@@ -705,7 +709,7 @@ export function MaterialSettings() {
       editor.render();
     };
     void editor.executeHistoryOperation({
-      name: `修改物体属性 - ${root.uuid} - 材质-颜色 = ${nextColor}`,
+      name: historyName(`修改物体属性 - ${root.uuid} - 材质-颜色 = ${nextColor}`),
       mergeKey: `material-color:${root.uuid}`,
       mergeWindowMs: 280,
       do: () => applyColor(nextColor),
@@ -726,7 +730,7 @@ export function MaterialSettings() {
     if (mats.length === 0) return;
     const before = mats.map((m) => ({ material: m, value: Boolean((m as any).transparent) }));
     void editor.executeHistoryOperation({
-      name: `修改物体属性 - ${root.uuid} - 材质-透明开关 = ${nextEnabled ? 'true' : 'false'}`,
+      name: historyName(`修改物体属性 - ${root.uuid} - 材质-透明开关 = ${nextEnabled ? 'true' : 'false'}`),
       do: () => {
         for (const m of mats) {
           (m as any).transparent = nextEnabled;
@@ -780,7 +784,7 @@ export function MaterialSettings() {
     if (Math.abs(beforeValue - next) <= 1e-6) return;
     const before = mats.map((m) => ({ material: m, opacity: (m as any).opacity, transparent: (m as any).transparent }));
     void editor.executeHistoryOperation({
-      name: `修改物体属性 - ${root.uuid} - 材质-不透明度 = ${Number(next.toFixed(4))}`,
+      name: historyName(`修改物体属性 - ${root.uuid} - 材质-不透明度 = ${Number(next.toFixed(4))}`),
       do: () => {
         for (const m of mats) {
           if (typeof (m as any).opacity !== 'number') continue;
@@ -814,7 +818,7 @@ export function MaterialSettings() {
     if (mats.length === 0) return;
     const before = mats.map((m) => ({ material: m, value: Boolean((m as any).wireframe) }));
     void editor.executeHistoryOperation({
-      name: `修改物体属性 - ${root.uuid} - 材质-线框 = ${next ? 'true' : 'false'}`,
+      name: historyName(`修改物体属性 - ${root.uuid} - 材质-线框 = ${next ? 'true' : 'false'}`),
       do: () => {
         for (const m of mats) {
           if (typeof (m as any).wireframe !== 'boolean') continue;
@@ -846,7 +850,7 @@ export function MaterialSettings() {
     if (mats.length === 0) return;
     const before = mats.map((m) => ({ material: m, value: Boolean((m as any).alphaToCoverage) }));
     void editor.executeHistoryOperation({
-      name: `修改物体属性 - ${root.uuid} - 材质-强制单通道 = ${nextEnabled ? 'true' : 'false'}`,
+      name: historyName(`修改物体属性 - ${root.uuid} - 材质-强制单通道 = ${nextEnabled ? 'true' : 'false'}`),
       do: () => {
         for (const m of mats) {
           (m as any).alphaToCoverage = nextEnabled;
@@ -899,7 +903,7 @@ export function MaterialSettings() {
     if (Math.abs(beforeValue - next) <= 1e-6) return;
     const before = mats.map((m) => ({ material: m, value: (m as any).alphaTest }));
     void editor.executeHistoryOperation({
-      name: `修改物体属性 - ${root.uuid} - 材质-AlphaTest = ${Number(next.toFixed(4))}`,
+      name: historyName(`修改物体属性 - ${root.uuid} - 材质-AlphaTest = ${Number(next.toFixed(4))}`),
       do: () => {
         for (const m of mats) {
           if (typeof (m as any).alphaTest !== 'number') continue;
@@ -931,7 +935,7 @@ export function MaterialSettings() {
     if (mats.length === 0) return;
     const before = mats.map((m) => ({ material: m, value: Boolean((m as any).depthTest) }));
     void editor.executeHistoryOperation({
-      name: `修改物体属性 - ${root.uuid} - 材质-深度测试 = ${next ? 'true' : 'false'}`,
+      name: historyName(`修改物体属性 - ${root.uuid} - 材质-深度测试 = ${next ? 'true' : 'false'}`),
       do: () => {
         for (const m of mats) {
           if (typeof (m as any).depthTest !== 'boolean') continue;
@@ -963,7 +967,7 @@ export function MaterialSettings() {
     if (mats.length === 0) return;
     const before = mats.map((m) => ({ material: m, value: Boolean((m as any).depthWrite) }));
     void editor.executeHistoryOperation({
-      name: `修改物体属性 - ${root.uuid} - 材质-深度写入 = ${next ? 'true' : 'false'}`,
+      name: historyName(`修改物体属性 - ${root.uuid} - 材质-深度写入 = ${next ? 'true' : 'false'}`),
       do: () => {
         for (const m of mats) {
           if (typeof (m as any).depthWrite !== 'boolean') continue;

@@ -1,5 +1,8 @@
 /**
  * core 全局 key 对照表（集中管理，避免魔法字符串散落）。
+ * 规则：
+ * - 新增 key 前，优先在本文件登记；
+ * - 业务代码中避免直接写魔法字符串。
  */
 
 /**
@@ -7,6 +10,14 @@
  */
 export const VIZON_STORAGE_KEYS = {
   EFFECTS: '__vizonEffects',
+} as const;
+
+/**
+ * 历史记录相关 key/prefix。
+ */
+export const VIZON_HISTORY_KEYS = {
+  I18N_PREFIX: '__VIZON_HISTORY_I18N__:',
+  OP_PREFIX: '__VIZON_HISTORY_OP__:'
 } as const;
 
 /**
