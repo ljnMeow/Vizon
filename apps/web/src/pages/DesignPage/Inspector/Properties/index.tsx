@@ -7,7 +7,7 @@ import { message } from '../../../../components/GlobalMessage';
 import { useLocale } from '../../../../hooks/useLocale';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { appMessages } from '../../../../i18n/messages';
-import { encodeHistoryI18nNameAuto } from '../../../../utils/historyI18n';
+import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 import { VIZON_USER_DATA_KEYS } from '../../../../utils/keys';
 import { copyToClipboard } from '../../../../utils/utils';
 import { basicModels } from '../../../../utils/models';
@@ -111,6 +111,25 @@ function getHistoryCategoryByObjectType(type?: string): string {
   if (type === 'RectAreaLight') return '修改矩形光属性';
   if (type.endsWith('Light')) return '修改灯光属性';
   return '修改物体属性';
+}
+
+function getHistoryCategoryI18n(type?: string): { zh: string; en: string } {
+  if (!type) return { zh: '修改物体属性', en: 'Modify object property' };
+  if (type === 'OrthographicCamera') return { zh: '修改正交相机属性', en: 'Modify orthographic camera property' };
+  if (type === 'PerspectiveCamera') return { zh: '修改透视相机属性', en: 'Modify perspective camera property' };
+  if (type.endsWith('Camera')) return { zh: '修改相机属性', en: 'Modify camera property' };
+  if (type === 'DirectionalLight') return { zh: '修改平行光属性', en: 'Modify directional light property' };
+  if (type === 'PointLight') return { zh: '修改点光源属性', en: 'Modify point light property' };
+  if (type === 'SpotLight') return { zh: '修改聚光灯属性', en: 'Modify spot light property' };
+  if (type === 'AmbientLight') return { zh: '修改环境光属性', en: 'Modify ambient light property' };
+  if (type === 'HemisphereLight') return { zh: '修改半球光属性', en: 'Modify hemisphere light property' };
+  if (type === 'RectAreaLight') return { zh: '修改矩形光属性', en: 'Modify rect area light property' };
+  if (type.endsWith('Light')) return { zh: '修改灯光属性', en: 'Modify light property' };
+  return { zh: '修改物体属性', en: 'Modify object property' };
+}
+
+function boolTextI18n(v: boolean): { zh: string; en: string } {
+  return v ? { zh: '是', en: 'true' } : { zh: '否', en: 'false' };
 }
 
 /** 读取阴影与视锥裁剪能力及当前值 */
@@ -307,8 +326,11 @@ export function PropertiesSettings() {
   }, [editor, selectedInfo?.uuid]);
 
   const labels = useMemo(() => t.propertiesSettings, [t.propertiesSettings]);
-  const historyName = (zhName: string) => encodeHistoryI18nNameAuto(zhName);
-  const historyCategory = useMemo(() => getHistoryCategoryByObjectType(selectedInfo?.type), [selectedInfo?.type]);
+  const labelsZh = appMessages['zh-CN'].designPage.inspector.propertiesSettings;
+  const labelsEn = appMessages['en-US'].designPage.inspector.propertiesSettings;
+  const historyName = (zhName: string, enName: string) =>
+    encodeHistoryI18nName({ 'zh-CN': zhName, 'en-US': enName });
+  const historyCategory = useMemo(() => getHistoryCategoryI18n(selectedInfo?.type), [selectedInfo?.type]);
 
   const showObjectAttributes = useMemo(() => {
     if (!editor || !selectedInfo?.uuid) return false;
@@ -325,9 +347,13 @@ export function PropertiesSettings() {
 
   const onNameCommit = (nextName: string) => {
     if (!editor || !selectedInfo) return;
+    const displayValue = nextName || '""';
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'name', nextName, {
       recordHistory: true,
-      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 名称 = ${nextName || '""'}`)
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.nameLabel} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.nameLabel} = ${displayValue}`
+      )
     });
   };
 
@@ -351,9 +377,13 @@ export function PropertiesSettings() {
   const commitPositionAxis = (axis: AxisKey, next: number) => {
     if (!editor || !selectedInfo || !transform) return;
     const nextPos = { ...transform.position, [axis]: next };
+    const displayValue = `(${Number(nextPos.x.toFixed(4))}, ${Number(nextPos.y.toFixed(4))}, ${Number(nextPos.z.toFixed(4))})`;
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, `position.${axis}`, next, {
       recordHistory: true,
-      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 位置 = (${Number(nextPos.x.toFixed(4))}, ${Number(nextPos.y.toFixed(4))}, ${Number(nextPos.z.toFixed(4))})`)
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.positionLabel} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.positionLabel} = ${displayValue}`
+      )
     });
   };
 
@@ -366,9 +396,13 @@ export function PropertiesSettings() {
   const commitRotationAxis = (axis: AxisKey, next: number) => {
     if (!editor || !selectedInfo || !transform) return;
     const nextRot = { ...transform.rotation, [axis]: next };
+    const displayValue = `(${Number(nextRot.x.toFixed(4))}, ${Number(nextRot.y.toFixed(4))}, ${Number(nextRot.z.toFixed(4))})`;
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, `rotation.${axis}`, next, {
       recordHistory: true,
-      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 旋转 = (${Number(nextRot.x.toFixed(4))}, ${Number(nextRot.y.toFixed(4))}, ${Number(nextRot.z.toFixed(4))})`)
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.rotationLabel} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.rotationLabel} = ${displayValue}`
+      )
     });
   };
 
@@ -381,16 +415,24 @@ export function PropertiesSettings() {
   const commitScaleAxis = (axis: AxisKey, next: number) => {
     if (!editor || !selectedInfo || !transform) return;
     const nextScale = { ...transform.scale, [axis]: next };
+    const displayValue = `(${Number(nextScale.x.toFixed(4))}, ${Number(nextScale.y.toFixed(4))}, ${Number(nextScale.z.toFixed(4))})`;
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, `scale.${axis}`, next, {
       recordHistory: true,
-      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 缩放 = (${Number(nextScale.x.toFixed(4))}, ${Number(nextScale.y.toFixed(4))}, ${Number(nextScale.z.toFixed(4))})`)
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.scaleLabel} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.scaleLabel} = ${displayValue}`
+      )
     });
   };
 
   const setVisible = (nextVisible: boolean) => {
     if (!editor || !selectedInfo) return;
+    const v = boolTextI18n(nextVisible);
     const ok = editor.setObjectVisibleByUuid(selectedInfo.uuid, nextVisible, {
-      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 可见 = ${nextVisible ? 'true' : 'false'}`)
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.visibleLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.visibleLabel} = ${v.en}`
+      )
     });
     if (!ok) return;
     // 若 nextVisible=false 触发 select(null)，上面的 select 回调会把 state 清空；这里乐观更新即可。
@@ -404,6 +446,7 @@ export function PropertiesSettings() {
     const canPickable = !hasNonSelectableAncestor(obj);
     if (!canPickable) return;
 
+    const v = boolTextI18n(nextPickable);
     const prevUserData = { ...(obj.userData ?? {}) };
     const applyPickable = (next: boolean) => {
       if (next) {
@@ -420,7 +463,10 @@ export function PropertiesSettings() {
       editor.render();
     };
     void editor.executeHistoryOperation({
-      name: historyName(`${historyCategory} - ${selectedInfo.uuid} - 可拾取 = ${nextPickable ? 'true' : 'false'}`),
+      name: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.pickableLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.pickableLabel} = ${v.en}`
+      ),
       do: () => applyPickable(nextPickable),
       undo: () => {
         obj.userData = { ...prevUserData };
@@ -437,6 +483,7 @@ export function PropertiesSettings() {
 
     if (!computeFreezeCapability(obj)) return;
 
+    const v = boolTextI18n(nextFrozen);
     const prevUserData = { ...(obj.userData ?? {}) };
     const prevStates: Array<{ node: any; matrixAutoUpdate: boolean }> = [];
     obj.traverse((node: any) => {
@@ -470,7 +517,10 @@ export function PropertiesSettings() {
       editor.render();
     };
     void editor.executeHistoryOperation({
-      name: historyName(`${historyCategory} - ${selectedInfo.uuid} - 冻结 = ${nextFrozen ? 'true' : 'false'}`),
+      name: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.freezeLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.freezeLabel} = ${v.en}`
+      ),
       do: () => applyFrozen(nextFrozen),
       undo: () => {
         obj.userData = { ...prevUserData };
@@ -509,9 +559,13 @@ export function PropertiesSettings() {
     const materials = getObjectMaterials(obj);
     if (materials.length === 0) return;
     const clamped = Math.max(0, Math.min(1, nextOpacity));
+    const displayValue = Number(clamped.toFixed(4));
     const before = materials.map((m) => ({ m, opacity: m.opacity, transparent: m.transparent }));
     void editor.executeHistoryOperation({
-      name: historyName(`${historyCategory} - ${selectedInfo.uuid} - 透明度 = ${Number(clamped.toFixed(4))}`),
+      name: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.opacityLabel} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.opacityLabel} = ${displayValue}`
+      ),
       do: () => {
         for (const m of materials) {
           m.transparent = clamped < 1;
@@ -540,7 +594,10 @@ export function PropertiesSettings() {
 
     const next = Math.max(0, Math.min(999, Math.round(nextRenderOrder)));
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'renderOrder', next, {
-      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 渲染层级 = ${next}`)
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.renderOrderLabel} = ${next}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.renderOrderLabel} = ${next}`
+      )
     });
     setRenderOrderState({ renderOrder: next, canRenderOrder: true });
   };
@@ -557,7 +614,10 @@ export function PropertiesSettings() {
     const next = Math.max(0, Math.min(999, Math.round(nextRenderOrder)));
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'renderOrder', next, {
       recordHistory: true,
-      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 渲染层级 = ${next}`)
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.renderOrderLabel} = ${next}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.renderOrderLabel} = ${next}`
+      )
     });
     setRenderOrderState({ renderOrder: next, canRenderOrder: true });
   };
@@ -567,8 +627,12 @@ export function PropertiesSettings() {
     const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
     if (!obj) return;
     if (typeof (obj as any).castShadow !== 'boolean') return;
+    const v = boolTextI18n(nextCastShadow);
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'castShadow', nextCastShadow, {
-      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 产生阴影 = ${nextCastShadow ? 'true' : 'false'}`)
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.castShadowLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.castShadowLabel} = ${v.en}`
+      )
     });
     setShadow((prev) => (prev ? { ...prev, castShadow: nextCastShadow, canCastShadow: true } : prev));
   };
@@ -578,8 +642,12 @@ export function PropertiesSettings() {
     const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
     if (!obj) return;
     if (typeof (obj as any).receiveShadow !== 'boolean') return;
+    const v = boolTextI18n(nextReceiveShadow);
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'receiveShadow', nextReceiveShadow, {
-      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 接收阴影 = ${nextReceiveShadow ? 'true' : 'false'}`)
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.receiveShadowLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.receiveShadowLabel} = ${v.en}`
+      )
     });
     setShadow((prev) => (prev ? { ...prev, receiveShadow: nextReceiveShadow, canReceiveShadow: true } : prev));
   };
@@ -589,8 +657,12 @@ export function PropertiesSettings() {
     const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
     if (!obj) return;
     if (typeof (obj as any).frustumCulled !== 'boolean') return;
+    const v = boolTextI18n(nextFrustumCulled);
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'frustumCulled', nextFrustumCulled, {
-      operationName: historyName(`${historyCategory} - ${selectedInfo.uuid} - 视锥裁剪 = ${nextFrustumCulled ? 'true' : 'false'}`)
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.frustumCulledLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.frustumCulledLabel} = ${v.en}`
+      )
     });
     setShadow((prev) => (prev ? { ...prev, frustumCulled: nextFrustumCulled, canFrustumCulled: true } : prev));
   };

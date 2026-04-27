@@ -4,6 +4,7 @@ import { ColorPicker } from '../../../../components/ColorPicker';
 import { ImagePreviewDialog } from '../../../../components/ImagePreviewDialog';
 import { Select } from '../../../../components/Select';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
+import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 
 /** 环境设置项的 i18n 文案（背景模式、HDRI、雾效等） */
 export type SceneSettingsEnvironmentLabels = {
@@ -81,6 +82,8 @@ export function SceneSettingsEnvironmentItem({
   const [hdrSelectKey, setHdrSelectKey] = useState('');
 
   const [previewOpen, setPreviewOpen] = useState(false);
+  const historyName = (zhName: string, enName: string) =>
+    encodeHistoryI18nName({ 'zh-CN': zhName, 'en-US': enName });
 
   const isPreviewableImage = useMemo(() => {
     if (hdri.type !== 'uploaded') return false;
@@ -212,8 +215,6 @@ export function SceneSettingsEnvironmentItem({
               );
             }}
             onPointerUp={() => setEnvironmentStrength(draftStrength)}
-            onMouseUp={() => setEnvironmentStrength(draftStrength)}
-            onTouchEnd={() => setEnvironmentStrength(draftStrength)}
             className="w-full"
           />
         </div>
@@ -269,12 +270,19 @@ export function SceneSettingsEnvironmentItem({
                     );
                   }}
                   onBlur={() => {
+                    const displayValue = Number(draftFogNear.toFixed(4));
                     updateSceneSettings(
                       (prev) => ({
                         ...prev,
                         environment: { ...prev.environment, fog: { ...prev.environment.fog, near: draftFogNear } }
                       }),
-                      { recordHistory: true, operationName: `修改场景属性-环境-雾近距 = ${Number(draftFogNear.toFixed(4))}` }
+                      {
+                        recordHistory: true,
+                        operationName: historyName(
+                          `修改场景属性-环境-雾近距 = ${displayValue}`,
+                          `Modify scene property - environment - fog near = ${displayValue}`
+                        )
+                      }
                     );
                   }}
                   className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
@@ -304,12 +312,19 @@ export function SceneSettingsEnvironmentItem({
                     );
                   }}
                   onBlur={() => {
+                    const displayValue = Number(draftFogFar.toFixed(4));
                     updateSceneSettings(
                       (prev) => ({
                         ...prev,
                         environment: { ...prev.environment, fog: { ...prev.environment.fog, far: draftFogFar } }
                       }),
-                      { recordHistory: true, operationName: `修改场景属性-环境-雾远距 = ${Number(draftFogFar.toFixed(4))}` }
+                      {
+                        recordHistory: true,
+                        operationName: historyName(
+                          `修改场景属性-环境-雾远距 = ${displayValue}`,
+                          `Modify scene property - environment - fog far = ${displayValue}`
+                        )
+                      }
                     );
                   }}
                   className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"

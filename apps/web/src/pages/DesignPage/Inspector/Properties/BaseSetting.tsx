@@ -405,8 +405,6 @@ export function BaseSetting({
           disabled={isDisabled || !opacityState?.canOpacity}
           onChange={(e) => previewOpacity(Number(e.target.value))}
           onPointerUp={(e) => commitOpacity(Number((e.target as HTMLInputElement).value))}
-          onMouseUp={(e) => commitOpacity(Number((e.target as HTMLInputElement).value))}
-          onTouchEnd={(e) => commitOpacity(Number((e.target as HTMLInputElement).value))}
           className="w-full disabled:opacity-50"
         />
       </div>
@@ -428,8 +426,6 @@ export function BaseSetting({
           disabled={isDisabled || !renderOrderState?.canRenderOrder}
           onChange={(e) => previewRenderOrder(Number(e.target.value))}
           onPointerUp={(e) => commitRenderOrder(Number((e.target as HTMLInputElement).value))}
-          onMouseUp={(e) => commitRenderOrder(Number((e.target as HTMLInputElement).value))}
-          onTouchEnd={(e) => commitRenderOrder(Number((e.target as HTMLInputElement).value))}
           className="w-full disabled:opacity-50"
         />
       </div>

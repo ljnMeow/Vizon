@@ -96,6 +96,7 @@ function translateHistoryNameToEn(zhName: string): string {
     [/网格/g, 'Grid'],
     [/显示开关/g, 'Visible'],
     [/颜色/g, 'Color'],
+    [/不透明度/g, 'Opacity'],
     [/透明度/g, 'Opacity'],
     [/辅助器/g, 'Helpers'],
     [/坐标轴开关/g, 'Axes enabled'],
@@ -125,6 +126,9 @@ function translateHistoryNameToEn(zhName: string): string {
     [/材质-AlphaTest/g, 'Material-Alpha test'],
     [/名称/g, 'Name'],
     [/材质/g, 'Material'],
+    [/正面/g, 'Front'],
+    [/背面/g, 'Back'],
+    [/双面/g, 'Double'],
     [/边框/g, 'Border'],
     [/辉光/g, 'Glow'],
     [/开关/g, 'Enabled'],
@@ -132,7 +136,8 @@ function translateHistoryNameToEn(zhName: string): string {
     [/范围/g, 'Range'],
     [/亮度/g, 'Brightness'],
     [/深度测试/g, 'Depth test'],
-    [/深度写入/g, 'Depth write']
+    [/深度写入/g, 'Depth write'],
+    [/深度/g, 'Depth']
   ];
   let result = zhName;
   for (const [regex, replacement] of map) {
@@ -157,6 +162,9 @@ function normalizeHistoryNameToZh(name: string): string {
   result = result.replace(/PCF Soft阴影/g, 'PCF软阴影');
   result = result.replace(/纯色\s*\(Solid\)/g, '纯色');
   result = result.replace(/天空盒\s*\(Skybox\)/g, '天空盒');
+  result = result.replace(/\bFront\b/g, '正面');
+  result = result.replace(/\bBack\b/g, '背面');
+  result = result.replace(/\bDouble\b/g, '双面');
   return result;
 }
 
@@ -232,8 +240,16 @@ export function decodeHistoryI18nName(name: string, locale: Locale): string {
           : `${actionEn} ${targetEn} - ${payload.uuid ?? ''}`.trim();
       }
       if (payload.op === 'update_property') {
-        const prop = payload.prop ?? '';
-        const valuePart = payload.valueText ? ` = ${payload.valueText}` : '';
+        const rawProp = payload.prop ?? '';
+        const rawValueText = payload.valueText ?? '';
+        const prop = locale === 'zh-CN' ? normalizeHistoryNameToZh(rawProp) : translateHistoryNameToEn(rawProp);
+        const localizedValueText =
+          typeof rawValueText === 'string'
+            ? locale === 'zh-CN'
+              ? normalizeHistoryNameToZh(rawValueText)
+              : translateHistoryNameToEn(rawValueText)
+            : '';
+        const valuePart = localizedValueText ? ` = ${localizedValueText}` : '';
         return locale === 'zh-CN'
           ? `修改${targetZh}属性 - ${payload.uuid ?? ''} - ${prop}${valuePart}`
           : `Modify ${targetEn} property - ${payload.uuid ?? ''} - ${prop}${valuePart}`;

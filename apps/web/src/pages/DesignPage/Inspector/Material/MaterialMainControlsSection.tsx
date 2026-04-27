@@ -154,7 +154,7 @@ export function MaterialMainControlsSection(props: MaterialMainControlsSectionPr
           <>
             <label className="block text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{p.materialOpacityLabel}</label>
             <div className="flex items-center gap-3">
-              <input type="range" min={0} max={1} step={0.01} value={selectedMaterialOpacity} disabled={!selectedMaterialTransparentEnabled} onPointerDown={onOpacityDragStart} onMouseDown={onOpacityDragStart} onTouchStart={onOpacityDragStart} onChange={(e) => onOpacityPreviewChange(Number(e.target.value))} onPointerUp={(e) => onOpacityCommit(Number((e.target as HTMLInputElement).value))} onMouseUp={(e) => onOpacityCommit(Number((e.target as HTMLInputElement).value))} onTouchEnd={(e) => onOpacityCommit(Number((e.target as HTMLInputElement).value))} aria-label={p.materialOpacityLabel} className="w-full" />
+              <input type="range" min={0} max={1} step={0.01} value={selectedMaterialOpacity} disabled={!selectedMaterialTransparentEnabled} onPointerDown={onOpacityDragStart} onChange={(e) => onOpacityPreviewChange(Number(e.target.value))} onPointerUp={(e) => onOpacityCommit(Number((e.target as HTMLInputElement).value))} aria-label={p.materialOpacityLabel} className="w-full" />
               <div className="w-12 text-right text-[10px] font-semibold tabular-nums text-[var(--text-secondary)]">{selectedMaterialOpacity.toFixed(2)}</div>
             </div>
           </>
@@ -172,7 +172,7 @@ export function MaterialMainControlsSection(props: MaterialMainControlsSectionPr
       <div className="space-y-1 pt-2">
         <label className="block text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{p.materialAlphaTestLabel}</label>
         <div className="flex items-center gap-3">
-          <input type="range" min={0} max={1} step={0.01} value={selectedMaterialAlphaTestThreshold} onPointerDown={onAlphaTestDragStart} onMouseDown={onAlphaTestDragStart} onTouchStart={onAlphaTestDragStart} onChange={(e) => onAlphaTestPreviewChange(Number(e.target.value))} onPointerUp={(e) => onAlphaTestCommit(Number((e.target as HTMLInputElement).value))} onMouseUp={(e) => onAlphaTestCommit(Number((e.target as HTMLInputElement).value))} onTouchEnd={(e) => onAlphaTestCommit(Number((e.target as HTMLInputElement).value))} aria-label={p.materialAlphaTestLabel} className="w-full" />
+          <input type="range" min={0} max={1} step={0.01} value={selectedMaterialAlphaTestThreshold} onPointerDown={onAlphaTestDragStart} onChange={(e) => onAlphaTestPreviewChange(Number(e.target.value))} onPointerUp={(e) => onAlphaTestCommit(Number((e.target as HTMLInputElement).value))} aria-label={p.materialAlphaTestLabel} className="w-full" />
           <div className="w-12 text-right text-[10px] font-semibold tabular-nums text-[var(--text-secondary)]">{selectedMaterialAlphaTestThreshold.toFixed(2)}</div>
         </div>
       </div>

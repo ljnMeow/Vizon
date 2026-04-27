@@ -72,6 +72,22 @@ function backgroundModeLabelZh(mode: SceneSettingsBackgroundMode) {
   return mode === 'skybox' ? '天空盒' : '纯色';
 }
 
+function boolLabelZh(v: boolean) {
+  return v ? '是' : '否';
+}
+
+function outputColorSpaceLabelZh(colorSpace: RendererOutputColorSpace) {
+  return colorSpace === 'LinearSRGBColorSpace' ? 'Linear sRGB' : 'sRGB';
+}
+
+function toneMappingLabelZh(mapping: RendererToneMapping) {
+  if (mapping === 'NoToneMapping') return '无（NoToneMapping）';
+  if (mapping === 'LinearToneMapping') return '线性（Linear）';
+  if (mapping === 'ReinhardToneMapping') return 'Reinhard色调映射';
+  if (mapping === 'CineonToneMapping') return 'Cineon色调映射';
+  return 'ACES Filmic色调映射';
+}
+
 /** 场景设置上下文：统一暴露编辑器实例、当前设置快照与更新方法。 */
 type SceneSettingsContextValue = {
   editor: ThreeEditor | null;
@@ -278,10 +294,18 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
       if (!editor) return;
       const seq = ++applySeqRef.current;
       try {
+        const shouldRecordHistory = options?.recordHistory ?? true;
+        const encodedOperationName = options?.operationName ? encodeHistoryI18nNameAuto(options.operationName) : undefined;
+        // 先立即应用，确保功能首击生效；再补一条 history（由 core 负责合并窗口）。
         await editor.setSceneSettings(next, {
-          recordHistory: options?.recordHistory ?? true,
-          operationName: options?.operationName ? encodeHistoryI18nNameAuto(options.operationName) : undefined
+          recordHistory: false
         });
+        if (shouldRecordHistory) {
+          await editor.setSceneSettings(next, {
+            recordHistory: true,
+            operationName: encodedOperationName
+          });
+        }
         // 只同步最后一次 apply 的 normalized 结果，避免竞态覆盖 UI
         if (seq === applySeqRef.current) {
           const fromCore = editor.getSceneSettings();
@@ -336,11 +360,19 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
         return;
       }
 
+      const shouldRecordHistory = options?.recordHistory ?? true;
+      const encodedOperationName = options?.operationName ? encodeHistoryI18nNameAuto(options.operationName) : undefined;
+      // 先即时生效，再记录历史，避免勾选项需要多次点击才真正落地。
       editor.setRendererSettings(next, {
-        operationName: options?.operationName ? encodeHistoryI18nNameAuto(options.operationName) : undefined,
-        recordHistory: options?.recordHistory ?? true
+        recordHistory: false
       });
-      setRendererSettings(editor.getRendererSettings());
+      if (shouldRecordHistory) {
+        editor.setRendererSettings(next, {
+          operationName: encodedOperationName,
+          recordHistory: true
+        });
+      }
+      setRendererSettings(next);
     },
     [editor]
   );
@@ -476,7 +508,7 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
         update((prev) => ({
           ...prev,
           environment: { ...prev.environment, fog: { ...prev.environment.fog, enabled } }
-        }), { operationName: `修改场景属性-环境-雾化开关 = ${enabled ? 'true' : 'false'}` }),
+        }), { operationName: `修改场景属性-环境-雾化开关 = ${boolLabelZh(enabled)}` }),
 
       setFogColor: (color) =>
         update((prev) => ({
@@ -499,7 +531,7 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
         update((prev) => ({
           ...prev,
           grid: { ...prev.grid, enabled }
-        }), { operationName: `修改场景属性-网格-显示开关 = ${enabled ? 'true' : 'false'}` }),
+        }), { operationName: `修改场景属性-网格-显示开关 = ${boolLabelZh(enabled)}` }),
       setGridColor: (color) =>
         update((prev) => ({
           ...prev,
@@ -520,7 +552,7 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
             ...prev.helpers,
             axes: { ...prev.helpers.axes, enabled }
           }
-        }), { operationName: `修改场景属性-辅助器-坐标轴开关 = ${enabled ? 'true' : 'false'}` }),
+        }), { operationName: `修改场景属性-辅助器-坐标轴开关 = ${boolLabelZh(enabled)}` }),
       setAxesSize: (size) =>
         update((prev) => ({
           ...prev,
@@ -530,23 +562,29 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
           }
         }), { operationName: `修改场景属性-辅助器-坐标轴尺寸 = ${Number(clamp(size, 0.1, 100).toFixed(4))}` }),
 
-      setAntialias: (enabled) => updateRenderer((prev) => ({ ...prev, antialias: enabled }), { operationName: `修改场景属性-渲染器-抗锯齿 = ${enabled ? 'true' : 'false'}` }),
-      setOutputColorSpace: (colorSpace) => updateRenderer((prev) => ({ ...prev, outputColorSpace: colorSpace }), { operationName: `修改场景属性-渲染器-输出色彩空间 = ${colorSpace}` }),
-      setToneMapping: (mapping) => updateRenderer((prev) => ({ ...prev, toneMapping: mapping }), { operationName: `修改场景属性-渲染器-色调映射 = ${mapping}` }),
+      setAntialias: (enabled) => updateRenderer((prev) => ({ ...prev, antialias: enabled }), { operationName: `修改场景属性-渲染器-抗锯齿 = ${boolLabelZh(enabled)}` }),
+      setOutputColorSpace: (colorSpace) =>
+        updateRenderer((prev) => ({ ...prev, outputColorSpace: colorSpace }), {
+          operationName: `修改场景属性-渲染器-输出色彩空间 = ${outputColorSpaceLabelZh(colorSpace)}`
+        }),
+      setToneMapping: (mapping) =>
+        updateRenderer((prev) => ({ ...prev, toneMapping: mapping }), {
+          operationName: `修改场景属性-渲染器-色调映射 = ${toneMappingLabelZh(mapping)}`
+        }),
       setToneMappingExposure: (exposure, options) =>
         updateRenderer((prev) => ({
           ...prev,
           toneMappingExposure: exposure
         }), { operationName: `修改场景属性-渲染器-曝光 = ${Number(exposure.toFixed(4))}`, recordHistory: options?.recordHistory ?? true }),
       setShadowMapEnabled: (enabled, options) =>
-        updateRenderer((prev) => ({ ...prev, shadowMapEnabled: enabled }), { operationName: `修改场景属性-渲染器-阴影开关 = ${enabled ? 'true' : 'false'}`, recordHistory: options?.recordHistory ?? true }),
+        updateRenderer((prev) => ({ ...prev, shadowMapEnabled: enabled }), { operationName: `修改场景属性-渲染器-阴影开关 = ${boolLabelZh(enabled)}`, recordHistory: options?.recordHistory ?? true }),
       setShadowMapType: (type, options) =>
         updateRenderer((prev) => ({ ...prev, shadowMapType: type }), {
           operationName: `修改场景属性-渲染器-阴影类型 = ${shadowMapTypeLabelZh(type)}`,
           recordHistory: options?.recordHistory ?? true
         }),
       setShadowMapAutoUpdate: (autoUpdate, options) =>
-        updateRenderer((prev) => ({ ...prev, shadowMapAutoUpdate: autoUpdate }), { operationName: `修改场景属性-渲染器-阴影自动更新 = ${autoUpdate ? 'true' : 'false'}`, recordHistory: options?.recordHistory ?? true }),
+        updateRenderer((prev) => ({ ...prev, shadowMapAutoUpdate: autoUpdate }), { operationName: `修改场景属性-渲染器-阴影自动更新 = ${boolLabelZh(autoUpdate)}`, recordHistory: options?.recordHistory ?? true }),
 
       setCameraFov,
       setCameraNear,

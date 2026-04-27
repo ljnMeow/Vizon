@@ -191,12 +191,8 @@ export function TextureMapItem({
             step={intensity.step ?? 0.01}
             value={intensity.value}
             onPointerDown={() => intensity.onDragStart?.()}
-            onMouseDown={() => intensity.onDragStart?.()}
-            onTouchStart={() => intensity.onDragStart?.()}
             onChange={(e) => intensity.onPreviewChange(Number(e.target.value))}
             onPointerUp={(e) => intensity.onCommit(Number((e.target as HTMLInputElement).value))}
-            onMouseUp={(e) => intensity.onCommit(Number((e.target as HTMLInputElement).value))}
-            onTouchEnd={(e) => intensity.onCommit(Number((e.target as HTMLInputElement).value))}
             className="w-full"
           />
         </div>
@@ -216,12 +212,8 @@ export function TextureMapItem({
               step={intensity.stepX ?? 0.01}
               value={intensity.value.x}
               onPointerDown={() => intensity.onDragStart?.('x')}
-              onMouseDown={() => intensity.onDragStart?.('x')}
-              onTouchStart={() => intensity.onDragStart?.('x')}
               onChange={(e) => intensity.onPreviewChange({ ...intensity.value, x: Number(e.target.value) })}
               onPointerUp={(e) => intensity.onCommit({ ...intensity.value, x: Number((e.target as HTMLInputElement).value) })}
-              onMouseUp={(e) => intensity.onCommit({ ...intensity.value, x: Number((e.target as HTMLInputElement).value) })}
-              onTouchEnd={(e) => intensity.onCommit({ ...intensity.value, x: Number((e.target as HTMLInputElement).value) })}
               className="w-full"
             />
           </div>
@@ -238,12 +230,8 @@ export function TextureMapItem({
               step={intensity.stepY ?? 0.01}
               value={intensity.value.y}
               onPointerDown={() => intensity.onDragStart?.('y')}
-              onMouseDown={() => intensity.onDragStart?.('y')}
-              onTouchStart={() => intensity.onDragStart?.('y')}
               onChange={(e) => intensity.onPreviewChange({ ...intensity.value, y: Number(e.target.value) })}
               onPointerUp={(e) => intensity.onCommit({ ...intensity.value, y: Number((e.target as HTMLInputElement).value) })}
-              onMouseUp={(e) => intensity.onCommit({ ...intensity.value, y: Number((e.target as HTMLInputElement).value) })}
-              onTouchEnd={(e) => intensity.onCommit({ ...intensity.value, y: Number((e.target as HTMLInputElement).value) })}
               className="w-full"
             />
           </div>

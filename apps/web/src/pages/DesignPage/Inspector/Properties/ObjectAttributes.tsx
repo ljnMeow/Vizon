@@ -3,7 +3,7 @@ import type { DefaultModelKey, ThreeEditor } from 'vizon-3d-core';
 import { useLocale } from '../../../../hooks/useLocale';
 import { basicModels } from '../../../../utils/models';
 import { appMessages } from '../../../../i18n/messages';
-import { encodeHistoryI18nNameAuto } from '../../../../utils/historyI18n';
+import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 import { VIZON_USER_DATA_KEYS } from '../../../../utils/keys';
 
 type SelectedObjectInfo = {
@@ -81,9 +81,12 @@ export function ObjectAttributes({
   const { locale } = useLocale();
   const inspectorT = appMessages[locale].designPage.inspector;
   const objAttrT = inspectorT.objectAttributes;
+  const objAttrZh = appMessages['zh-CN'].designPage.inspector.objectAttributes;
+  const objAttrEn = appMessages['en-US'].designPage.inspector.objectAttributes;
 
   const [refreshKey, setRefreshKey] = useState(0);
-  const historyName = (zhName: string) => encodeHistoryI18nNameAuto(zhName);
+  const historyName = (zhName: string, enName: string) =>
+    encodeHistoryI18nName({ 'zh-CN': zhName, 'en-US': enName });
 
   const { modelKey, modelTitle, geometryType, attributes } = useMemo(() => {
     if (!editor || !selectedInfo?.uuid) {
@@ -319,8 +322,47 @@ export function ObjectAttributes({
       const valueText = typeof nextValue === 'number' ? String(Number(nextValue.toFixed?.(4) ?? nextValue)) : String(nextValue);
       const labelItem = attributes.find((it) => it.paramKey === paramKey);
       const displayLabel = labelItem?.label ?? paramKey;
+      const paramLabelMapZh: Record<string, string> = {
+        width: objAttrZh.attributes.cube.widthLabel,
+        height: objAttrZh.attributes.cube.heightLabel,
+        depth: objAttrZh.attributes.cube.depthLabel,
+        radius: objAttrZh.attributes.sphere.radiusLabel,
+        widthSegments: objAttrZh.attributes.sphere.widthSegmentsLabel,
+        heightSegments: objAttrZh.attributes.sphere.heightSegmentsLabel,
+        segments: objAttrZh.attributes.circular.segmentsLabel,
+        radiusTop: objAttrZh.attributes.cylinder.radiusTopLabel,
+        radiusBottom: objAttrZh.attributes.cylinder.radiusBottomLabel,
+        radialSegments: objAttrZh.attributes.cylinder.radialSegmentsLabel,
+        tubularSegments: objAttrZh.attributes.torus.tubularSegmentsLabel,
+        tube: objAttrZh.attributes.torus.tubeLabel,
+        arc: objAttrZh.attributes.torus.arcLabel,
+        closed: objAttrZh.attributes.theConduit.closedLabel
+      };
+      const paramLabelMapEn: Record<string, string> = {
+        width: objAttrEn.attributes.cube.widthLabel,
+        height: objAttrEn.attributes.cube.heightLabel,
+        depth: objAttrEn.attributes.cube.depthLabel,
+        radius: objAttrEn.attributes.sphere.radiusLabel,
+        widthSegments: objAttrEn.attributes.sphere.widthSegmentsLabel,
+        heightSegments: objAttrEn.attributes.sphere.heightSegmentsLabel,
+        segments: objAttrEn.attributes.circular.segmentsLabel,
+        radiusTop: objAttrEn.attributes.cylinder.radiusTopLabel,
+        radiusBottom: objAttrEn.attributes.cylinder.radiusBottomLabel,
+        radialSegments: objAttrEn.attributes.cylinder.radialSegmentsLabel,
+        tubularSegments: objAttrEn.attributes.torus.tubularSegmentsLabel,
+        tube: objAttrEn.attributes.torus.tubeLabel,
+        arc: objAttrEn.attributes.torus.arcLabel,
+        closed: objAttrEn.attributes.theConduit.closedLabel
+      };
+      const displayLabelZh = paramLabelMapZh[paramKey] ?? displayLabel;
+      const displayLabelEn = paramLabelMapEn[paramKey] ?? paramKey;
+      const valueTextZh = typeof nextValue === 'boolean' ? (nextValue ? objAttrZh.yesLabel : objAttrZh.noLabel) : valueText;
+      const valueTextEn = typeof nextValue === 'boolean' ? (nextValue ? objAttrEn.yesLabel : objAttrEn.noLabel) : valueText;
       void editor.executeHistoryOperation({
-        name: historyName(`修改物体属性 - ${selectedInfo.uuid} - ${displayLabel} = ${valueText}`),
+        name: historyName(
+          `修改物体属性 - ${selectedInfo.uuid} - ${displayLabelZh} = ${valueTextZh}`,
+          `Modify object property - ${selectedInfo.uuid} - ${displayLabelEn} = ${valueTextEn}`
+        ),
         do: () => {
           obj.geometry = nextGeometry;
           obj.updateMatrixWorld?.(true);
@@ -335,7 +377,7 @@ export function ObjectAttributes({
         }
       });
     },
-    [attributes, editor, modelKey, modelTitle, selectedInfo?.uuid]
+    [attributes, editor, modelKey, modelTitle, objAttrEn, objAttrZh, selectedInfo?.uuid]
   );
 
   if (!selectedInfo || !modelKey || !modelTitle || !attributes) {
@@ -386,7 +428,10 @@ export function ObjectAttributes({
                 const next = e.target.checked;
                 const prev = Boolean(obj?.userData?.[VIZON_USER_DATA_KEYS.CONDUIT.EDIT_ENABLED]);
                 void editor.executeHistoryOperation({
-                  name: historyName(`修改物体属性 - ${selectedInfo.uuid} - ${objAttrT.conduitEditToggleLabel} = ${next ? objAttrT.yesLabel : objAttrT.noLabel}`),
+                  name: historyName(
+                    `修改物体属性 - ${selectedInfo.uuid} - ${objAttrZh.conduitEditToggleLabel} = ${next ? objAttrZh.yesLabel : objAttrZh.noLabel}`,
+                    `Modify object property - ${selectedInfo.uuid} - ${objAttrEn.conduitEditToggleLabel} = ${next ? objAttrEn.yesLabel : objAttrEn.noLabel}`
+                  ),
                   do: () => {
                     obj.userData = obj.userData ?? {};
                     obj.userData[VIZON_USER_DATA_KEYS.CONDUIT.EDIT_ENABLED] = next;

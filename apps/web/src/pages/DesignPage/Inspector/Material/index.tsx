@@ -5,7 +5,7 @@ import { switchMaterialTypeOnObject } from 'vizon-3d-core';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { useLocale } from '../../../../hooks/useLocale';
 import { appMessages, type AppMessages } from '../../../../i18n/messages';
-import { encodeHistoryI18nNameAuto } from '../../../../utils/historyI18n';
+import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 import { WEB_USER_DATA_KEYS } from '../../../../utils/keys';
 import { MaterialMainControlsSection } from './MaterialMainControlsSection';
 import { MaterialTextureMapsSection } from './MaterialTextureMapsSection';
@@ -52,6 +52,8 @@ export function MaterialSettings() {
   const t = appMessages[locale].designPage.inspector;
   // p = propertiesSettings 的别名，避免后续频繁写长路径
   const p: AppMessages['designPage']['inspector']['propertiesSettings'] = t.propertiesSettings;
+  const pZh = appMessages['zh-CN'].designPage.inspector.propertiesSettings;
+  const pEn = appMessages['en-US'].designPage.inspector.propertiesSettings;
 
   // 材质类型下拉选项文案
   const materialLabels = p.materialTypeOptions;
@@ -72,7 +74,9 @@ export function MaterialSettings() {
   const blendingOptions = p.materialBlendingOptions;
   // 混合模式说明文案（下拉框下方解释）
   const blendingDescriptions = p.materialBlendingDescriptions;
-  const historyName = (zhName: string) => encodeHistoryI18nNameAuto(zhName);
+  const historyName = (zhName: string, enName: string) =>
+    encodeHistoryI18nName({ 'zh-CN': zhName, 'en-US': enName });
+  const boolText = (v: boolean) => (v ? { zh: '是', en: 'true' } : { zh: '否', en: 'false' });
 
   // 面板状态与 three 材质数据保持“受控同步”
   // 当前材质类型（用于主控区渲染与贴图支持判断）
@@ -389,7 +393,10 @@ export function MaterialSettings() {
             ? value
             : '';
     void editor.executeHistoryOperation({
-      name: historyName(`修改物体属性 - ${root.uuid} - 材质-${key}${valueText ? ` = ${valueText}` : ''}`),
+      name: historyName(
+        `修改物体属性 - ${root.uuid} - 材质-${key}${valueText ? ` = ${valueText}` : ''}`,
+        `Modify object property - ${root.uuid} - Material-${key}${valueText ? ` = ${valueText}` : ''}`
+      ),
       mergeKey: `material-prop:${root.uuid}:${key}`,
       mergeWindowMs: 280,
       do: () => applyValue(value),
@@ -619,7 +626,10 @@ export function MaterialSettings() {
       editor.render();
     };
     void editor.executeHistoryOperation({
-      name: historyName(`修改物体属性 - ${root.uuid} - 材质-材质类型 = ${materialLabels[nextType] ?? nextType}`),
+      name: historyName(
+        `修改物体属性 - ${root.uuid} - 材质-材质类型 = ${pZh.materialTypeOptions[nextType] ?? nextType}`,
+        `Modify object property - ${root.uuid} - Material-Material type = ${pEn.materialTypeOptions[nextType] ?? nextType}`
+      ),
       do: () => applyType(nextType),
       undo: () => applyType(prevType)
     });
@@ -639,7 +649,10 @@ export function MaterialSettings() {
     const nextValue = materialSideKeyToValue[next];
     const before = mats.map((m) => ({ material: m, value: (m as any).side }));
     void editor.executeHistoryOperation({
-      name: historyName(`修改物体属性 - ${root.uuid} - 材质-面 = ${materialSideOptions[next] ?? next}`),
+      name: historyName(
+        `修改物体属性 - ${root.uuid} - 材质-面 = ${pZh.materialSideOptions[next] ?? next}`,
+        `Modify object property - ${root.uuid} - Material-Side = ${pEn.materialSideOptions[next] ?? next}`
+      ),
       do: () => {
         for (const m of mats) {
           (m as any).side = nextValue;
@@ -671,7 +684,10 @@ export function MaterialSettings() {
     const nextValue = blendingKeyToValue[next];
     const before = mats.map((m) => ({ material: m, blending: (m as any).blending, premultipliedAlpha: (m as any).premultipliedAlpha }));
     void editor.executeHistoryOperation({
-      name: historyName(`修改物体属性 - ${root.uuid} - 材质-混合模式 = ${blendingOptions[next] ?? next}`),
+      name: historyName(
+        `修改物体属性 - ${root.uuid} - 材质-混合模式 = ${pZh.materialBlendingOptions[next] ?? next}`,
+        `Modify object property - ${root.uuid} - Material-Blending mode = ${pEn.materialBlendingOptions[next] ?? next}`
+      ),
       do: () => {
         for (const m of mats) {
           (m as any).blending = nextValue;
@@ -714,7 +730,10 @@ export function MaterialSettings() {
       editor.render();
     };
     void editor.executeHistoryOperation({
-      name: historyName(`修改物体属性 - ${root.uuid} - 材质-颜色 = ${nextColor}`),
+      name: historyName(
+        `修改物体属性 - ${root.uuid} - 材质-颜色 = ${nextColor}`,
+        `Modify object property - ${root.uuid} - Material-Color = ${nextColor}`
+      ),
       mergeKey: `material-color:${root.uuid}`,
       mergeWindowMs: 280,
       do: () => applyColor(nextColor),
@@ -734,8 +753,12 @@ export function MaterialSettings() {
     const mats = getAllMeshMaterials(root);
     if (mats.length === 0) return;
     const before = mats.map((m) => ({ material: m, value: Boolean((m as any).transparent) }));
+    const v = boolText(nextEnabled);
     void editor.executeHistoryOperation({
-      name: historyName(`修改物体属性 - ${root.uuid} - 材质-透明开关 = ${nextEnabled ? 'true' : 'false'}`),
+      name: historyName(
+        `修改物体属性 - ${root.uuid} - 材质-透明开关 = ${v.zh}`,
+        `Modify object property - ${root.uuid} - Material-Transparency = ${v.en}`
+      ),
       do: () => {
         for (const m of mats) {
           (m as any).transparent = nextEnabled;
@@ -789,7 +812,10 @@ export function MaterialSettings() {
     if (Math.abs(beforeValue - next) <= 1e-6) return;
     const before = mats.map((m) => ({ material: m, opacity: (m as any).opacity, transparent: (m as any).transparent }));
     void editor.executeHistoryOperation({
-      name: historyName(`修改物体属性 - ${root.uuid} - 材质-不透明度 = ${Number(next.toFixed(4))}`),
+      name: historyName(
+        `修改物体属性 - ${root.uuid} - 材质-不透明度 = ${Number(next.toFixed(4))}`,
+        `Modify object property - ${root.uuid} - Material-Opacity = ${Number(next.toFixed(4))}`
+      ),
       do: () => {
         for (const m of mats) {
           if (typeof (m as any).opacity !== 'number') continue;
@@ -808,6 +834,7 @@ export function MaterialSettings() {
         editor.render();
       }
     });
+    opacityDragStartValueRef.current = null;
   }, [editor, selectedMaterialOpacity, selectedMaterialTransparentEnabled]);
 
   /**
@@ -822,8 +849,12 @@ export function MaterialSettings() {
     const mats = getAllMeshMaterials(root);
     if (mats.length === 0) return;
     const before = mats.map((m) => ({ material: m, value: Boolean((m as any).wireframe) }));
+    const v = boolText(next);
     void editor.executeHistoryOperation({
-      name: historyName(`修改物体属性 - ${root.uuid} - 材质-线框 = ${next ? 'true' : 'false'}`),
+      name: historyName(
+        `修改物体属性 - ${root.uuid} - 材质-线框 = ${v.zh}`,
+        `Modify object property - ${root.uuid} - Material-Wireframe = ${v.en}`
+      ),
       do: () => {
         for (const m of mats) {
           if (typeof (m as any).wireframe !== 'boolean') continue;
@@ -854,8 +885,12 @@ export function MaterialSettings() {
     const mats = getAllMeshMaterials(root);
     if (mats.length === 0) return;
     const before = mats.map((m) => ({ material: m, value: Boolean((m as any).alphaToCoverage) }));
+    const v = boolText(nextEnabled);
     void editor.executeHistoryOperation({
-      name: historyName(`修改物体属性 - ${root.uuid} - 材质-强制单通道 = ${nextEnabled ? 'true' : 'false'}`),
+      name: historyName(
+        `修改物体属性 - ${root.uuid} - 材质-强制单通道 = ${v.zh}`,
+        `Modify object property - ${root.uuid} - Material-Force single channel = ${v.en}`
+      ),
       do: () => {
         for (const m of mats) {
           (m as any).alphaToCoverage = nextEnabled;
@@ -908,7 +943,10 @@ export function MaterialSettings() {
     if (Math.abs(beforeValue - next) <= 1e-6) return;
     const before = mats.map((m) => ({ material: m, value: (m as any).alphaTest }));
     void editor.executeHistoryOperation({
-      name: historyName(`修改物体属性 - ${root.uuid} - 材质-AlphaTest = ${Number(next.toFixed(4))}`),
+      name: historyName(
+        `修改物体属性 - ${root.uuid} - 材质-AlphaTest = ${Number(next.toFixed(4))}`,
+        `Modify object property - ${root.uuid} - Material-Alpha test = ${Number(next.toFixed(4))}`
+      ),
       do: () => {
         for (const m of mats) {
           if (typeof (m as any).alphaTest !== 'number') continue;
@@ -925,6 +963,7 @@ export function MaterialSettings() {
         editor.render();
       }
     });
+    alphaTestDragStartValueRef.current = null;
   }, [editor, selectedMaterialAlphaTestThreshold]);
 
   /**
@@ -939,8 +978,12 @@ export function MaterialSettings() {
     const mats = getAllMeshMaterials(root);
     if (mats.length === 0) return;
     const before = mats.map((m) => ({ material: m, value: Boolean((m as any).depthTest) }));
+    const v = boolText(next);
     void editor.executeHistoryOperation({
-      name: historyName(`修改物体属性 - ${root.uuid} - 材质-深度测试 = ${next ? 'true' : 'false'}`),
+      name: historyName(
+        `修改物体属性 - ${root.uuid} - 材质-深度测试 = ${v.zh}`,
+        `Modify object property - ${root.uuid} - Material-Depth test = ${v.en}`
+      ),
       do: () => {
         for (const m of mats) {
           if (typeof (m as any).depthTest !== 'boolean') continue;
@@ -971,8 +1014,12 @@ export function MaterialSettings() {
     const mats = getAllMeshMaterials(root);
     if (mats.length === 0) return;
     const before = mats.map((m) => ({ material: m, value: Boolean((m as any).depthWrite) }));
+    const v = boolText(next);
     void editor.executeHistoryOperation({
-      name: historyName(`修改物体属性 - ${root.uuid} - 材质-深度写入 = ${next ? 'true' : 'false'}`),
+      name: historyName(
+        `修改物体属性 - ${root.uuid} - 材质-深度写入 = ${v.zh}`,
+        `Modify object property - ${root.uuid} - Material-Depth write = ${v.en}`
+      ),
       do: () => {
         for (const m of mats) {
           if (typeof (m as any).depthWrite !== 'boolean') continue;
@@ -1001,12 +1048,30 @@ export function MaterialSettings() {
     const root = editor.getSelected();
     if (!root) return;
     const mats = getAllMeshMaterials(root);
-    for (const m of mats) {
-      (m as any).vertexColors = next;
-      (m as any).needsUpdate = true;
-    }
-    if (!next) return;
-    applyVertexColorToMeshes(root, selectedVertexColor);
+    const before = mats.map((m) => ({ material: m, vertexColors: Boolean((m as any).vertexColors) }));
+    const applyVertexColors = (enabled: boolean) => {
+      for (const m of mats) {
+        (m as any).vertexColors = enabled;
+        (m as any).needsUpdate = true;
+      }
+      if (enabled) applyVertexColorToMeshes(root, selectedVertexColor);
+      editor.render();
+    };
+    const v = boolText(next);
+    void editor.executeHistoryOperation({
+      name: historyName(
+        `修改物体属性 - ${root.uuid} - 材质-顶点颜色开关 = ${v.zh}`,
+        `Modify object property - ${root.uuid} - Material-Vertex color enabled = ${v.en}`
+      ),
+      do: () => applyVertexColors(next),
+      undo: () => {
+        for (const item of before) {
+          (item.material as any).vertexColors = item.vertexColors;
+          (item.material as any).needsUpdate = true;
+        }
+        editor.render();
+      }
+    });
   }, [applyVertexColorToMeshes, editor, selectedVertexColor]);
 
   /**
@@ -1019,11 +1084,31 @@ export function MaterialSettings() {
     const root = editor.getSelected();
     if (!root) return;
     const mats = getAllMeshMaterials(root);
-    for (const m of mats) {
-      (m as any).vertexColors = true;
-      (m as any).needsUpdate = true;
-    }
-    applyVertexColorToMeshes(root, nextColor);
+    const before = mats.map((m) => ({ material: m, vertexColors: Boolean((m as any).vertexColors) }));
+    const applyColor = (color: string) => {
+      for (const m of mats) {
+        (m as any).vertexColors = true;
+        (m as any).needsUpdate = true;
+      }
+      applyVertexColorToMeshes(root, color);
+      editor.render();
+    };
+    void editor.executeHistoryOperation({
+      name: historyName(
+        `修改物体属性 - ${root.uuid} - 材质-顶点颜色 = ${nextColor}`,
+        `Modify object property - ${root.uuid} - Material-Vertex color = ${nextColor}`
+      ),
+      mergeKey: `material-vertex-color:${root.uuid}`,
+      mergeWindowMs: 280,
+      do: () => applyColor(nextColor),
+      undo: () => {
+        for (const item of before) {
+          (item.material as any).vertexColors = item.vertexColors;
+          (item.material as any).needsUpdate = true;
+        }
+        editor.render();
+      }
+    });
   }, [applyVertexColorToMeshes, editor]);
 
   return (

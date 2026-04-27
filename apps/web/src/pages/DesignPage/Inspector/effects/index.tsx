@@ -114,10 +114,10 @@ export function EffectsSettings() {
   const t = appMessages[locale].designPage.inspector.effectsSettings;
   const effectsZh = appMessages['zh-CN'].designPage.inspector.effectsSettings;
   const effectsEn = appMessages['en-US'].designPage.inspector.effectsSettings;
-  const historyName = (key: keyof typeof effectsZh.history) =>
+  const historyName = (key: keyof typeof effectsZh.history, valueText?: { zh: string; en: string }) =>
     encodeHistoryI18nName({
-      'zh-CN': effectsZh.history[key],
-      'en-US': effectsEn.history[key]
+      'zh-CN': `${effectsZh.history[key]}${valueText ? ` = ${valueText.zh}` : ''}`,
+      'en-US': `${effectsEn.history[key]}${valueText ? ` = ${valueText.en}` : ''}`
     });
 
   const [effects, setEffects] = useState<EffectsState>(DEFAULT_EFFECTS);
@@ -227,13 +227,13 @@ export function EffectsSettings() {
             borderColor: effects.borderColor
           }
         : { borderEnabled: false },
-      historyName('borderEnabled')
+      historyName('borderEnabled', checked ? { zh: '是', en: 'true' } : { zh: '否', en: 'false' })
     );
   const onBorderWidthPreviewChange = (next: number) =>
-    applyPatchToSelection({ borderWidth: clamp(next, 1, 20) }, historyName('borderWidth'), { recordHistory: false });
+    applyPatchToSelection({ borderWidth: clamp(next, 1, 20) }, historyName('borderWidth', { zh: String(clamp(next, 1, 20)), en: String(clamp(next, 1, 20)) }), { recordHistory: false });
   const onBorderWidthCommit = (next: number) =>
-    applyPatchToSelection({ borderWidth: clamp(next, 1, 20) }, historyName('borderWidth'), { recordHistory: true });
-  const onBorderColorChange = (hex: string) => applyPatchToSelection({ borderColor: hex }, historyName('borderColor'));
+    applyPatchToSelection({ borderWidth: clamp(next, 1, 20) }, historyName('borderWidth', { zh: String(clamp(next, 1, 20)), en: String(clamp(next, 1, 20)) }), { recordHistory: true });
+  const onBorderColorChange = (hex: string) => applyPatchToSelection({ borderColor: hex }, historyName('borderColor', { zh: hex, en: hex }));
 
   const onGlowEnabledChange = (checked: boolean) =>
     applyPatchToSelection(
@@ -245,17 +245,17 @@ export function EffectsSettings() {
             glowBrightness: effects.glowBrightness
           }
         : { glowEnabled: false },
-      historyName('glowEnabled')
+      historyName('glowEnabled', checked ? { zh: '是', en: 'true' } : { zh: '否', en: 'false' })
     );
-  const onGlowColorChange = (hex: string) => applyPatchToSelection({ glowColor: hex }, historyName('glowColor'));
+  const onGlowColorChange = (hex: string) => applyPatchToSelection({ glowColor: hex }, historyName('glowColor', { zh: hex, en: hex }));
   const onGlowRangePreviewChange = (next: number) =>
-    applyPatchToSelection({ glowRange: next }, historyName('glowRange'), { recordHistory: false });
+    applyPatchToSelection({ glowRange: next }, historyName('glowRange', { zh: String(next), en: String(next) }), { recordHistory: false });
   const onGlowRangeCommit = (next: number) =>
-    applyPatchToSelection({ glowRange: next }, historyName('glowRange'), { recordHistory: true });
+    applyPatchToSelection({ glowRange: next }, historyName('glowRange', { zh: String(next), en: String(next) }), { recordHistory: true });
   const onGlowBrightnessPreviewChange = (next: number) =>
-    applyPatchToSelection({ glowBrightness: next }, historyName('glowBrightness'), { recordHistory: false });
+    applyPatchToSelection({ glowBrightness: next }, historyName('glowBrightness', { zh: String(next), en: String(next) }), { recordHistory: false });
   const onGlowBrightnessCommit = (next: number) =>
-    applyPatchToSelection({ glowBrightness: next }, historyName('glowBrightness'), { recordHistory: true });
+    applyPatchToSelection({ glowBrightness: next }, historyName('glowBrightness', { zh: String(next), en: String(next) }), { recordHistory: true });
 
   return (
     <div className="space-y-4">
@@ -287,8 +287,6 @@ export function EffectsSettings() {
                   disabled={!hasMeshSelection}
                   onChange={(e) => onBorderWidthPreviewChange(Number(e.target.value))}
                   onPointerUp={(e) => onBorderWidthCommit(Number((e.target as HTMLInputElement).value))}
-                  onMouseUp={(e) => onBorderWidthCommit(Number((e.target as HTMLInputElement).value))}
-                  onTouchEnd={(e) => onBorderWidthCommit(Number((e.target as HTMLInputElement).value))}
                   aria-label={t.borderWidthAriaLabel}
                   className="w-full"
                 />
@@ -331,8 +329,6 @@ export function EffectsSettings() {
                   disabled={!hasMeshSelection}
                   onChange={(e) => onGlowRangePreviewChange(Number(e.target.value))}
                   onPointerUp={(e) => onGlowRangeCommit(Number((e.target as HTMLInputElement).value))}
-                  onMouseUp={(e) => onGlowRangeCommit(Number((e.target as HTMLInputElement).value))}
-                  onTouchEnd={(e) => onGlowRangeCommit(Number((e.target as HTMLInputElement).value))}
                   aria-label={t.glowRangeAriaLabel}
                   className="w-full"
                 />
@@ -352,8 +348,6 @@ export function EffectsSettings() {
                   disabled={!hasMeshSelection}
                   onChange={(e) => onGlowBrightnessPreviewChange(Number(e.target.value))}
                   onPointerUp={(e) => onGlowBrightnessCommit(Number((e.target as HTMLInputElement).value))}
-                  onMouseUp={(e) => onGlowBrightnessCommit(Number((e.target as HTMLInputElement).value))}
-                  onTouchEnd={(e) => onGlowBrightnessCommit(Number((e.target as HTMLInputElement).value))}
                   aria-label={t.glowBrightnessAriaLabel}
                   className="w-full"
                 />

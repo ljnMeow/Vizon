@@ -79,8 +79,6 @@ function GridHelperSettings({ labels }: { labels: SceneSettingsGridLabels }) {
                 );
               }}
               onPointerUp={() => setGridOpacity(draftOpacity)}
-              onMouseUp={() => setGridOpacity(draftOpacity)}
-              onTouchEnd={() => setGridOpacity(draftOpacity)}
               className="w-full"
             />
           </div>
@@ -146,8 +144,6 @@ export function SceneSettingsHelpersItem({
                 );
               }}
               onPointerUp={() => setAxesSize(draftAxesSize)}
-              onMouseUp={() => setAxesSize(draftAxesSize)}
-              onTouchEnd={() => setAxesSize(draftAxesSize)}
               disabled={!axes.enabled}
               className="w-full disabled:opacity-50"
             />

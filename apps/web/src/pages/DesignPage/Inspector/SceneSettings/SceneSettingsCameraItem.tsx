@@ -1,6 +1,7 @@
 import { createDefaultSceneSettings } from 'vizon-3d-core';
 import { useEffect, useState } from 'react';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
+import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 
 /** 相机设置项的 i18n 文案 */
 export type SceneSettingsCameraLabels = {
@@ -74,6 +75,8 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
   const [draftFar, setDraftFar] = useState(far);
   const [draftPos, setDraftPos] = useState(position);
   const [draftTarget, setDraftTarget] = useState(target);
+  const historyName = (zhName: string, enName: string) =>
+    encodeHistoryI18nName({ 'zh-CN': zhName, 'en-US': enName });
 
   useEffect(() => setDraftFov(fov), [fov]);
   useEffect(() => setDraftNear(near), [near]);
@@ -117,8 +120,6 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
             );
           }}
           onPointerUp={() => setCameraFov(draftFov)}
-          onMouseUp={() => setCameraFov(draftFov)}
-          onTouchEnd={() => setCameraFov(draftFov)}
           className="w-full"
         />
       </div>
@@ -145,9 +146,16 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
               );
             }}
             onBlur={() => {
+              const displayValue = Number(draftNear.toFixed(4));
               updateSceneSettings(
                 (prev) => ({ ...prev, camera: { ...prev.camera, near: draftNear } }),
-                { recordHistory: true, operationName: `修改场景属性-相机-近平面 = ${Number(draftNear.toFixed(4))}` }
+                {
+                  recordHistory: true,
+                  operationName: historyName(
+                    `修改场景属性-相机-近平面 = ${displayValue}`,
+                    `Modify scene property - camera - near = ${displayValue}`
+                  )
+                }
               );
             }}
             className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
@@ -174,9 +182,16 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
               );
             }}
             onBlur={() => {
+              const displayValue = Number(draftFar.toFixed(4));
               updateSceneSettings(
                 (prev) => ({ ...prev, camera: { ...prev.camera, far: draftFar } }),
-                { recordHistory: true, operationName: `修改场景属性-相机-远平面 = ${Number(draftFar.toFixed(4))}` }
+                {
+                  recordHistory: true,
+                  operationName: historyName(
+                    `修改场景属性-相机-远平面 = ${displayValue}`,
+                    `Modify scene property - camera - far = ${displayValue}`
+                  )
+                }
               );
             }}
             className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
@@ -201,10 +216,17 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
             }}
             onCommit={(x) => {
               const next = { ...draftPos, x };
+              const displayValue = `(${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})`;
               setDraftPos(next);
               updateSceneSettings(
                 (prev) => ({ ...prev, camera: { ...prev.camera, position: next } }),
-                  { recordHistory: true, operationName: `修改场景属性-相机-位置 = (${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})` }
+                  {
+                    recordHistory: true,
+                    operationName: historyName(
+                      `修改场景属性-相机-位置 = ${displayValue}`,
+                      `Modify scene property - camera - position = ${displayValue}`
+                    )
+                  }
               );
             }}
           />
@@ -221,10 +243,17 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
             }}
             onCommit={(y) => {
               const next = { ...draftPos, y };
+              const displayValue = `(${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})`;
               setDraftPos(next);
               updateSceneSettings(
                 (prev) => ({ ...prev, camera: { ...prev.camera, position: next } }),
-                  { recordHistory: true, operationName: `修改场景属性-相机-位置 = (${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})` }
+                  {
+                    recordHistory: true,
+                    operationName: historyName(
+                      `修改场景属性-相机-位置 = ${displayValue}`,
+                      `Modify scene property - camera - position = ${displayValue}`
+                    )
+                  }
               );
             }}
           />
@@ -241,10 +270,17 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
             }}
             onCommit={(z) => {
               const next = { ...draftPos, z };
+              const displayValue = `(${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})`;
               setDraftPos(next);
               updateSceneSettings(
                 (prev) => ({ ...prev, camera: { ...prev.camera, position: next } }),
-                  { recordHistory: true, operationName: `修改场景属性-相机-位置 = (${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})` }
+                  {
+                    recordHistory: true,
+                    operationName: historyName(
+                      `修改场景属性-相机-位置 = ${displayValue}`,
+                      `Modify scene property - camera - position = ${displayValue}`
+                    )
+                  }
               );
             }}
           />
@@ -268,10 +304,17 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
             }}
             onCommit={(x) => {
               const next = { ...draftTarget, x };
+              const displayValue = `(${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})`;
               setDraftTarget(next);
               updateSceneSettings(
                 (prev) => ({ ...prev, camera: { ...prev.camera, target: next } }),
-                  { recordHistory: true, operationName: `修改场景属性-相机-目标 = (${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})` }
+                  {
+                    recordHistory: true,
+                    operationName: historyName(
+                      `修改场景属性-相机-目标 = ${displayValue}`,
+                      `Modify scene property - camera - target = ${displayValue}`
+                    )
+                  }
               );
             }}
           />
@@ -288,10 +331,17 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
             }}
             onCommit={(y) => {
               const next = { ...draftTarget, y };
+              const displayValue = `(${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})`;
               setDraftTarget(next);
               updateSceneSettings(
                 (prev) => ({ ...prev, camera: { ...prev.camera, target: next } }),
-                  { recordHistory: true, operationName: `修改场景属性-相机-目标 = (${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})` }
+                  {
+                    recordHistory: true,
+                    operationName: historyName(
+                      `修改场景属性-相机-目标 = ${displayValue}`,
+                      `Modify scene property - camera - target = ${displayValue}`
+                    )
+                  }
               );
             }}
           />
@@ -308,10 +358,17 @@ export function SceneSettingsCameraItem({ labels }: { labels: SceneSettingsCamer
             }}
             onCommit={(z) => {
               const next = { ...draftTarget, z };
+              const displayValue = `(${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})`;
               setDraftTarget(next);
               updateSceneSettings(
                 (prev) => ({ ...prev, camera: { ...prev.camera, target: next } }),
-                  { recordHistory: true, operationName: `修改场景属性-相机-目标 = (${Number(next.x.toFixed(4))}, ${Number(next.y.toFixed(4))}, ${Number(next.z.toFixed(4))})` }
+                  {
+                    recordHistory: true,
+                    operationName: historyName(
+                      `修改场景属性-相机-目标 = ${displayValue}`,
+                      `Modify scene property - camera - target = ${displayValue}`
+                    )
+                  }
               );
             }}
           />

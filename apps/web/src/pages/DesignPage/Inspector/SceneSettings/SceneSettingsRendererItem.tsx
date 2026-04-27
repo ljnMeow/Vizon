@@ -137,14 +137,6 @@ export function SceneSettingsRendererItem({ labels }: { labels: SceneSettingsRen
             if (toneMapping === 'NoToneMapping') return;
             setToneMappingExposure(draftExposure, { recordHistory: true });
           }}
-          onMouseUp={() => {
-            if (toneMapping === 'NoToneMapping') return;
-            setToneMappingExposure(draftExposure, { recordHistory: true });
-          }}
-          onTouchEnd={() => {
-            if (toneMapping === 'NoToneMapping') return;
-            setToneMappingExposure(draftExposure, { recordHistory: true });
-          }}
           disabled={toneMapping === 'NoToneMapping'}
           className="w-full disabled:opacity-50"
         />
