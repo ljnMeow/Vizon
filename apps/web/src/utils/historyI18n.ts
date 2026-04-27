@@ -201,6 +201,9 @@ export function decodeHistoryI18nName(name: string, locale: Locale): string {
         action?: string;
         targetKind?: string;
         uuid?: string;
+        uuids?: string[] | string;
+        count?: number;
+        groupUuid?: string;
         prop?: string;
         valueText?: string;
       };
@@ -253,6 +256,26 @@ export function decodeHistoryI18nName(name: string, locale: Locale): string {
         return locale === 'zh-CN'
           ? `修改${targetZh}属性 - ${payload.uuid ?? ''} - ${prop}${valuePart}`
           : `Modify ${targetEn} property - ${payload.uuid ?? ''} - ${prop}${valuePart}`;
+      }
+      if (payload.op === 'group' || payload.op === 'ungroup') {
+        const uuids = Array.isArray(payload.uuids)
+          ? payload.uuids
+          : typeof payload.uuids === 'string'
+            ? payload.uuids.split(',').map((s) => s.trim()).filter(Boolean)
+            : [];
+        const count = Number.isFinite(payload.count) ? Number(payload.count) : uuids.length;
+        const uuidListZh = `（${uuids.join('，')}）`;
+        const uuidListEn = `(${uuids.join(', ')})`;
+        if (payload.op === 'group') {
+          return locale === 'zh-CN'
+            ? `组合节点（${count} 个）- ${uuidListZh}`
+            : `Group nodes (${count}) - ${uuidListEn}`;
+        }
+        const groupPartZh = payload.groupUuid ? `Group=${payload.groupUuid} - ` : '';
+        const groupPartEn = payload.groupUuid ? `Group=${payload.groupUuid} - ` : '';
+        return locale === 'zh-CN'
+          ? `取消组合节点（${count} 个）- ${groupPartZh}${uuidListZh}`
+          : `Ungroup nodes (${count}) - ${groupPartEn}${uuidListEn}`;
       }
     } catch {
       // ignore and fallback to existing decode logic

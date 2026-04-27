@@ -51,7 +51,7 @@ export type ViewTransitionOptions = {
  * - sceneTreeChange：结构树刷新，供侧边栏重绘。
  */
 export type ThreeEditorEvents = {
-  select: { object: THREE.Object3D | null };
+  select: { object: THREE.Object3D | null; objects: THREE.Object3D[] };
   sceneTreeChange: { tree: SceneTreeNode[] };
   historyChange: { records: EditorHistoryRecord[]; canUndo: boolean; canRedo: boolean };
 };
@@ -113,6 +113,8 @@ export class ThreeEditor {
   private frame: number | null = null;
   /** 当前选中可编辑对象；经 `isNonSelectableInHierarchy` 过滤 */
   private selected: THREE.Object3D | null = null;
+  /** 当前多选对象列表（最后一个元素等于 `selected`） */
+  private selectedObjects: THREE.Object3D[] = [];
   /** 归一化后的完整场景配置快照（含 sceneTree 缓存字段） */
   private sceneSettings: SceneSettings;
   /**
@@ -125,16 +127,26 @@ export class ThreeEditor {
   private transformMode: TransformMode = 'translate';
   /** false 时关闭 pointer 拾取与 gizmo attach */
   private transformToolEnabled = true;
+  /** false 时仅隐藏 gizmo，但保留拾取链路 */
+  private transformHandleVisible = true;
   /** 构造选项拷贝；控制 StaticObjectFreezeController 是否介入 */
   private freezeStaticObjects: boolean;
   /** freeze 模式下监听 `dragging-changed` 的句柄；dispose 时需移除 */
   private onTransformDraggingChanged: ((e: { value?: boolean }) => void) | null = null;
+  /** 监听 transform objectChange，驱动多选联动变换 */
+  private transformObjectChangeHandler: (() => void) | null = null;
   /** gizmo 拖拽起点快照，用于在结束时生成单条历史 */
   private transformDragStartSnapshot: {
     position: { x: number; y: number; z: number };
     rotation: { x: number; y: number; z: number };
     scale: { x: number; y: number; z: number };
   } | null = null;
+  /** 多选拖拽时记录每个对象的起始 local transform，用于历史记录 */
+  private transformDragStartSnapshots = new Map<string, ReturnType<ThreeEditor['captureObjectTransform']>>();
+  /** 多选拖拽时记录每个对象起始 world 矩阵，用于实时联动变换 */
+  private transformDragStartWorldMatrices = new Map<string, THREE.Matrix4>();
+  /** 多选拖拽时主对象起始 world 矩阵 */
+  private transformDragPrimaryStartWorld = new THREE.Matrix4();
 
   // —— 视口投射 / 拖拽放置（复用向量，避免高频 new）——
   /** 地面求交：NDC 临时向量 */
@@ -276,7 +288,8 @@ export class ThreeEditor {
     this.interactionController = new InteractionController({
       scene: this.scene,
       camera: this.camera,
-      select: (obj) => this.select(obj)
+      select: (obj, options) => this.select(obj, options),
+      setSelectionHighlightEnabled: (enabled) => this.effectsController.setSelectionHighlightEnabled(enabled)
     });
     // antialias 切换时需要该控制器重建 WebGL 上下文并回调 recreateControls
     this.rendererController = new RendererController(this.canvas, this.interactionController);
@@ -367,8 +380,21 @@ export class ThreeEditor {
   }
 
   copySelected() {
-    if (!this.selected || isNonSelectableInHierarchy(this.selected)) return false;
-    this.clipboardObject = this.selected.clone(true);
+    if (this.selectedObjects.length === 0) return false;
+    const targets = this.selectedObjects.filter((obj) => !isNonSelectableInHierarchy(obj));
+    if (targets.length === 0) return false;
+    if (targets.length === 1) {
+      this.clipboardObject = targets[0].clone(true);
+      return true;
+    }
+    const group = new THREE.Group();
+    group.name = 'ClipboardGroup';
+    for (const obj of targets) {
+      const clone = obj.clone(true);
+      clone.updateMatrixWorld(true);
+      group.attach(clone);
+    }
+    this.clipboardObject = group;
     return true;
   }
 
@@ -392,22 +418,205 @@ export class ThreeEditor {
   }
 
   async deleteSelected() {
-    const target = this.selected;
-    if (!target || !target.parent || isNonSelectableInHierarchy(target)) return false;
-    const parent = target.parent;
-    const index = parent.children.indexOf(target);
-    if (index < 0) return false;
+    const targets = this.selectedObjects.filter((target) => target.parent && !isNonSelectableInHierarchy(target));
+    if (targets.length === 0) return false;
+    const snapshot = targets
+      .map((node) => ({ node, parent: node.parent, index: node.parent ? node.parent.children.indexOf(node) : -1 }))
+      .filter((item) => Boolean(item.parent) && item.index >= 0)
+      .sort((a, b) => b.index - a.index);
+    if (snapshot.length === 0) return false;
 
     await this.executeHistoryOperation({
-      name: `删除节点 - ${target.uuid}`,
+      name: snapshot.length === 1 ? `删除节点 - ${snapshot[0].node.uuid}` : `删除节点（${snapshot.length}个）`,
       do: () => {
-        this.detachObjectFromParent(target);
+        for (const item of snapshot) this.detachObjectFromParent(item.node);
         this.select(null);
         this.syncSceneTreeState();
         this.render();
       },
       undo: () => {
-        this.insertChildAt(parent, target, index);
+        const restore = [...snapshot].sort((a, b) => a.index - b.index);
+        for (const item of restore) {
+          if (!item.parent || item.index < 0) continue;
+          this.insertChildAt(item.parent, item.node, item.index);
+        }
+        this.syncSceneTreeState();
+        this.render();
+      }
+    });
+    return true;
+  }
+
+  canGroupSelected() {
+    return this.selectedObjects.filter((obj) => obj.parent && !isNonSelectableInHierarchy(obj)).length >= 2;
+  }
+
+  canUngroupSelected() {
+    return Boolean(this.selected && this.selected.type === 'Group' && this.selected.parent && this.selected.children.length > 0);
+  }
+
+  async groupSelected() {
+    const targets = this.selectedObjects.filter((obj) => obj.parent && !isNonSelectableInHierarchy(obj));
+    if (targets.length < 2) return false;
+    const unique = Array.from(new Set(targets));
+    const snapshot = unique
+      .map((node) => ({ node, parent: node.parent, index: node.parent ? node.parent.children.indexOf(node) : -1 }))
+      .filter((item) => Boolean(item.parent) && item.index >= 0);
+    if (snapshot.length < 2) return false;
+
+    // 重复组合防御：若选中对象本身已构成同一个 Group 的“完整子集”，则不再创建嵌套 Group。
+    // 例：Group(G) 下只有 A/B/C 三个可编辑节点，用户 Shift 多选 A/B/C 再点“组合”。
+    const sameParent = snapshot.every((x) => x.parent === snapshot[0].parent);
+    const parent = sameParent ? snapshot[0].parent : null;
+    if (parent && parent.type === 'Group') {
+      const groupChildren = parent.children.filter((child) => !isNonSelectableInHierarchy(child));
+      const selectedSet = new Set(snapshot.map((x) => x.node));
+      const isFullGroupSelection =
+        groupChildren.length === snapshot.length && groupChildren.every((child) => selectedSet.has(child));
+      if (isFullGroupSelection) {
+        this.select(parent);
+        this.syncSceneTreeState();
+        this.render();
+        return true;
+      }
+    }
+
+    // 组内“部分组合”收敛：若本次组合发生在同一个 Group 内，
+    // 且组合后该 Group 只剩 1 个可编辑节点，则自动解散该 Group（提升剩余节点，避免出现 group > node3 空壳层级）。
+    const cleanupCandidate =
+      parent && parent.type === 'Group' && parent.parent
+        ? ({
+            group: parent as THREE.Group,
+            parent: parent.parent,
+            index: parent.parent.children.indexOf(parent),
+            performed: false,
+            onlyChildUuid: null as string | null
+          } as const)
+        : null;
+
+    this.scene.updateMatrixWorld(true);
+    const center = new THREE.Vector3();
+    for (const item of snapshot) {
+      const w = new THREE.Vector3();
+      item.node.getWorldPosition(w);
+      center.add(w);
+    }
+    center.multiplyScalar(1 / snapshot.length);
+
+    const group = new THREE.Group();
+    group.name = `Group ${snapshot.length}`;
+    group.position.copy(center);
+    group.updateMatrixWorld(true);
+
+    await this.executeHistoryOperation({
+      name: this.encodeHistoryOp({
+        op: 'group',
+        count: snapshot.length,
+        uuids: snapshot.map((x) => x.node.uuid)
+      }),
+      do: () => {
+        this.scene.add(group);
+        group.updateMatrixWorld(true);
+        for (const item of snapshot) {
+          group.attach(item.node);
+        }
+
+        if (cleanupCandidate && cleanupCandidate.index >= 0) {
+          const remaining = cleanupCandidate.group.children.filter((child) => !isNonSelectableInHierarchy(child));
+          if (remaining.length === 1) {
+            const [onlyChild] = remaining;
+            (cleanupCandidate as any).performed = true;
+            (cleanupCandidate as any).onlyChildUuid = onlyChild.uuid;
+            // 提升剩余节点到 group 的父级，并把 group 本体删除。
+            this.scene.updateMatrixWorld(true);
+            cleanupCandidate.parent.updateMatrixWorld(true);
+            cleanupCandidate.parent.attach(onlyChild);
+            this.insertChildAt(cleanupCandidate.parent, onlyChild, cleanupCandidate.index);
+            this.detachObjectFromParent(cleanupCandidate.group);
+          }
+        }
+
+        this.select(group);
+        this.syncSceneTreeState();
+        this.render();
+      },
+      undo: () => {
+        const parent = group.parent;
+        if (!parent) return;
+        for (const item of snapshot) {
+          parent.attach(item.node);
+        }
+        for (const item of snapshot) {
+          if (!item.parent || item.index < 0) continue;
+          this.insertChildAt(item.parent, item.node, item.index);
+        }
+
+        if (cleanupCandidate && cleanupCandidate.index >= 0 && (cleanupCandidate as any).performed) {
+          // 若 do() 阶段解散了旧 group，这里把它与剩余节点恢复回去。
+          const restoredGroup = cleanupCandidate.group;
+          const restoredParent = cleanupCandidate.parent;
+          // 只在旧 group 当前未挂到父级时恢复（避免重复插入）。
+          if (restoredGroup.parent !== restoredParent) {
+            this.insertChildAt(restoredParent, restoredGroup, cleanupCandidate.index);
+          }
+          // 把被提升的“唯一剩余节点”重新挂回 group（此时它应该在 restoredParent 下）。
+          const onlyChildUuid = (cleanupCandidate as any).onlyChildUuid as string | null;
+          const expected = onlyChildUuid ? restoredParent.getObjectByProperty('uuid', onlyChildUuid) : null;
+          if (expected) {
+            restoredGroup.attach(expected);
+          }
+        }
+
+        this.detachObjectFromParent(group);
+        this.select(snapshot[0]?.node ?? null);
+        this.syncSceneTreeState();
+        this.render();
+      }
+    });
+    return true;
+  }
+
+  async ungroupSelected() {
+    const group = this.selected && this.selected.type === 'Group' && this.selected.parent && this.selected.children.length > 0 ? this.selected : null;
+    if (!group) return false;
+    const snapshot = [
+      {
+        group,
+        parent: group.parent!,
+        index: group.parent!.children.indexOf(group),
+        children: [...group.children]
+      }
+    ];
+
+    await this.executeHistoryOperation({
+      name: this.encodeHistoryOp({
+        op: 'ungroup',
+        count: snapshot[0].children.length,
+        groupUuid: group.uuid,
+        uuids: snapshot[0].children.map((x) => x.uuid)
+      }),
+      do: () => {
+        for (const item of snapshot) {
+          let insertOffset = 0;
+          for (const child of item.children) {
+            item.parent.attach(child);
+            this.insertChildAt(item.parent, child, item.index + insertOffset);
+            insertOffset += 1;
+          }
+          this.detachObjectFromParent(item.group);
+        }
+        this.select(snapshot[0]?.children[0] ?? null);
+        this.syncSceneTreeState();
+        this.render();
+      },
+      undo: () => {
+        for (const item of snapshot) {
+          this.insertChildAt(item.parent, item.group, item.index);
+          for (const child of item.children) {
+            item.group.attach(child);
+          }
+        }
+        this.select(snapshot[0]?.group ?? null);
         this.syncSceneTreeState();
         this.render();
       }
@@ -736,6 +945,10 @@ export class ThreeEditor {
     return this.selected;
   }
 
+  getSelectedObjects() {
+    return [...this.selectedObjects];
+  }
+
   /**
    * 获取当前视图预设（仅表示“最近一次设置的预设”）。
    * 注意：用户通过 OrbitControls 自由旋转后，该值不会自动推断更新。
@@ -804,30 +1017,63 @@ export class ThreeEditor {
     return false;
   }
 
-  select(object: THREE.Object3D | null) {
+  select(object: THREE.Object3D | null, options?: { toggle?: boolean }) {
     const safe = object && !isNonSelectableInHierarchy(object) ? object : null;
     const prev = this.selected;
-
-    if (this.freezeStaticObjects && prev && prev !== safe) {
-      this.staticObjectFreezeController.freezeObjectTree(prev);
+    const prevObjects = this.selectedObjects;
+    let nextObjects: THREE.Object3D[];
+    // 非 Shift 单选模式下的点击：应清掉“临时高亮”（包括点空白清空）。
+    if (!options?.toggle) {
+      this.effectsController.setSelectionHighlightEnabled(false);
+    } else {
+      // Shift(toggle) 选中行为：确保临时 bloom 高亮开启（不依赖 keydown 是否先触发）。
+      this.effectsController.setSelectionHighlightEnabled(true);
     }
-    if (this.freezeStaticObjects && safe) {
-      this.staticObjectFreezeController.unfreezeObjectTree(safe);
+    if (options?.toggle) {
+      if (!safe) {
+        // 多选模式点击空白处：保持当前集合，等待用户继续增减选择。
+        nextObjects = [...prevObjects];
+      } else {
+        const exists = prevObjects.includes(safe);
+        nextObjects = exists ? prevObjects.filter((item) => item !== safe) : [...prevObjects, safe];
+      }
+    } else {
+      nextObjects = safe ? [safe] : [];
+    }
+    const nextPrimary = nextObjects.length > 0 ? nextObjects[nextObjects.length - 1] : null;
+
+    if (this.freezeStaticObjects) {
+      const prevSet = new Set(prevObjects);
+      const nextSet = new Set(nextObjects);
+      for (const item of prevObjects) {
+        if (!nextSet.has(item)) this.staticObjectFreezeController.freezeObjectTree(item);
+      }
+      for (const item of nextObjects) {
+        if (!prevSet.has(item)) this.staticObjectFreezeController.unfreezeObjectTree(item);
+      }
     }
 
-    this.selected = safe;
-    if ((prev as any)?.isCamera || (safe as any)?.isCamera) this.cameraHelpersDirty = true;
-    if ((prev as any)?.isLight || (safe as any)?.isLight) this.lightHelpersDirty = true;
+    this.selectedObjects = nextObjects;
+    this.selected = nextPrimary;
+    this.effectsController.setSelectedObjects(nextObjects);
+    if ((prev as any)?.isCamera || (nextPrimary as any)?.isCamera) this.cameraHelpersDirty = true;
+    if ((prev as any)?.isLight || (nextPrimary as any)?.isLight) this.lightHelpersDirty = true;
 
-    if (this.transformToolEnabled && this.canAttachTransformTarget(safe)) {
-      this.transform.attach(safe);
+    if (
+      this.transformToolEnabled &&
+      this.transformHandleVisible &&
+      !options?.toggle &&
+      nextObjects.length === 1 &&
+      this.canAttachTransformTarget(nextPrimary)
+    ) {
+      this.transform.attach(nextPrimary);
       this.transform.visible = true;
     } else {
       this.transform.detach();
       this.transform.visible = false;
     }
-    this.conduitEditController?.syncFromSelection(safe);
-    this.events.emit('select', { object: safe });
+    this.conduitEditController?.syncFromSelection(nextPrimary);
+    this.events.emit('select', { object: nextPrimary, objects: [...nextObjects] });
   }
 
   /**
@@ -848,7 +1094,7 @@ export class ThreeEditor {
     this.transformToolEnabled = enabled;
 
     // 关闭时确保 gizmo 不再接管交互
-    if (enabled && this.canAttachTransformTarget(this.selected)) {
+    if (enabled && this.transformHandleVisible && this.selectedObjects.length === 1 && this.canAttachTransformTarget(this.selected)) {
       this.transform.attach(this.selected);
       this.transform.visible = true;
     } else {
@@ -857,6 +1103,21 @@ export class ThreeEditor {
     }
 
     this.interactionController.setToolEnabled(enabled);
+  }
+
+  /**
+   * 仅控制 transform gizmo 的可见/可挂载状态，不影响拾取链路。
+   * 用于 Shift 临时多选模式（隐藏 helper，但仍可点击多选对象）。
+   */
+  setTransformHandleVisible(visible: boolean) {
+    this.transformHandleVisible = visible;
+    if (this.transformToolEnabled && this.transformHandleVisible && this.selectedObjects.length === 1 && this.canAttachTransformTarget(this.selected)) {
+      this.transform.attach(this.selected);
+      this.transform.visible = true;
+      return;
+    }
+    this.transform.detach();
+    this.transform.visible = false;
   }
 
   add(object: THREE.Object3D, options?: { recordHistory?: boolean; operationName?: string }) {
@@ -868,7 +1129,7 @@ export class ThreeEditor {
         undo: () => {
           if (!object.parent) return;
           object.parent.remove(object);
-          if (object === this.selected) this.select(null);
+          if (this.selectedObjects.includes(object)) this.select(null);
           this.syncSceneTreeState();
           this.render();
         },
@@ -938,7 +1199,7 @@ export class ThreeEditor {
     const obj = this.scene.getObjectByProperty('uuid', uuid);
     if (!obj || isNonSelectableInHierarchy(obj)) return false;
     obj.visible = visible;
-    if (!visible && this.selected && !isVisibleInHierarchy(this.selected)) {
+    if (!visible && this.selectedObjects.some((selected) => !isVisibleInHierarchy(selected))) {
       this.select(null);
     }
     this.syncSceneTreeState();
@@ -948,7 +1209,7 @@ export class ThreeEditor {
   removeObjectByUuid(uuid: string): boolean {
     const obj = this.scene.getObjectByProperty('uuid', uuid);
     if (!obj || !obj.parent || isNonSelectableInHierarchy(obj)) return false;
-    if (obj === this.selected) this.select(null);
+    if (this.selectedObjects.includes(obj)) this.select(null);
     obj.parent.remove(obj);
     // 同步移除相机 helper（如果存在）。
     const helper = this.cameraHelpers.get(uuid);
@@ -1294,12 +1555,45 @@ export class ThreeEditor {
       const dragging = Boolean(e?.value);
       if (dragging) {
         this.transformDragStartSnapshot = this.captureObjectTransform(this.selected);
+        this.transformDragStartSnapshots.clear();
+        this.transformDragStartWorldMatrices.clear();
+        this.scene.updateMatrixWorld(true);
+        this.transformDragPrimaryStartWorld.copy(this.selected.matrixWorld);
+        for (const obj of this.selectedObjects) {
+          this.transformDragStartSnapshots.set(obj.uuid, this.captureObjectTransform(obj));
+          this.transformDragStartWorldMatrices.set(obj.uuid, obj.matrixWorld.clone());
+        }
       } else if (this.transformDragStartSnapshot) {
         const before = this.transformDragStartSnapshot;
         this.transformDragStartSnapshot = null;
         const target = this.selected;
         const after = this.captureObjectTransform(target);
-        if (!this.isSameTransformSnapshot(before, after)) {
+        const hasMulti = this.transformDragStartSnapshots.size > 1;
+        if (hasMulti) {
+          const beforeMap = new Map(this.transformDragStartSnapshots);
+          const afterMap = new Map<string, ReturnType<ThreeEditor['captureObjectTransform']>>();
+          for (const obj of this.selectedObjects) {
+            afterMap.set(obj.uuid, this.captureObjectTransform(obj));
+          }
+          const changed = Array.from(beforeMap.entries()).some(([uuid, snap]) => {
+            const next = afterMap.get(uuid);
+            return next ? !this.isSameTransformSnapshot(snap, next) : false;
+          });
+          if (changed) {
+            void this.executeHistoryOperation({
+              name: this.encodeHistoryOp({
+                op: 'transform',
+                action: this.getTransformActionLabel(this.transformMode),
+                targetKind: 'object',
+                uuid: this.selectedObjects.map((obj) => obj.uuid).join(',')
+              }),
+              mergeKey: `transform-objects:${this.selectedObjects.map((obj) => obj.uuid).sort().join('|')}:${this.transformMode}`,
+              mergeWindowMs: 120,
+              do: () => this.applySelectionTransformSnapshots(beforeMap, afterMap),
+              undo: () => this.applySelectionTransformSnapshots(afterMap, beforeMap)
+            });
+          }
+        } else if (!this.isSameTransformSnapshot(before, after)) {
           const actionLabel = this.getTransformActionLabel(this.transformMode);
           const targetKind = this.getHistoryTargetKind(target);
           void this.executeHistoryOperation({
@@ -1315,25 +1609,38 @@ export class ThreeEditor {
             undo: () => this.applyObjectTransform(target, before)
           });
         }
+        this.transformDragStartSnapshots.clear();
+        this.transformDragStartWorldMatrices.clear();
       }
       if ((this.selected as any).isCamera) this.cameraHelpersDirty = true;
       if ((this.selected as any).isLight) this.lightHelpersDirty = true;
       if (!this.freezeStaticObjects) return;
       if (dragging) {
-        this.staticObjectFreezeController.unfreezeObjectTree(this.selected);
+        for (const obj of this.selectedObjects) this.staticObjectFreezeController.unfreezeObjectTree(obj);
         return;
       }
-      this.selected.updateMatrixWorld(true);
-      this.staticObjectFreezeController.freezeObjectTree(this.selected);
+      for (const obj of this.selectedObjects) {
+        obj.updateMatrixWorld(true);
+        this.staticObjectFreezeController.freezeObjectTree(obj);
+      }
+    };
+
+    this.transformObjectChangeHandler = () => {
+      this.applyMultiSelectionTransform();
     };
 
     (this.transform as any).addEventListener('dragging-changed', this.onTransformDraggingChanged);
+    (this.transform as any).addEventListener('objectChange', this.transformObjectChangeHandler);
   }
 
   private unbindTransformDragHooks() {
     if (!this.onTransformDraggingChanged) return;
     (this.transform as any)?.removeEventListener?.('dragging-changed', this.onTransformDraggingChanged);
     this.onTransformDraggingChanged = null;
+    if (this.transformObjectChangeHandler) {
+      (this.transform as any)?.removeEventListener?.('objectChange', this.transformObjectChangeHandler);
+      this.transformObjectChangeHandler = null;
+    }
   }
 
   private updateSelectionBoxHelper() {
@@ -1444,6 +1751,52 @@ export class ThreeEditor {
     obj.updateMatrixWorld(true);
     this.syncSceneTreeState();
     this.render();
+  }
+
+  private applySelectionTransformSnapshots(
+    from: Map<string, ReturnType<ThreeEditor['captureObjectTransform']>>,
+    to: Map<string, ReturnType<ThreeEditor['captureObjectTransform']>>
+  ) {
+    for (const [uuid, before] of from.entries()) {
+      const obj = this.scene.getObjectByProperty('uuid', uuid);
+      if (!obj) continue;
+      const next = to.get(uuid) ?? before;
+      this.applyObjectTransform(obj, next);
+    }
+    this.syncSceneTreeState();
+    this.render();
+  }
+
+  private applyMultiSelectionTransform() {
+    if (!this.selected || this.selectedObjects.length <= 1) return;
+    if (this.transformDragStartWorldMatrices.size <= 1) return;
+    const primary = this.selected;
+    const primaryStartWorld = this.transformDragPrimaryStartWorld;
+    const invPrimaryStartWorld = primaryStartWorld.clone().invert();
+    const delta = primary.matrixWorld.clone().multiply(invPrimaryStartWorld);
+    const parentWorldInverse = new THREE.Matrix4();
+    const nextWorld = new THREE.Matrix4();
+    const nextPos = new THREE.Vector3();
+    const nextQuat = new THREE.Quaternion();
+    const nextScale = new THREE.Vector3();
+
+    for (const obj of this.selectedObjects) {
+      if (obj === primary) continue;
+      const startWorld = this.transformDragStartWorldMatrices.get(obj.uuid);
+      if (!startWorld) continue;
+      nextWorld.copy(delta).multiply(startWorld);
+      if (obj.parent) {
+        parentWorldInverse.copy(obj.parent.matrixWorld).invert();
+        nextWorld.premultiply(parentWorldInverse);
+      }
+      nextWorld.decompose(nextPos, nextQuat, nextScale);
+      obj.position.copy(nextPos);
+      obj.quaternion.copy(nextQuat);
+      obj.scale.copy(nextScale);
+      obj.updateMatrixWorld(true);
+      if ((obj as any).isCamera) this.cameraHelpersDirty = true;
+      if ((obj as any).isLight) this.lightHelpersDirty = true;
+    }
   }
 
   private isSameTransformSnapshot(

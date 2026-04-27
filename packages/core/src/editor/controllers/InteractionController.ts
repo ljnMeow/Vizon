@@ -21,7 +21,8 @@ import {
 export type InteractionControllerInit = {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
-  select: (object: THREE.Object3D | null) => void;
+  select: (object: THREE.Object3D | null, options?: { toggle?: boolean }) => void;
+  setSelectionHighlightEnabled: (enabled: boolean) => void;
 };
 
 export type InteractionRecreateControlsOptions = {
@@ -52,6 +53,10 @@ export class InteractionController {
   private domElement: HTMLElement | null = null;
   /** false 时移除监听，避免禁选模式下仍 raycast */
   private toolEnabled = true;
+  /** 全局记录 Shift 是否按下，避免 pointer 事件修饰键丢失 */
+  private isShiftPressed = false;
+  /** 键盘监听注销句柄 */
+  private detachKeyboardEvents: (() => void) | null = null;
 
   /**
    * 沿父链查找「代理拾取目标」：CameraHelper 等线框 mesh 通过 userData 指向真实 Camera/Light。
@@ -85,6 +90,7 @@ export class InteractionController {
    */
   recreateControls(opts: InteractionRecreateControlsOptions) {
     this.disposePointerEvents();
+    this.disposeKeyboardEvents();
     this.disposeControls();
 
     const { domElement, toolEnabled } = opts;
@@ -119,6 +125,7 @@ export class InteractionController {
     this.restoreSelection(opts.selected, toolEnabled);
 
     if (toolEnabled) {
+      this.attachKeyboardEvents();
       this.attachPointerEvents(domElement);
     }
 
@@ -144,9 +151,11 @@ export class InteractionController {
     // 控制拾取链路是否存在：禁用时不再 raycast/写回 select。
     if (!this.domElement) return;
     if (enabled) {
+      this.attachKeyboardEvents();
       this.attachPointerEvents(this.domElement);
     } else {
       this.disposePointerEvents();
+      this.disposeKeyboardEvents();
     }
   }
 
@@ -160,7 +169,41 @@ export class InteractionController {
 
   dispose() {
     this.disposePointerEvents();
+    this.disposeKeyboardEvents();
     this.disposeControls();
+  }
+
+  private attachKeyboardEvents() {
+    this.detachKeyboardEvents?.();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Shift') return;
+      if (this.isShiftPressed) return;
+      this.isShiftPressed = true;
+      // 进入 Shift 多选模式：开启“临时高亮”（松开 Shift 后仍会保留，直到用户单选/点空白清掉）。
+      this.init.setSelectionHighlightEnabled(true);
+      // 进入 Shift 多选模式时，先清空当前选中（隐藏 helper 并清理单选态）。
+      this.init.select(null);
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key !== 'Shift') return;
+      if (!this.isShiftPressed) return;
+      this.isShiftPressed = false;
+      // 松开 Shift 仅退出“增选模式”，不清空选中，也不关闭临时高亮。
+    };
+    const onBlur = () => {
+      if (!this.isShiftPressed) return;
+      this.isShiftPressed = false;
+      // blur 时同样只退出“增选模式”
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    this.detachKeyboardEvents = () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+      this.isShiftPressed = false;
+    };
   }
 
   private attachPointerEvents(dom: HTMLElement) {
@@ -200,7 +243,7 @@ export class InteractionController {
           this.init.select(null); // 理论防御：映射目标被隐藏则清空选中
           return;
         }
-        this.init.select(next); // 委托 ThreeEditor：冻结矩阵、attach gizmo、emit
+        this.init.select(next, { toggle: this.isShiftPressed }); // 委托 ThreeEditor：冻结矩阵、attach gizmo、emit
       },
       { signal: this.pointerAbort.signal }
     );
@@ -209,6 +252,11 @@ export class InteractionController {
   private disposePointerEvents() {
     this.pointerAbort?.abort();
     this.pointerAbort = null;
+  }
+
+  private disposeKeyboardEvents() {
+    this.detachKeyboardEvents?.();
+    this.detachKeyboardEvents = null;
   }
 
   private disposeControls() {

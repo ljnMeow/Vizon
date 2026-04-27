@@ -57,6 +57,7 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
   const hostRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const toolRef = useRef<ViewportTool | null>('translate');
+  const shiftSelectingRef = useRef(false);
   const MODEL_DRAG_MIME = DATA_TRANSFER_KEYS.MODEL_MIME;
   const CAMERA_DRAG_MIME = DATA_TRANSFER_KEYS.CAMERA_MIME;
   const LIGHT_DRAG_MIME = DATA_TRANSFER_KEYS.LIGHT_MIME;
@@ -65,6 +66,7 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
   const [view, setView] = useState<ViewPreset>('default');
   // 工具非必选：未选中时不允许拾取/变换交互
   const [tool, setTool] = useState<ViewportTool | null>('translate');
+  const [hideViewportTool, setHideViewportTool] = useState(false);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -86,7 +88,9 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
     inst.setViewPreset(view);
     inst.setTransformMode('translate');
     inst.setTransformToolEnabled(true);
+    inst.setTransformHandleVisible(true);
     const offSelect = inst.on('select', ({ object }) => {
+      if (shiftSelectingRef.current) return;
       // 当工具未激活时，树节点选中对象后自动回到默认工具（第一个：translate）。
       if (!object) return;
       if (toolRef.current != null) return;
@@ -95,6 +99,43 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
       inst.setTransformMode('translate');
       inst.setTransformToolEnabled(true);
     });
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Shift') return;
+      if (shiftSelectingRef.current) return;
+      shiftSelectingRef.current = true;
+      setHideViewportTool(true);
+      inst.setTransformHandleVisible(false);
+      inst.select(null);
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key !== 'Shift') return;
+      if (!shiftSelectingRef.current) return;
+      shiftSelectingRef.current = false;
+      setHideViewportTool(false);
+      const nextTool = toolRef.current;
+      if (!nextTool) {
+        inst.setTransformHandleVisible(true);
+        return;
+      }
+      inst.setTransformMode(nextTool);
+      inst.setTransformHandleVisible(true);
+    };
+    const onWindowBlur = () => {
+      if (!shiftSelectingRef.current) return;
+      shiftSelectingRef.current = false;
+      setHideViewportTool(false);
+      const nextTool = toolRef.current;
+      if (!nextTool) {
+        inst.setTransformHandleVisible(true);
+        return;
+      }
+      inst.setTransformMode(nextTool);
+      inst.setTransformHandleVisible(true);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onWindowBlur);
 
     const resize = () => {
       const rect = host.getBoundingClientRect();
@@ -107,6 +148,9 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
 
     return () => {
       offSelect();
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onWindowBlur);
       ro.disconnect();
       inst.dispose();
       editor.current = null;
@@ -195,7 +239,7 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
     <div ref={hostRef} className="relative h-full w-full" onDragOver={onDragOver} onDrop={onDrop}>
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
       <ViewPresetToolbar value={view} onChange={setPreset} />
-      <TransformToolbar value={tool} onChange={setViewportTool} />
+      {!hideViewportTool ? <TransformToolbar value={tool} onChange={setViewportTool} /> : null}
     </div>
   );
 }

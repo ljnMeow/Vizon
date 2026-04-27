@@ -31,6 +31,8 @@ export function ActionBar() {
   const [canRedo, setCanRedo] = useState(false);
   const [canPaste, setCanPaste] = useState(false);
   const [hasSelection, setHasSelection] = useState(false);
+  const [canGroup, setCanGroup] = useState(false);
+  const [canUngroup, setCanUngroup] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
 
   const labels = useMemo(() => appMessages[locale].designPage.actionBar, [locale]);
@@ -43,13 +45,17 @@ export function ActionBar() {
       setCanRedo(false);
       setCanPaste(false);
       setHasSelection(false);
+      setCanGroup(false);
+      setCanUngroup(false);
       return;
     }
     const refresh = () => {
       setCanUndo(editor.canUndo());
       setCanRedo(editor.canRedo());
       setCanPaste(editor.canPaste());
-      setHasSelection(Boolean(editor.getSelected()));
+      setHasSelection(editor.getSelectedObjects().length > 0);
+      setCanGroup(editor.canGroupSelected());
+      setCanUngroup(editor.canUngroupSelected());
     };
     refresh();
     const offHistory = editor.on('historyChange', refresh);
@@ -86,6 +92,16 @@ export function ActionBar() {
       if (cmd && key === 'v') {
         e.preventDefault();
         void editor.pasteFromClipboard();
+        return;
+      }
+      if (cmd && key === 'd') {
+        e.preventDefault();
+        void editor.groupSelected();
+        return;
+      }
+      if (cmd && key === 'f') {
+        e.preventDefault();
+        void editor.ungroupSelected();
         return;
       }
       if (e.key === 'Delete') {
@@ -125,6 +141,8 @@ export function ActionBar() {
               { key: 'copy', label: labels.copyWithShortcut, disabled: !hasSelection, onClick: () => { setOpen(false); editor?.copySelected(); } },
               { key: 'paste', label: labels.pasteWithShortcut, disabled: !canPaste, onClick: () => { setOpen(false); void editor?.pasteFromClipboard(); } },
               { key: 'delete', label: labels.deleteWithShortcut, disabled: !hasSelection, onClick: () => { setOpen(false); void editor?.deleteSelected(); } },
+              { key: 'group', label: labels.groupWithShortcut, disabled: !canGroup, onClick: () => { setOpen(false); void editor?.groupSelected(); } },
+              { key: 'ungroup', label: labels.ungroupWithShortcut, disabled: !canUngroup, onClick: () => { setOpen(false); void editor?.ungroupSelected(); } },
               { key: 'clear', label: labels.clear, onClick: () => { setOpen(false); void editor?.clearSceneNodes(); } },
               { key: 'reset', label: labels.reset, onClick: () => { setOpen(false); void editor?.resetWorkspace(); } }
             ]

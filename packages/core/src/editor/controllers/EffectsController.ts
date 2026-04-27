@@ -30,6 +30,15 @@ const DEFAULT_BORDER: BorderSettings = {
   glowRange: 30,
   glowBrightness: 1
 };
+const MULTI_SELECT_GLOW: BorderSettings = {
+  borderEnabled: false,
+  borderWidth: 1,
+  borderColor: '#ff0000',
+  glowEnabled: true,
+  glowColor: '#66ccff',
+  glowRange: 34,
+  glowBrightness: 1.35
+};
 
 type BorderHelperRecord = {
   line: LineSegments2;
@@ -209,11 +218,23 @@ export class EffectsController {
   private readonly originalVisibility = new Map<string, boolean>();
   // 按“颜色|亮度”缓存辉光材质，避免每帧为 bloom pass 分配新材质。
   private readonly glowMaterials = new Map<string, THREE.MeshBasicMaterial>();
+  /** 当前多选对象 uuid（仅用于临时视觉高亮，不写入 userData） */
+  private selectedObjectUuids = new Set<string>();
+  /** 是否启用“临时选中高亮”（用于 Shift 多选后的持续 bloom） */
+  private selectionHighlightEnabled = false;
 
   constructor(
     private readonly scene: THREE.Scene,
     private readonly camera: THREE.Camera
   ) {}
+
+  setSelectedObjects(objects: THREE.Object3D[]) {
+    this.selectedObjectUuids = new Set(objects.map((obj) => obj.uuid));
+  }
+
+  setSelectionHighlightEnabled(enabled: boolean) {
+    this.selectionHighlightEnabled = enabled;
+  }
 
   /**
    * 与 renderer 建立后处理链。
@@ -351,6 +372,29 @@ export class EffectsController {
         glowBrightnessSum += effects.glowBrightness;
       }
     });
+
+    // 多选态：临时给选中对象（及其子 mesh）叠加统一 bloom 高亮，不污染业务配置。
+    if (this.selectionHighlightEnabled && this.selectedObjectUuids.size > 0) {
+      this.scene.traverse((obj) => {
+        if (!isEffectTargetMesh(obj)) return;
+        let cur: THREE.Object3D | null = obj;
+        let underSelected = false;
+        while (cur) {
+          if (this.selectedObjectUuids.has(cur.uuid)) {
+            underSelected = true;
+            break;
+          }
+          cur = cur.parent;
+        }
+        if (!underSelected) return;
+        if (!glowMap.has(obj.uuid)) {
+          glowMap.set(obj.uuid, MULTI_SELECT_GLOW);
+          glowCount += 1;
+          glowRangeSum += MULTI_SELECT_GLOW.glowRange;
+          glowBrightnessSum += MULTI_SELECT_GLOW.glowBrightness;
+        }
+      });
+    }
 
     // 如果后处理链还没绑好，说明 renderer 可能还在初始化/重建过程中，直接回退普通渲染。
     if (!this.bloomComposer || !this.finalComposer || !this.bloomPass || !this.mixPass || !this.glowSourceTarget) {

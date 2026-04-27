@@ -137,6 +137,8 @@ export interface AppMessages {
       copyWithShortcut: string;
       pasteWithShortcut: string;
       deleteWithShortcut: string;
+      groupWithShortcut: string;
+      ungroupWithShortcut: string;
       clear: string;
       reset: string;
     };
@@ -598,6 +600,8 @@ export const appMessages: Record<Locale, AppMessages> = {
         copyWithShortcut: '复制（Ctrl+C / Command+C）',
         pasteWithShortcut: '粘贴（Ctrl+V / Command+V）',
         deleteWithShortcut: '删除（Delete）',
+        groupWithShortcut: '组合（Ctrl+D / Command+D）',
+        ungroupWithShortcut: '取消组合（Ctrl+F / Command+F）',
         clear: '清空',
         reset: '重置'
       },
@@ -1051,6 +1055,8 @@ export const appMessages: Record<Locale, AppMessages> = {
         copyWithShortcut: 'Copy (Ctrl+C / Command+C)',
         pasteWithShortcut: 'Paste (Ctrl+V / Command+V)',
         deleteWithShortcut: 'Delete (Delete)',
+        groupWithShortcut: 'Group (Ctrl+D / Command+D)',
+        ungroupWithShortcut: 'Ungroup (Ctrl+F / Command+F)',
         clear: 'Clear',
         reset: 'Reset'
       },
