@@ -1,4 +1,5 @@
 import type { AppMessages } from '../../../../i18n/messages';
+import { ColorPicker } from '../../../../components/ColorPicker';
 
 /** 属性设置面板使用的 i18n 文案类型 */
 type PropertiesLabels = AppMessages['designPage']['inspector']['propertiesSettings'];
@@ -49,6 +50,30 @@ type OpacityState = {
 type RenderOrderState = {
   renderOrder: number;
   canRenderOrder: boolean;
+};
+
+type LightColorState = {
+  color: string;
+  canColor: boolean;
+};
+
+type LightIntensityState = {
+  intensity: number;
+  canIntensity: boolean;
+};
+
+type DirectionalLightShadowState = {
+  intensity: number;
+  bias: number;
+  normalBias: number;
+  radius: number;
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  near: number;
+  far: number;
+  canEdit: boolean;
 };
 
 /** 当前选中对象的基础信息 */
@@ -104,6 +129,54 @@ function AxisNumberInput({
   );
 }
 
+function LabeledNumberInput({
+  label,
+  value,
+  disabled,
+  step,
+  min,
+  max,
+  onPreviewChange,
+  onCommit
+}: {
+  label: string;
+  value: number;
+  disabled: boolean;
+  step?: number;
+  min?: number;
+  max?: number;
+  onPreviewChange: (next: number) => void;
+  onCommit: (next: number) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <label className="block text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{label}</label>
+      <input
+        type="number"
+        value={value}
+        disabled={disabled}
+        step={step ?? 0.01}
+        min={min}
+        max={max}
+        onChange={(e) => {
+          const next = Number(e.target.value);
+          if (!Number.isFinite(next)) return;
+          onPreviewChange(next);
+        }}
+        onBlur={(e) => {
+          const next = Number((e.target as HTMLInputElement).value);
+          if (!Number.isFinite(next)) return;
+          onCommit(next);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+        }}
+        className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors disabled:opacity-60 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+      />
+    </div>
+  );
+}
+
 /**
  * 基础属性设置面板：类型、uuid、名称、变换、可见性、阴影、透明度等通用属性。
  */
@@ -115,6 +188,9 @@ export function BaseSetting({
   visibilityPickFreeze,
   opacityState,
   renderOrderState,
+  lightColorState,
+  lightIntensityState,
+  directionalLightShadowState,
   onNamePreviewChange,
   onNameCommit,
   copyUuid,
@@ -133,7 +209,13 @@ export function BaseSetting({
   commitRenderOrder,
   setCastShadow,
   setReceiveShadow,
-  setFrustumCulled
+  setFrustumCulled,
+  previewLightColor,
+  commitLightColor,
+  previewLightIntensity,
+  commitLightIntensity,
+  previewDirectionalShadowNumber,
+  commitDirectionalShadowNumber
 }: {
   labels: PropertiesLabels;
   selectedInfo: SelectedObjectInfo;
@@ -142,6 +224,9 @@ export function BaseSetting({
   visibilityPickFreeze: VisibilityPickFreezeState | null;
   opacityState: OpacityState | null;
   renderOrderState: RenderOrderState | null;
+  lightColorState: LightColorState | null;
+  lightIntensityState: LightIntensityState | null;
+  directionalLightShadowState: DirectionalLightShadowState | null;
   onNamePreviewChange: (nextName: string) => void;
   onNameCommit: (nextName: string) => void;
   copyUuid: () => void | Promise<void>;
@@ -161,8 +246,57 @@ export function BaseSetting({
   setCastShadow: (nextCastShadow: boolean) => void;
   setReceiveShadow: (nextReceiveShadow: boolean) => void;
   setFrustumCulled: (nextFrustumCulled: boolean) => void;
+  previewLightColor: (nextColor: string) => void;
+  commitLightColor: (nextColor: string) => void;
+  previewLightIntensity: (nextIntensity: number) => void;
+  commitLightIntensity: (nextIntensity: number) => void;
+  previewDirectionalShadowNumber: (
+    path:
+      | 'shadow.intensity'
+      | 'shadow.bias'
+      | 'shadow.normalBias'
+      | 'shadow.radius'
+      | 'shadow.camera.left'
+      | 'shadow.camera.right'
+      | 'shadow.camera.top'
+      | 'shadow.camera.bottom'
+      | 'shadow.camera.near'
+      | 'shadow.camera.far',
+    nextValue: number
+  ) => void;
+  commitDirectionalShadowNumber: (
+    path:
+      | 'shadow.intensity'
+      | 'shadow.bias'
+      | 'shadow.normalBias'
+      | 'shadow.radius'
+      | 'shadow.camera.left'
+      | 'shadow.camera.right'
+      | 'shadow.camera.top'
+      | 'shadow.camera.bottom'
+      | 'shadow.camera.near'
+      | 'shadow.camera.far',
+    nextValue: number
+  ) => void;
 }) {
   const isDisabled = !selectedInfo;
+  const canShowShadow =
+    Boolean(shadow?.canCastShadow) || Boolean(shadow?.canReceiveShadow) || Boolean(shadow?.canFrustumCulled);
+  const canShowPickable = Boolean(visibilityPickFreeze?.canPickable);
+  const canShowFreeze = Boolean(visibilityPickFreeze?.canFreeze);
+  const canShowOpacity = Boolean(opacityState?.canOpacity);
+  const canShowLightColor = Boolean(lightColorState?.canColor);
+  const canShowLightIntensity = Boolean(lightIntensityState?.canIntensity);
+  const canShowDirectionalLightShadow = Boolean(shadow?.castShadow) && Boolean(directionalLightShadowState?.canEdit);
+  const isLightObject = Boolean(selectedInfo?.type?.endsWith('Light'));
+  const lightColorLabel = ((labels as any).colorLabel as string | undefined) ?? 'Color';
+  const shadowCameraRangeTitleLabel = ((labels as any).shadowCameraRangeTitleLabel as string | undefined) ?? 'Shadow Camera Range';
+  const shadowCameraLeftLabel = ((labels as any).shadowCameraLeftLabel as string | undefined) ?? 'Left';
+  const shadowCameraRightLabel = ((labels as any).shadowCameraRightLabel as string | undefined) ?? 'Right';
+  const shadowCameraTopLabel = ((labels as any).shadowCameraTopLabel as string | undefined) ?? 'Top';
+  const shadowCameraBottomLabel = ((labels as any).shadowCameraBottomLabel as string | undefined) ?? 'Bottom';
+  const shadowCameraNearLabel = ((labels as any).shadowCameraNearLabel as string | undefined) ?? 'Near';
+  const shadowCameraFarLabel = ((labels as any).shadowCameraFarLabel as string | undefined) ?? 'Far';
 
   return (
     <div className="space-y-3">
@@ -303,52 +437,187 @@ export function BaseSetting({
         </div>
       </div>
 
+      {canShowLightColor ? (
+        <div className="space-y-1">
+          <label className="block text-[11px] font-semibold tracking-wide text-[var(--text-muted)]">{lightColorLabel}</label>
+          <ColorPicker
+            value={lightColorState?.color ?? '#ffffff'}
+            onChange={previewLightColor}
+            onCommit={commitLightColor}
+            disabled={isDisabled}
+            ariaLabel={lightColorLabel}
+            showValue={true}
+          />
+        </div>
+      ) : null}
+
+      {canShowLightIntensity ? (
+        <LabeledNumberInput
+          label={labels.lightIntensityLabel}
+          value={lightIntensityState?.intensity ?? 1}
+          disabled={isDisabled}
+          step={0.1}
+          onPreviewChange={previewLightIntensity}
+          onCommit={commitLightIntensity}
+        />
+      ) : null}
+
       {/* Shadow */}
-      <div className="space-y-1.5">
-        <div className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.shadowTitleLabel}</div>
+      {canShowShadow ? (
+        <div className="space-y-1.5">
+          <div className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.shadowTitleLabel}</div>
 
-        {/* 产生 / 接受：独占两行（框内） */}
-        <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
-          <label className="flex cursor-pointer items-center justify-between gap-2">
-            <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.castShadowLabel}</span>
-            <input
-              type="checkbox"
-              checked={shadow?.castShadow ?? false}
-              disabled={isDisabled || !shadow?.canCastShadow}
-              onChange={(e) => setCastShadow(e.target.checked)}
-              className="h-4 w-4"
-            />
-          </label>
-          <label className="flex cursor-pointer items-center justify-between gap-2">
-            <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.receiveShadowLabel}</span>
-            <input
-              type="checkbox"
-              checked={shadow?.receiveShadow ?? false}
-              disabled={isDisabled || !shadow?.canReceiveShadow}
-              onChange={(e) => setReceiveShadow(e.target.checked)}
-              className="h-4 w-4"
-            />
-          </label>
-        </div>
+          {/* 产生 / 接受：独占两行（框内） */}
+          {shadow?.canCastShadow || shadow?.canReceiveShadow ? (
+            <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
+              {shadow?.canCastShadow ? (
+                <label className="flex cursor-pointer items-center justify-between gap-2">
+                  <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.castShadowLabel}</span>
+                  <input
+                    type="checkbox"
+                    checked={shadow?.castShadow ?? false}
+                    disabled={isDisabled}
+                    onChange={(e) => setCastShadow(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                </label>
+              ) : null}
+              {shadow?.canReceiveShadow && !isLightObject ? (
+                <label className="flex cursor-pointer items-center justify-between gap-2">
+                  <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.receiveShadowLabel}</span>
+                  <input
+                    type="checkbox"
+                    checked={shadow?.receiveShadow ?? false}
+                    disabled={isDisabled}
+                    onChange={(e) => setReceiveShadow(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                </label>
+              ) : null}
+            </div>
+          ) : null}
 
-        <div className="space-y-1 pt-1">
-          <div className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.frustumCulledLabel}</div>
-          <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2">
-            <label className="flex cursor-pointer items-center justify-between gap-3">
-              <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">
-                {labels.yesLabel}/{labels.noLabel}
-              </span>
-              <input
-                type="checkbox"
-                checked={shadow?.frustumCulled ?? false}
-                disabled={isDisabled || !shadow?.canFrustumCulled}
-                onChange={(e) => setFrustumCulled(e.target.checked)}
-                className="h-4 w-4"
-              />
-            </label>
-          </div>
+          {canShowDirectionalLightShadow ? (
+            <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <LabeledNumberInput
+                  label={labels.shadowIntensityLabel}
+                  value={directionalLightShadowState?.intensity ?? 1}
+                  disabled={isDisabled}
+                  step={0.05}
+                  min={0}
+                  max={1}
+                  onPreviewChange={(v) => previewDirectionalShadowNumber('shadow.intensity', v)}
+                  onCommit={(v) => commitDirectionalShadowNumber('shadow.intensity', v)}
+                />
+                <LabeledNumberInput
+                  label={labels.shadowRadiusLabel}
+                  value={directionalLightShadowState?.radius ?? 1}
+                  disabled={isDisabled}
+                  step={0.1}
+                  min={0}
+                  onPreviewChange={(v) => previewDirectionalShadowNumber('shadow.radius', v)}
+                  onCommit={(v) => commitDirectionalShadowNumber('shadow.radius', v)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <LabeledNumberInput
+                  label={labels.shadowBiasLabel}
+                  value={directionalLightShadowState?.bias ?? 0}
+                  disabled={isDisabled}
+                  step={0.0001}
+                  onPreviewChange={(v) => previewDirectionalShadowNumber('shadow.bias', v)}
+                  onCommit={(v) => commitDirectionalShadowNumber('shadow.bias', v)}
+                />
+                <LabeledNumberInput
+                  label={labels.shadowNormalBiasLabel}
+                  value={directionalLightShadowState?.normalBias ?? 0}
+                  disabled={isDisabled}
+                  step={0.001}
+                  min={0}
+                  onPreviewChange={(v) => previewDirectionalShadowNumber('shadow.normalBias', v)}
+                  onCommit={(v) => commitDirectionalShadowNumber('shadow.normalBias', v)}
+                />
+              </div>
+              <div className="border-t border-[var(--border-subtle)] pt-2">
+                <div className="mb-2 text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">
+                  {shadowCameraRangeTitleLabel}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <LabeledNumberInput
+                    label={shadowCameraLeftLabel}
+                    value={directionalLightShadowState?.left ?? -5}
+                    disabled={isDisabled}
+                    step={0.1}
+                    onPreviewChange={(v) => previewDirectionalShadowNumber('shadow.camera.left', v)}
+                    onCommit={(v) => commitDirectionalShadowNumber('shadow.camera.left', v)}
+                  />
+                  <LabeledNumberInput
+                    label={shadowCameraRightLabel}
+                    value={directionalLightShadowState?.right ?? 5}
+                    disabled={isDisabled}
+                    step={0.1}
+                    onPreviewChange={(v) => previewDirectionalShadowNumber('shadow.camera.right', v)}
+                    onCommit={(v) => commitDirectionalShadowNumber('shadow.camera.right', v)}
+                  />
+                  <LabeledNumberInput
+                    label={shadowCameraTopLabel}
+                    value={directionalLightShadowState?.top ?? 5}
+                    disabled={isDisabled}
+                    step={0.1}
+                    onPreviewChange={(v) => previewDirectionalShadowNumber('shadow.camera.top', v)}
+                    onCommit={(v) => commitDirectionalShadowNumber('shadow.camera.top', v)}
+                  />
+                  <LabeledNumberInput
+                    label={shadowCameraBottomLabel}
+                    value={directionalLightShadowState?.bottom ?? -5}
+                    disabled={isDisabled}
+                    step={0.1}
+                    onPreviewChange={(v) => previewDirectionalShadowNumber('shadow.camera.bottom', v)}
+                    onCommit={(v) => commitDirectionalShadowNumber('shadow.camera.bottom', v)}
+                  />
+                  <LabeledNumberInput
+                    label={shadowCameraNearLabel}
+                    value={directionalLightShadowState?.near ?? 0.5}
+                    disabled={isDisabled}
+                    step={0.1}
+                    onPreviewChange={(v) => previewDirectionalShadowNumber('shadow.camera.near', v)}
+                    onCommit={(v) => commitDirectionalShadowNumber('shadow.camera.near', v)}
+                  />
+                  <LabeledNumberInput
+                    label={shadowCameraFarLabel}
+                    value={directionalLightShadowState?.far ?? 500}
+                    disabled={isDisabled}
+                    step={0.1}
+                    onPreviewChange={(v) => previewDirectionalShadowNumber('shadow.camera.far', v)}
+                    onCommit={(v) => commitDirectionalShadowNumber('shadow.camera.far', v)}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {shadow?.canFrustumCulled ? (
+            <div className="space-y-1 pt-1">
+              <div className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.frustumCulledLabel}</div>
+              <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2">
+                <label className="flex cursor-pointer items-center justify-between gap-3">
+                  <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">
+                    {labels.yesLabel}/{labels.noLabel}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={shadow?.frustumCulled ?? false}
+                    disabled={isDisabled}
+                    onChange={(e) => setFrustumCulled(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                </label>
+              </div>
+            </div>
+          ) : null}
         </div>
-      </div>
+      ) : null}
 
       {/* Visibility / Pickable / Freeze */}
       <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
@@ -364,50 +633,56 @@ export function BaseSetting({
             />
           </label>
 
-          <label className="flex cursor-pointer items-center justify-between gap-2">
-            <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.pickableLabel}</span>
-            <input
-              type="checkbox"
-              checked={visibilityPickFreeze?.pickable ?? false}
-              disabled={isDisabled || !visibilityPickFreeze?.canPickable}
-              onChange={(e) => setPickable(e.target.checked)}
-              className="h-4 w-4"
-            />
-          </label>
+          {canShowPickable ? (
+            <label className="flex cursor-pointer items-center justify-between gap-2">
+              <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.pickableLabel}</span>
+              <input
+                type="checkbox"
+                checked={visibilityPickFreeze?.pickable ?? false}
+                disabled={isDisabled}
+                onChange={(e) => setPickable(e.target.checked)}
+                className="h-4 w-4"
+              />
+            </label>
+          ) : null}
 
-          <label className="flex cursor-pointer items-center justify-between gap-2">
-            <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.freezeLabel}</span>
-            <input
-              type="checkbox"
-              checked={visibilityPickFreeze?.frozen ?? false}
-              disabled={isDisabled || !visibilityPickFreeze?.canFreeze}
-              onChange={(e) => setFrozen(e.target.checked)}
-              className="h-4 w-4"
-            />
-          </label>
+          {canShowFreeze ? (
+            <label className="flex cursor-pointer items-center justify-between gap-2">
+              <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.freezeLabel}</span>
+              <input
+                type="checkbox"
+                checked={visibilityPickFreeze?.frozen ?? false}
+                disabled={isDisabled}
+                onChange={(e) => setFrozen(e.target.checked)}
+                className="h-4 w-4"
+              />
+            </label>
+          ) : null}
         </div>
       </div>
 
       {/* Opacity */}
-      <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.opacityLabel}</span>
-          <div className="text-[10px] font-semibold tabular-nums text-[var(--text-secondary)]">
-            {(opacityState?.opacity ?? 1).toFixed(2)}
+      {canShowOpacity ? (
+        <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.opacityLabel}</span>
+            <div className="text-[10px] font-semibold tabular-nums text-[var(--text-secondary)]">
+              {(opacityState?.opacity ?? 1).toFixed(2)}
+            </div>
           </div>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={opacityState?.opacity ?? 1}
+            disabled={isDisabled}
+            onChange={(e) => previewOpacity(Number(e.target.value))}
+            onPointerUp={(e) => commitOpacity(Number((e.target as HTMLInputElement).value))}
+            className="w-full disabled:opacity-50"
+          />
         </div>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={opacityState?.opacity ?? 1}
-          disabled={isDisabled || !opacityState?.canOpacity}
-          onChange={(e) => previewOpacity(Number(e.target.value))}
-          onPointerUp={(e) => commitOpacity(Number((e.target as HTMLInputElement).value))}
-          className="w-full disabled:opacity-50"
-        />
-      </div>
+      ) : null}
 
       {/* Render Order */}
       <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">

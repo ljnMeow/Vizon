@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Accordion } from '../../../../components/Accordion';
+import { Color } from 'three';
 import { BaseSetting } from './BaseSetting';
 import { ObjectAttributes } from './ObjectAttributes';
 import { message } from '../../../../components/GlobalMessage';
@@ -55,6 +56,30 @@ type OpacityState = {
 type RenderOrderState = {
   renderOrder: number;
   canRenderOrder: boolean;
+};
+
+type LightColorState = {
+  color: string;
+  canColor: boolean;
+};
+
+type LightIntensityState = {
+  intensity: number;
+  canIntensity: boolean;
+};
+
+type DirectionalLightShadowState = {
+  intensity: number;
+  bias: number;
+  normalBias: number;
+  radius: number;
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  near: number;
+  far: number;
+  canEdit: boolean;
 };
 
 type SelectedObjectInfo = {
@@ -246,6 +271,43 @@ function readSelectedRenderOrder(obj: any): RenderOrderState | null {
   return { renderOrder: v, canRenderOrder: true };
 }
 
+function readSelectedLightColor(obj: any): LightColorState | null {
+  if (!obj) return null;
+  const isLight = Boolean((obj as any)?.isLight);
+  const color = (obj as any)?.color;
+  const canColor = isLight && color && typeof color.getHexString === 'function';
+  if (!canColor) return null;
+  return { color: `#${String(color.getHexString()).toLowerCase()}`, canColor: true };
+}
+
+function readSelectedLightIntensity(obj: any): LightIntensityState | null {
+  if (!obj) return null;
+  const isLight = Boolean((obj as any)?.isLight);
+  const intensity = (obj as any)?.intensity;
+  const canIntensity = isLight && typeof intensity === 'number';
+  if (!canIntensity) return null;
+  return { intensity: Number(intensity), canIntensity: true };
+}
+
+function readSelectedDirectionalLightShadow(obj: any): DirectionalLightShadowState | null {
+  if (!obj || !(obj as any)?.isDirectionalLight) return null;
+  const shadow = (obj as any)?.shadow;
+  if (!shadow) return null;
+  return {
+    intensity: typeof shadow.intensity === 'number' ? Number(shadow.intensity) : 1,
+    bias: typeof shadow.bias === 'number' ? Number(shadow.bias) : 0,
+    normalBias: typeof shadow.normalBias === 'number' ? Number(shadow.normalBias) : 0,
+    radius: typeof shadow.radius === 'number' ? Number(shadow.radius) : 1,
+    left: typeof shadow.camera?.left === 'number' ? Number(shadow.camera.left) : -5,
+    right: typeof shadow.camera?.right === 'number' ? Number(shadow.camera.right) : 5,
+    top: typeof shadow.camera?.top === 'number' ? Number(shadow.camera.top) : 5,
+    bottom: typeof shadow.camera?.bottom === 'number' ? Number(shadow.camera.bottom) : -5,
+    near: typeof shadow.camera?.near === 'number' ? Number(shadow.camera.near) : 0.5,
+    far: typeof shadow.camera?.far === 'number' ? Number(shadow.camera.far) : 500,
+    canEdit: true
+  };
+}
+
 export function PropertiesSettings() {
   const { locale } = useLocale();
   const t = appMessages[locale].designPage.inspector;
@@ -257,6 +319,10 @@ export function PropertiesSettings() {
   const [visibilityPickFreeze, setVisibilityPickFreeze] = useState<VisibilityPickFreezeState | null>(null);
   const [opacityState, setOpacityState] = useState<OpacityState | null>(null);
   const [renderOrderState, setRenderOrderState] = useState<RenderOrderState | null>(null);
+  const [lightColorState, setLightColorState] = useState<LightColorState | null>(null);
+  const [lightIntensityState, setLightIntensityState] = useState<LightIntensityState | null>(null);
+  const [directionalLightShadowState, setDirectionalLightShadowState] = useState<DirectionalLightShadowState | null>(null);
+  const lightColorHistoryBaseRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!editor) return;
@@ -268,6 +334,11 @@ export function PropertiesSettings() {
     setVisibilityPickFreeze(selected ? readSelectedVisibilityPickFreeze(selected) : null);
     setOpacityState(selected ? readSelectedOpacity(selected) : null);
     setRenderOrderState(selected ? readSelectedRenderOrder(selected) : null);
+    const selectedLightColor = selected ? readSelectedLightColor(selected) : null;
+    setLightColorState(selectedLightColor);
+    setLightIntensityState(selected ? readSelectedLightIntensity(selected) : null);
+    setDirectionalLightShadowState(selected ? readSelectedDirectionalLightShadow(selected) : null);
+    lightColorHistoryBaseRef.current = selectedLightColor?.color?.toLowerCase() ?? null;
 
     const off = editor.on('select', ({ object }) => {
       if (!object) {
@@ -277,6 +348,10 @@ export function PropertiesSettings() {
         setVisibilityPickFreeze(null);
         setOpacityState(null);
         setRenderOrderState(null);
+        setLightColorState(null);
+        setLightIntensityState(null);
+        setDirectionalLightShadowState(null);
+        lightColorHistoryBaseRef.current = null;
         return;
       }
       setSelectedInfo({
@@ -289,6 +364,11 @@ export function PropertiesSettings() {
       setVisibilityPickFreeze(readSelectedVisibilityPickFreeze(object));
       setOpacityState(readSelectedOpacity(object));
       setRenderOrderState(readSelectedRenderOrder(object));
+      const nextLightColor = readSelectedLightColor(object);
+      setLightColorState(nextLightColor);
+      setLightIntensityState(readSelectedLightIntensity(object));
+      setDirectionalLightShadowState(readSelectedDirectionalLightShadow(object));
+      lightColorHistoryBaseRef.current = nextLightColor?.color?.toLowerCase() ?? null;
     });
 
     return off;
@@ -310,6 +390,9 @@ export function PropertiesSettings() {
       // 这些属性不涉及昂贵材质遍历，跟随 dragging/changing 实时刷新没问题
       setVisibilityPickFreeze(readSelectedVisibilityPickFreeze(obj));
       setRenderOrderState(readSelectedRenderOrder(obj));
+      setLightColorState(readSelectedLightColor(obj));
+      setLightIntensityState(readSelectedLightIntensity(obj));
+      setDirectionalLightShadowState(readSelectedDirectionalLightShadow(obj));
     };
 
     // 立即刷新一次，确保选中刚切换时是最新值
@@ -452,12 +535,10 @@ export function PropertiesSettings() {
       if (next) {
         if (obj.userData) {
           delete obj.userData[VIZON_USER_DATA_KEYS.COMMON.NON_PICKABLE];
-          delete obj.userData[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE];
         }
       } else {
         obj.userData = obj.userData ?? {};
         obj.userData[VIZON_USER_DATA_KEYS.COMMON.NON_PICKABLE] = true;
-        delete obj.userData[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE];
       }
       setVisibilityPickFreeze(readSelectedVisibilityPickFreeze(obj));
       editor.render();
@@ -667,6 +748,154 @@ export function PropertiesSettings() {
     setShadow((prev) => (prev ? { ...prev, frustumCulled: nextFrustumCulled, canFrustumCulled: true } : prev));
   };
 
+  const previewLightColor = (nextColor: string) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isLight || !obj?.color || typeof obj.color.getHexString !== 'function') return;
+    const normalizedNext = nextColor.startsWith('#') ? nextColor : `#${nextColor}`;
+    obj.color = obj.color ?? new Color();
+    obj.color.set(normalizedNext);
+    setLightColorState({ color: normalizedNext.toLowerCase(), canColor: true });
+    editor.render();
+  };
+
+  const commitLightColor = (nextColor: string) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isLight || !obj?.color || typeof obj.color.getHexString !== 'function') return;
+    const normalizedNext = (nextColor.startsWith('#') ? nextColor : `#${nextColor}`).toLowerCase();
+    const beforeColor = lightColorHistoryBaseRef.current?.toLowerCase();
+    if (!beforeColor || beforeColor === normalizedNext) return;
+    void editor.executeHistoryOperation({
+      name: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.colorLabel} = ${normalizedNext}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.colorLabel} = ${normalizedNext}`
+      ),
+      do: () => {
+        obj.color = obj.color ?? new Color();
+        obj.color.set(normalizedNext);
+        setLightColorState({ color: normalizedNext.toLowerCase(), canColor: true });
+        lightColorHistoryBaseRef.current = normalizedNext.toLowerCase();
+        editor.render();
+      },
+      undo: () => {
+        obj.color = obj.color ?? new Color();
+        obj.color.set(beforeColor);
+        setLightColorState({ color: beforeColor, canColor: true });
+        lightColorHistoryBaseRef.current = beforeColor;
+        editor.render();
+      }
+    });
+  };
+
+  const previewLightIntensity = (nextIntensity: number) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isLight || typeof obj.intensity !== 'number') return;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'intensity', nextIntensity, { recordHistory: false });
+    setLightIntensityState({ intensity: nextIntensity, canIntensity: true });
+  };
+
+  const commitLightIntensity = (nextIntensity: number) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isLight || typeof obj.intensity !== 'number') return;
+    const displayValue = Number(nextIntensity.toFixed(4));
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'intensity', nextIntensity, {
+      recordHistory: true,
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.lightIntensityLabel} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.lightIntensityLabel} = ${displayValue}`
+      )
+    });
+    setLightIntensityState({ intensity: nextIntensity, canIntensity: true });
+  };
+
+  const previewDirectionalShadowNumber = (
+    path:
+      | 'shadow.intensity'
+      | 'shadow.bias'
+      | 'shadow.normalBias'
+      | 'shadow.radius'
+      | 'shadow.camera.left'
+      | 'shadow.camera.right'
+      | 'shadow.camera.top'
+      | 'shadow.camera.bottom'
+      | 'shadow.camera.near'
+      | 'shadow.camera.far',
+    nextValue: number
+  ) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isDirectionalLight || !obj.shadow) return;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, nextValue, { recordHistory: false });
+    setDirectionalLightShadowState((prev) => {
+      if (!prev) return prev;
+      if (path === 'shadow.intensity') return { ...prev, intensity: nextValue };
+      if (path === 'shadow.bias') return { ...prev, bias: nextValue };
+      if (path === 'shadow.normalBias') return { ...prev, normalBias: nextValue };
+      if (path === 'shadow.radius') return { ...prev, radius: nextValue };
+      if (path === 'shadow.camera.left') return { ...prev, left: nextValue };
+      if (path === 'shadow.camera.right') return { ...prev, right: nextValue };
+      if (path === 'shadow.camera.top') return { ...prev, top: nextValue };
+      if (path === 'shadow.camera.bottom') return { ...prev, bottom: nextValue };
+      if (path === 'shadow.camera.near') return { ...prev, near: nextValue };
+      return { ...prev, far: nextValue };
+    });
+  };
+
+  const commitDirectionalShadowNumber = (
+    path:
+      | 'shadow.intensity'
+      | 'shadow.bias'
+      | 'shadow.normalBias'
+      | 'shadow.radius'
+      | 'shadow.camera.left'
+      | 'shadow.camera.right'
+      | 'shadow.camera.top'
+      | 'shadow.camera.bottom'
+      | 'shadow.camera.near'
+      | 'shadow.camera.far',
+    nextValue: number
+  ) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isDirectionalLight || !obj.shadow) return;
+    const labelMap = {
+      'shadow.intensity': { zh: labelsZh.shadowIntensityLabel, en: labelsEn.shadowIntensityLabel },
+      'shadow.bias': { zh: labelsZh.shadowBiasLabel, en: labelsEn.shadowBiasLabel },
+      'shadow.normalBias': { zh: labelsZh.shadowNormalBiasLabel, en: labelsEn.shadowNormalBiasLabel },
+      'shadow.radius': { zh: labelsZh.shadowRadiusLabel, en: labelsEn.shadowRadiusLabel },
+      'shadow.camera.left': { zh: labelsZh.shadowCameraLeftLabel, en: labelsEn.shadowCameraLeftLabel },
+      'shadow.camera.right': { zh: labelsZh.shadowCameraRightLabel, en: labelsEn.shadowCameraRightLabel },
+      'shadow.camera.top': { zh: labelsZh.shadowCameraTopLabel, en: labelsEn.shadowCameraTopLabel },
+      'shadow.camera.bottom': { zh: labelsZh.shadowCameraBottomLabel, en: labelsEn.shadowCameraBottomLabel },
+      'shadow.camera.near': { zh: labelsZh.shadowCameraNearLabel, en: labelsEn.shadowCameraNearLabel },
+      'shadow.camera.far': { zh: labelsZh.shadowCameraFarLabel, en: labelsEn.shadowCameraFarLabel }
+    } as const;
+    const displayValue = Number(nextValue.toFixed(6));
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, nextValue, {
+      recordHistory: true,
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelMap[path].zh} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelMap[path].en} = ${displayValue}`
+      )
+    });
+    setDirectionalLightShadowState((prev) => {
+      if (!prev) return prev;
+      if (path === 'shadow.intensity') return { ...prev, intensity: nextValue };
+      if (path === 'shadow.bias') return { ...prev, bias: nextValue };
+      if (path === 'shadow.normalBias') return { ...prev, normalBias: nextValue };
+      if (path === 'shadow.radius') return { ...prev, radius: nextValue };
+      if (path === 'shadow.camera.left') return { ...prev, left: nextValue };
+      if (path === 'shadow.camera.right') return { ...prev, right: nextValue };
+      if (path === 'shadow.camera.top') return { ...prev, top: nextValue };
+      if (path === 'shadow.camera.bottom') return { ...prev, bottom: nextValue };
+      if (path === 'shadow.camera.near') return { ...prev, near: nextValue };
+      return { ...prev, far: nextValue };
+    });
+  };
+
   return (
     <Accordion<'base' | 'object'>
       allowMultiple={true}
@@ -684,6 +913,9 @@ export function PropertiesSettings() {
               visibilityPickFreeze={visibilityPickFreeze}
               opacityState={opacityState}
               renderOrderState={renderOrderState}
+              lightColorState={lightColorState}
+              lightIntensityState={lightIntensityState}
+              directionalLightShadowState={directionalLightShadowState}
               onNamePreviewChange={onNamePreviewChange}
               onNameCommit={onNameCommit}
               copyUuid={copyUuid}
@@ -703,6 +935,12 @@ export function PropertiesSettings() {
               setCastShadow={setCastShadow}
               setReceiveShadow={setReceiveShadow}
               setFrustumCulled={setFrustumCulled}
+              previewLightColor={previewLightColor}
+              commitLightColor={commitLightColor}
+              previewLightIntensity={previewLightIntensity}
+              commitLightIntensity={commitLightIntensity}
+              previewDirectionalShadowNumber={previewDirectionalShadowNumber}
+              commitDirectionalShadowNumber={commitDirectionalShadowNumber}
             />
           )
         },

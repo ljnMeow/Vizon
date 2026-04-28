@@ -304,6 +304,18 @@ export interface AppMessages {
         scaleLabel: string;
         castShadowLabel: string;
         receiveShadowLabel: string;
+        lightIntensityLabel: string;
+        shadowIntensityLabel: string;
+        shadowBiasLabel: string;
+        shadowNormalBiasLabel: string;
+        shadowRadiusLabel: string;
+        shadowCameraRangeTitleLabel: string;
+        shadowCameraLeftLabel: string;
+        shadowCameraRightLabel: string;
+        shadowCameraTopLabel: string;
+        shadowCameraBottomLabel: string;
+        shadowCameraNearLabel: string;
+        shadowCameraFarLabel: string;
         frustumCulledLabel: string;
         shadowTitleLabel: string;
         yesLabel: string;
@@ -311,6 +323,7 @@ export interface AppMessages {
         visibleLabel: string;
         pickableLabel: string;
         freezeLabel: string;
+        colorLabel: string;
         opacityLabel: string;
         renderOrderLabel: string;
         xLabel: string;
@@ -766,6 +779,18 @@ export const appMessages: Record<Locale, AppMessages> = {
           scaleLabel: '缩放',
           castShadowLabel: '产生阴影',
           receiveShadowLabel: '接受阴影',
+          lightIntensityLabel: '光照强度',
+          shadowIntensityLabel: '阴影强度',
+          shadowBiasLabel: '阴影偏移',
+          shadowNormalBiasLabel: '阴影法线偏移',
+          shadowRadiusLabel: '阴影半径',
+          shadowCameraRangeTitleLabel: '阴影视锥范围',
+          shadowCameraLeftLabel: '左边界',
+          shadowCameraRightLabel: '右边界',
+          shadowCameraTopLabel: '上边界',
+          shadowCameraBottomLabel: '下边界',
+          shadowCameraNearLabel: '近平面',
+          shadowCameraFarLabel: '远平面',
           frustumCulledLabel: '视锥体裁剪',
           shadowTitleLabel: '阴影',
           yesLabel: '是',
@@ -773,6 +798,7 @@ export const appMessages: Record<Locale, AppMessages> = {
           visibleLabel: '显示',
           pickableLabel: '可拾取',
           freezeLabel: '冻结',
+          colorLabel: '颜色',
           opacityLabel: '透明度',
           renderOrderLabel: '渲染层级',
           xLabel: 'X',
@@ -1221,6 +1247,18 @@ export const appMessages: Record<Locale, AppMessages> = {
           scaleLabel: 'Scale',
           castShadowLabel: 'Cast Shadow',
           receiveShadowLabel: 'Receive Shadow',
+          lightIntensityLabel: 'Light Intensity',
+          shadowIntensityLabel: 'Shadow Intensity',
+          shadowBiasLabel: 'Shadow Bias',
+          shadowNormalBiasLabel: 'Shadow Normal Bias',
+          shadowRadiusLabel: 'Shadow Radius',
+          shadowCameraRangeTitleLabel: 'Shadow Camera Range',
+          shadowCameraLeftLabel: 'Left',
+          shadowCameraRightLabel: 'Right',
+          shadowCameraTopLabel: 'Top',
+          shadowCameraBottomLabel: 'Bottom',
+          shadowCameraNearLabel: 'Near',
+          shadowCameraFarLabel: 'Far',
           frustumCulledLabel: 'Frustum Culling',
           shadowTitleLabel: 'Shadow',
           yesLabel: 'Yes',
@@ -1228,6 +1266,7 @@ export const appMessages: Record<Locale, AppMessages> = {
           visibleLabel: 'Visible',
           pickableLabel: 'Pickable',
           freezeLabel: 'Freeze',
+          colorLabel: 'Color',
           opacityLabel: 'Opacity',
           renderOrderLabel: 'Render Order',
           xLabel: 'X',

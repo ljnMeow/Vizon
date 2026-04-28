@@ -144,8 +144,8 @@ export function createDefaultModel(key: DefaultModelKey, opts?: CreateDefaultMod
   withDefaultUserData(root, key);
   root.traverse((child) => {
     if (child instanceof THREE.Mesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
+      child.castShadow = false;
+      child.receiveShadow = false;
     }
   });
   applyTransform(root, opts);

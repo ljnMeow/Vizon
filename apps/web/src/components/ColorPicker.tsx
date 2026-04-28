@@ -1,9 +1,13 @@
+import { useEffect, useRef } from 'react';
+
 /** 颜色拾取器属性。 */
 export type ColorPickerProps = {
   /** 当前颜色值（CSS color 字符串，如 `#ff0000`）。 */
   value: string;
   /** 颜色变化回调，参数为新的颜色值。 */
   onChange: (next: string) => void;
+  /** 颜色提交回调，通常用于只记录最终历史。 */
+  onCommit?: (next: string) => void;
   /** 是否禁用。 */
   disabled?: boolean;
   className?: string;
@@ -21,11 +25,22 @@ export type ColorPickerProps = {
 export function ColorPicker({
   value,
   onChange,
+  onCommit,
   disabled = false,
   className = '',
   ariaLabel,
   showValue = false
 }: ColorPickerProps) {
+  const latestValueRef = useRef(value);
+  useEffect(() => {
+    latestValueRef.current = value;
+  }, [value]);
+
+  const commitLatest = () => {
+    if (!onCommit) return;
+    onCommit(latestValueRef.current);
+  };
+
   return (
     <div
       className={[
@@ -50,7 +65,16 @@ export function ColorPicker({
       <input
         type="color"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          const next = e.target.value;
+          latestValueRef.current = next;
+          onChange(next);
+        }}
+        onBlur={commitLatest}
+        onPointerUp={commitLatest}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') commitLatest();
+        }}
         disabled={disabled}
         aria-label={ariaLabel}
         className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"

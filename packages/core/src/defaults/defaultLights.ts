@@ -111,31 +111,63 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
   const helperEnabled = opts?.helperEnabled ?? true; // 默认带 helper，便于编辑 aim
 
   if (key === 'ambientLight') {
-    const light = new THREE.AmbientLight(0xffffff, 0.6); // 环境光无方向、无阴影
+    const light = new THREE.AmbientLight(DEFAULT_LIGHT_HELPER_COLOR, 0.6); // 环境光无方向、无阴影
     applyCommon(light, key, opts);
     return light;
   }
 
   if (key === 'directionalLight') {
-    const light = new THREE.DirectionalLight(0xffffff, 1.0);
+    const light = new THREE.DirectionalLight(DEFAULT_LIGHT_HELPER_COLOR, 1.0);
     light.position.set(4, 6, 4); // 经典斜上方主光
     applyCommon(light, key, opts);
     light.target.position.copy(getTarget(opts)); // Directional 需 target 才有朝向语义
+    light.castShadow = false;
+    light.shadow.mapSize.set(2048, 2048);
+    light.shadow.camera.left = -10;
+    light.shadow.camera.right = 10;
+    light.shadow.camera.top = 10;
+    light.shadow.camera.bottom = -10;
+    light.shadow.camera.near = 0.1;
+    light.shadow.camera.far = 40;
+    light.shadow.intensity = 1;
+    light.shadow.bias = -0.0001;
+    light.shadow.normalBias = 0.02;
+    light.shadow.radius = 1.5;
     light.target.updateMatrixWorld();
     if (helperEnabled) {
-      const helper = new THREE.DirectionalLightHelper(light, 1.2, DEFAULT_LIGHT_HELPER_COLOR);
-      configureLightHelper(helper, light);
-      (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helper; // editor 取出并 scene.add
+      const helperGroup = new THREE.Group();
+      helperGroup.name = 'DirectionalLightHelpers';
+      const lightHelper = new THREE.DirectionalLightHelper(light, 1.2);
+      const shadowHelper = new THREE.CameraHelper(light.shadow.camera);
+      shadowHelper.visible = light.castShadow;
+      helperGroup.add(lightHelper);
+      helperGroup.add(shadowHelper);
+      (helperGroup as any).update = () => {
+        light.updateMatrixWorld(true);
+        light.target.updateMatrixWorld(true);
+        light.shadow.updateMatrices(light);
+        lightHelper.update();
+        light.shadow.camera.updateProjectionMatrix();
+        light.shadow.camera.updateMatrixWorld(true);
+        shadowHelper.visible = Boolean(light.castShadow);
+        shadowHelper.update();
+      };
+      configureLightHelper(helperGroup, light);
+      helperGroup.traverse((child) => {
+        if (child === helperGroup) return;
+        configureLightHelper(child, light);
+      });
+      (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helperGroup; // editor 取出并 scene.add
     }
     return light;
   }
 
   if (key === 'pointLight') {
-    const light = new THREE.PointLight(0xffffff, 1.0, 0, 2); // distance 0 表示无限衰减距离（three 语义）
+    const light = new THREE.PointLight(DEFAULT_LIGHT_HELPER_COLOR, 1.0, 0, 2); // distance 0 表示无限衰减距离（three 语义）
     light.position.set(0, 2, 0);
     applyCommon(light, key, opts);
     if (helperEnabled) {
-      const helper = new THREE.PointLightHelper(light, 0.45, DEFAULT_LIGHT_HELPER_COLOR);
+      const helper = new THREE.PointLightHelper(light, 0.45);
       configureLightHelper(helper, light);
       (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helper;
     }
@@ -144,13 +176,13 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
 
   if (key === 'spotLight') {
     // 锥角较窄、范围有限，避免 SpotLightHelper 几何巨大挡满视口
-    const light = new THREE.SpotLight(0xffffff, 1.2, 12, Math.PI / 10, 0.2, 1);
+    const light = new THREE.SpotLight(DEFAULT_LIGHT_HELPER_COLOR, 1.2, 12, Math.PI / 10, 0.2, 1);
     light.position.set(2, 4, 2);
     applyCommon(light, key, opts);
     light.target.position.copy(getTarget(opts));
     light.target.updateMatrixWorld();
     if (helperEnabled) {
-      const helper = new THREE.SpotLightHelper(light, DEFAULT_LIGHT_HELPER_COLOR);
+      const helper = new THREE.SpotLightHelper(light);
       configureLightHelper(helper, light);
       (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helper;
     }
@@ -158,11 +190,11 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
   }
 
   if (key === 'hemisphereLight') {
-    const light = new THREE.HemisphereLight(0xb1e1ff, 0x444422, 1.0); // 天光蓝 + 地面褐
+    const light = new THREE.HemisphereLight(DEFAULT_LIGHT_HELPER_COLOR, DEFAULT_LIGHT_HELPER_COLOR, 1.0);
     light.position.set(0, 3, 0);
     applyCommon(light, key, opts);
     if (helperEnabled) {
-      const helper = new THREE.HemisphereLightHelper(light, 0.9, DEFAULT_LIGHT_HELPER_COLOR);
+      const helper = new THREE.HemisphereLightHelper(light, 0.9);
       configureLightHelper(helper, light);
       (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helper;
     }
@@ -174,12 +206,12 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
     RectAreaLightUniformsLib.init(); // 注册 shader 所需 uniform
     rectAreaUniformsInited = true;
   }
-  const light = new THREE.RectAreaLight(0xffffff, 4.0, 2.5, 2.5); // 强度与宽高为经验默认值
+  const light = new THREE.RectAreaLight(DEFAULT_LIGHT_HELPER_COLOR, 4.0, 2.5, 2.5); // 强度与宽高为经验默认值
   light.position.set(2, 3, 2);
   applyCommon(light, key, opts);
   light.lookAt(getTarget(opts)); // 面光法线指向 target
   if (helperEnabled) {
-    const helper = new RectAreaLightHelper(light, DEFAULT_LIGHT_HELPER_COLOR);
+    const helper = new RectAreaLightHelper(light);
     configureLightHelper(helper, light);
     (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helper;
   }

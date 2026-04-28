@@ -231,7 +231,14 @@ export class InteractionController {
           if (obj === this.transform || this.isTransformChild(obj)) return false; // 不选 gizmo 子网格
 
           const pickTarget = this.findPickTarget(obj);
-          if (pickTarget) return isVisibleInHierarchy(pickTarget); // 代理目标也要整链可见
+          if (pickTarget) {
+            // 代理命中（如 CameraHelper/LightHelper）也必须遵守可见 + 可拾取过滤。
+            return (
+              isVisibleInHierarchy(pickTarget) &&
+              !isNonSelectableInHierarchy(pickTarget) &&
+              !isNonPickableInHierarchy(pickTarget)
+            );
+          }
 
           // 普通物体：非装饰/可见分支才允许鼠标拾取
           return !isNonSelectableInHierarchy(obj) && !isNonPickableInHierarchy(obj);

@@ -914,7 +914,9 @@ export class ThreeEditor {
       this.cameraHelpersDirty = false; // 本帧已消化
     }
     if (this.lightHelpersDirty || selectedIsLight) {
-      for (const helper of this.lightHelpers.values()) {
+      for (const [uuid, helper] of this.lightHelpers.entries()) {
+        const light = this.scene.getObjectByProperty('uuid', uuid) as any;
+        if (light?.isLight) this.syncLightHelperColor(light, helper);
         (helper as any).update?.(); // Spot/Directional 等 helper 需跟目标姿态
       }
       this.lightHelpersDirty = false;
@@ -1143,6 +1145,12 @@ export class ThreeEditor {
     }
     // 把外部创建的对象挂载到 three.Scene（不做额外校验）。
     this.scene.add(object);
+    if (((object as any).isDirectionalLight || (object as any).isSpotLight) && (object as any).target) {
+      const lightTarget = (object as any).target as THREE.Object3D;
+      if (!lightTarget.parent) this.scene.add(lightTarget);
+      lightTarget.updateMatrixWorld(true);
+      object.updateMatrixWorld?.(true);
+    }
     // 默认相机 helper：作为独立对象加入 scene，避免作为子节点导致二次变换偏移。
     if ((object as any).isCamera) {
       const helper = (object.userData as any)?.[VIZON_USER_DATA_KEYS.HELPERS.CAMERA_HELPER] as
@@ -1322,6 +1330,7 @@ export class ThreeEditor {
         if (helper && !this.lightHelpers.has(node.uuid)) {
           this.lightHelpers.set(node.uuid, helper);
           this.scene.add(helper);
+          this.syncLightHelperColor(node as THREE.Light, helper);
           (helper as any).update?.();
           this.lightHelpersDirty = true;
         }
@@ -1627,6 +1636,9 @@ export class ThreeEditor {
 
     this.transformObjectChangeHandler = () => {
       this.applyMultiSelectionTransform();
+      if ((this.selected as any)?.isLight) {
+        this.lightHelpersDirty = true;
+      }
     };
 
     (this.transform as any).addEventListener('dragging-changed', this.onTransformDraggingChanged);
@@ -1934,6 +1946,15 @@ export class ThreeEditor {
     // 这里对 Object3D 做一次兜底更新，保证 Inspector 输入实时反馈。
     const maybeObj3d = target as any;
     if (maybeObj3d?.isObject3D) {
+      if (maybeObj3d?.isLight) this.lightHelpersDirty = true;
+      if (maybeObj3d?.isDirectionalLight || maybeObj3d?.isSpotLight) {
+        if (path.startsWith('shadow.camera.')) {
+          maybeObj3d.shadow?.camera?.updateProjectionMatrix?.();
+        }
+        if (path.startsWith('shadow.')) {
+          maybeObj3d.shadow?.camera?.updateMatrixWorld?.(true);
+        }
+      }
       if (maybeObj3d.matrixAutoUpdate === false) {
         maybeObj3d.updateMatrix?.();
       }
@@ -1941,6 +1962,27 @@ export class ThreeEditor {
     }
     this.syncSceneTreeState();
     this.render();
+  }
+
+  private syncLightHelperColor(light: THREE.Light, helper: THREE.Object3D) {
+    const lightColor = (light as any)?.color;
+    if (!lightColor || typeof lightColor.getHex !== 'function') return;
+    const targetHex = lightColor.getHex();
+    const helperColor = (helper as any)?.color;
+    if (helperColor && typeof helperColor.setHex === 'function') {
+      helperColor.setHex(targetHex);
+    }
+    helper.traverse((node: THREE.Object3D) => {
+      const helperMaterial = (node as any)?.material as THREE.Material | THREE.Material[] | undefined;
+      if (!helperMaterial) return;
+      const materials = Array.isArray(helperMaterial) ? helperMaterial : [helperMaterial];
+      for (const mat of materials) {
+        const colorLike = (mat as any)?.color;
+        if (!colorLike || typeof colorLike.setHex !== 'function') continue;
+        colorLike.setHex(targetHex);
+        mat.needsUpdate = true;
+      }
+    });
   }
 }
 
