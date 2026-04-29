@@ -118,17 +118,18 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
 
   if (key === 'directionalLight') {
     const light = new THREE.DirectionalLight(DEFAULT_LIGHT_HELPER_COLOR, 1.0);
-    light.position.set(4, 6, 4); // 经典斜上方主光
+    light.position.set(4, 8, 4); // 稍抬高主光高度，减少近距离硬阴影
     applyCommon(light, key, opts);
     light.target.position.copy(getTarget(opts)); // Directional 需 target 才有朝向语义
+    (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] = true;
     light.castShadow = false;
     light.shadow.mapSize.set(2048, 2048);
-    light.shadow.camera.left = -10;
-    light.shadow.camera.right = 10;
-    light.shadow.camera.top = 10;
-    light.shadow.camera.bottom = -10;
+    light.shadow.camera.left = -4;
+    light.shadow.camera.right = 4;
+    light.shadow.camera.top = 4;
+    light.shadow.camera.bottom = -4;
     light.shadow.camera.near = 0.1;
-    light.shadow.camera.far = 40;
+    light.shadow.camera.far = 20;
     light.shadow.intensity = 1;
     light.shadow.bias = -0.0001;
     light.shadow.normalBias = 0.02;
@@ -139,7 +140,7 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
       helperGroup.name = 'DirectionalLightHelpers';
       const lightHelper = new THREE.DirectionalLightHelper(light, 1.2);
       const shadowHelper = new THREE.CameraHelper(light.shadow.camera);
-      shadowHelper.visible = light.castShadow;
+      shadowHelper.visible = Boolean(light.castShadow && (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false);
       helperGroup.add(lightHelper);
       helperGroup.add(shadowHelper);
       (helperGroup as any).update = () => {
@@ -149,7 +150,9 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
         lightHelper.update();
         light.shadow.camera.updateProjectionMatrix();
         light.shadow.camera.updateMatrixWorld(true);
-        shadowHelper.visible = Boolean(light.castShadow);
+        shadowHelper.visible = Boolean(
+          light.castShadow && (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false
+        );
         shadowHelper.update();
       };
       configureLightHelper(helperGroup, light);

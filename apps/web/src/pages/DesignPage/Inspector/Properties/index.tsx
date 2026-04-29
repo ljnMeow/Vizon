@@ -79,6 +79,7 @@ type DirectionalLightShadowState = {
   bottom: number;
   near: number;
   far: number;
+  helperVisible: boolean;
   canEdit: boolean;
 };
 
@@ -304,6 +305,7 @@ function readSelectedDirectionalLightShadow(obj: any): DirectionalLightShadowSta
     bottom: typeof shadow.camera?.bottom === 'number' ? Number(shadow.camera.bottom) : -5,
     near: typeof shadow.camera?.near === 'number' ? Number(shadow.camera.near) : 0.5,
     far: typeof shadow.camera?.far === 'number' ? Number(shadow.camera.far) : 500,
+    helperVisible: (obj as any)?.userData?.[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false,
     canEdit: true
   };
 }
@@ -896,6 +898,20 @@ export function PropertiesSettings() {
     });
   };
 
+  const setDirectionalShadowHelperVisible = (nextVisible: boolean) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isDirectionalLight) return;
+    const v = boolTextI18n(nextVisible);
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, `userData.${VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE}`, nextVisible, {
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.shadowHelperVisibleLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.shadowHelperVisibleLabel} = ${v.en}`
+      )
+    });
+    setDirectionalLightShadowState((prev) => (prev ? { ...prev, helperVisible: nextVisible } : prev));
+  };
+
   return (
     <Accordion<'base' | 'object'>
       allowMultiple={true}
@@ -941,6 +957,7 @@ export function PropertiesSettings() {
               commitLightIntensity={commitLightIntensity}
               previewDirectionalShadowNumber={previewDirectionalShadowNumber}
               commitDirectionalShadowNumber={commitDirectionalShadowNumber}
+              setDirectionalShadowHelperVisible={setDirectionalShadowHelperVisible}
             />
           )
         },

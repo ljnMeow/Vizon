@@ -309,6 +309,7 @@ export interface AppMessages {
         shadowBiasLabel: string;
         shadowNormalBiasLabel: string;
         shadowRadiusLabel: string;
+        shadowHelperVisibleLabel: string;
         shadowCameraRangeTitleLabel: string;
         shadowCameraLeftLabel: string;
         shadowCameraRightLabel: string;
@@ -784,6 +785,7 @@ export const appMessages: Record<Locale, AppMessages> = {
           shadowBiasLabel: '阴影偏移',
           shadowNormalBiasLabel: '阴影法线偏移',
           shadowRadiusLabel: '阴影半径',
+          shadowHelperVisibleLabel: '显示阴影视锥辅助器',
           shadowCameraRangeTitleLabel: '阴影视锥范围',
           shadowCameraLeftLabel: '左边界',
           shadowCameraRightLabel: '右边界',
@@ -1252,6 +1254,7 @@ export const appMessages: Record<Locale, AppMessages> = {
           shadowBiasLabel: 'Shadow Bias',
           shadowNormalBiasLabel: 'Shadow Normal Bias',
           shadowRadiusLabel: 'Shadow Radius',
+          shadowHelperVisibleLabel: 'Show Shadow Frustum Helper',
           shadowCameraRangeTitleLabel: 'Shadow Camera Range',
           shadowCameraLeftLabel: 'Left',
           shadowCameraRightLabel: 'Right',

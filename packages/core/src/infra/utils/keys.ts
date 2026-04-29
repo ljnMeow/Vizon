@@ -47,6 +47,7 @@ export const VIZON_USER_DATA_KEYS = {
   HELPERS: {
     CAMERA_HELPER: '__vizonCameraHelper',
     LIGHT_HELPER: '__vizonLightHelper',
+    SHADOW_HELPER_VISIBLE: '__vizonShadowHelperVisible',
     BORDER_LINE_HELPER: '__vizonBorderLineHelper',
   },
 

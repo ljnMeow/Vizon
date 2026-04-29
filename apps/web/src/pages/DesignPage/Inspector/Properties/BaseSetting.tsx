@@ -1,5 +1,6 @@
 import type { AppMessages } from '../../../../i18n/messages';
 import { ColorPicker } from '../../../../components/ColorPicker';
+import { useEffect, useState } from 'react';
 
 /** 属性设置面板使用的 i18n 文案类型 */
 type PropertiesLabels = AppMessages['designPage']['inspector']['propertiesSettings'];
@@ -73,6 +74,7 @@ type DirectionalLightShadowState = {
   bottom: number;
   near: number;
   far: number;
+  helperVisible: boolean;
   canEdit: boolean;
 };
 
@@ -102,26 +104,44 @@ function AxisNumberInput({
   onPreviewChange: (next: number) => void;
   onCommit: (next: number) => void;
 }) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const commitDraft = () => {
+    const next = Number(draft);
+    if (!Number.isFinite(next)) {
+      setDraft(String(value));
+      return;
+    }
+    onCommit(next);
+    setDraft(String(next));
+  };
+
   return (
     <div className="space-y-1">
       <label className="block text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{label}</label>
       <input
         type="number"
-        value={value}
+        value={draft}
         disabled={disabled}
         step={step ?? 0.01}
         onChange={(e) => {
-          const next = Number(e.target.value);
+          const raw = e.target.value;
+          setDraft(raw);
+          const next = Number(raw);
           if (!Number.isFinite(next)) return;
           onPreviewChange(next);
         }}
-        onBlur={(e) => {
-          const next = Number((e.target as HTMLInputElement).value);
-          if (!Number.isFinite(next)) return;
-          onCommit(next);
-        }}
+        onBlur={commitDraft}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commitDraft();
+            (e.currentTarget as HTMLInputElement).blur();
+          }
         }}
         className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors disabled:opacity-60 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
       />
@@ -148,28 +168,46 @@ function LabeledNumberInput({
   onPreviewChange: (next: number) => void;
   onCommit: (next: number) => void;
 }) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const commitDraft = () => {
+    const next = Number(draft);
+    if (!Number.isFinite(next)) {
+      setDraft(String(value));
+      return;
+    }
+    onCommit(next);
+    setDraft(String(next));
+  };
+
   return (
     <div className="space-y-1">
       <label className="block text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{label}</label>
       <input
         type="number"
-        value={value}
+        value={draft}
         disabled={disabled}
         step={step ?? 0.01}
         min={min}
         max={max}
         onChange={(e) => {
-          const next = Number(e.target.value);
+          const raw = e.target.value;
+          setDraft(raw);
+          const next = Number(raw);
           if (!Number.isFinite(next)) return;
           onPreviewChange(next);
         }}
-        onBlur={(e) => {
-          const next = Number((e.target as HTMLInputElement).value);
-          if (!Number.isFinite(next)) return;
-          onCommit(next);
-        }}
+        onBlur={commitDraft}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commitDraft();
+            (e.currentTarget as HTMLInputElement).blur();
+          }
         }}
         className="w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)] px-2 py-1.5 text-sm text-[var(--text-primary)] outline-none transition-colors disabled:opacity-60 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
       />
@@ -215,7 +253,8 @@ export function BaseSetting({
   previewLightIntensity,
   commitLightIntensity,
   previewDirectionalShadowNumber,
-  commitDirectionalShadowNumber
+  commitDirectionalShadowNumber,
+  setDirectionalShadowHelperVisible
 }: {
   labels: PropertiesLabels;
   selectedInfo: SelectedObjectInfo;
@@ -278,6 +317,7 @@ export function BaseSetting({
       | 'shadow.camera.far',
     nextValue: number
   ) => void;
+  setDirectionalShadowHelperVisible: (nextVisible: boolean) => void;
 }) {
   const isDisabled = !selectedInfo;
   const canShowShadow =
@@ -297,6 +337,7 @@ export function BaseSetting({
   const shadowCameraBottomLabel = ((labels as any).shadowCameraBottomLabel as string | undefined) ?? 'Bottom';
   const shadowCameraNearLabel = ((labels as any).shadowCameraNearLabel as string | undefined) ?? 'Near';
   const shadowCameraFarLabel = ((labels as any).shadowCameraFarLabel as string | undefined) ?? 'Far';
+  const shadowHelperVisibleLabel = ((labels as any).shadowHelperVisibleLabel as string | undefined) ?? 'Show Shadow Frustum Helper';
 
   return (
     <div className="space-y-3">
@@ -538,6 +579,20 @@ export function BaseSetting({
                   onPreviewChange={(v) => previewDirectionalShadowNumber('shadow.normalBias', v)}
                   onCommit={(v) => commitDirectionalShadowNumber('shadow.normalBias', v)}
                 />
+              </div>
+              <div className="border-t border-[var(--border-subtle)] pt-2">
+                <label className="flex cursor-pointer items-center justify-between gap-2">
+                  <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">
+                    {shadowHelperVisibleLabel}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={directionalLightShadowState?.helperVisible ?? true}
+                    disabled={isDisabled}
+                    onChange={(e) => setDirectionalShadowHelperVisible(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                </label>
               </div>
               <div className="border-t border-[var(--border-subtle)] pt-2">
                 <div className="mb-2 text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">

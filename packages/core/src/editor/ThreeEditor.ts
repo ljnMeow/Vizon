@@ -831,6 +831,7 @@ export class ThreeEditor {
     }
 
     this.rendererController.applyRendererSettings(this.renderer, nextRenderer);
+    this.requestShadowMapUpdate();
   }
 
   private applyCameraSettings(nextCamera: SceneSettings['camera']) {
@@ -1210,6 +1211,7 @@ export class ThreeEditor {
     if (!visible && this.selectedObjects.some((selected) => !isVisibleInHierarchy(selected))) {
       this.select(null);
     }
+    this.requestShadowMapUpdate();
     this.syncSceneTreeState();
     return true;
   }
@@ -1761,6 +1763,7 @@ export class ThreeEditor {
     obj.rotation.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z);
     obj.scale.set(snapshot.scale.x, snapshot.scale.y, snapshot.scale.z);
     obj.updateMatrixWorld(true);
+    this.requestShadowMapUpdate();
     this.syncSceneTreeState();
     this.render();
   }
@@ -1960,8 +1963,20 @@ export class ThreeEditor {
       }
       maybeObj3d.updateMatrixWorld?.(true);
     }
+    this.requestShadowMapUpdate();
     this.syncSceneTreeState();
     this.render();
+  }
+
+  /**
+   * 当 shadowMap.autoUpdate=false 时，手动请求下一帧重建阴影贴图。
+   * 这样 UI 修改灯光/物体/阴影参数后仍能看到结果，不会像“开关失效”。
+   */
+  private requestShadowMapUpdate() {
+    const shadowMap = this.renderer?.shadowMap;
+    if (!shadowMap?.enabled) return;
+    if (shadowMap.autoUpdate) return;
+    shadowMap.needsUpdate = true;
   }
 
   private syncLightHelperColor(light: THREE.Light, helper: THREE.Object3D) {
