@@ -24,9 +24,6 @@ import {
   configureRaycasterForScenePicking,
   enableEditorViewLayers
 } from './picking/pickLayers';
-import { createDefaultLight } from '../defaults/defaultLights';
-import { createDefaultModel } from '../defaults/defaultModels';
-import { switchMaterialTypeOnObject } from '../material/switchMaterialType';
 
 /** TransformControls 工作模式：平移 / 旋转 / 缩放 */
 export type TransformMode = 'translate' | 'rotate' | 'scale';
@@ -191,10 +188,6 @@ export class ThreeEditor {
   /** 有相机增删或需强制刷新时为 true，render 中批量 `helper.update()` */
   private cameraHelpersDirty = true;
   private lightHelpersDirty = true;
-  /** bootstrap shadow demo 的关键对象，用于在编辑时重算阴影视锥 */
-  private shadowDemoLightUuid: string | null = null;
-  private shadowDemoParticipantUuids = new Set<string>();
-
   /** 选中含子节点时包围盒预览；红框、overlay 层、不可拾取 */
   private selectionBoxHelper: THREE.BoxHelper | null = null;
   /** 节点复制缓冲区（仅内存） */
@@ -1612,48 +1605,7 @@ export class ThreeEditor {
 
   private bootstrapScene() {
     this.helperController.mount(this.scene);
-    const demo = this.createShadowDemo();
-    if (demo) {
-      this.add(demo.light, { recordHistory: false });
-      this.add(demo.cube, { recordHistory: false });
-      this.add(demo.plane, { recordHistory: false });
-      this.scene.add(demo.lightTarget);
-    }
     this.syncSceneTreeState();
-  }
-
-  private createShadowDemo(): null | { light: THREE.DirectionalLight; lightTarget: THREE.Object3D; cube: THREE.Object3D; plane: THREE.Object3D } {
-    const demoDirectional = createDefaultLight('directionalLight', { helperEnabled: true }) as THREE.DirectionalLight;
-    demoDirectional.castShadow = true;
-
-    const cube = createDefaultModel('cube');
-    switchMaterialTypeOnObject(cube, 'MeshStandardMaterial');
-    cube.name = 'ShadowDemoCube';
-    cube.castShadow = true;
-    cube.receiveShadow = false;
-
-    const plane = createDefaultModel('plane');
-    switchMaterialTypeOnObject(plane, 'MeshStandardMaterial');
-    plane.name = 'ShadowDemoPlane';
-    plane.scale.setScalar(4);
-    plane.receiveShadow = true;
-    plane.castShadow = false;
-
-    // DirectionalLight.target 应作为 scene 根节点对象参与矩阵计算，
-    // 避免被父组变换牵连导致拖拽灯光时 target 世界位置看起来“漂移”。
-    demoDirectional.target.name = 'ShadowDemoDirectionalTarget';
-    demoDirectional.target.userData[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE] = true;
-    demoDirectional.target.userData[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR] = true;
-    this.shadowDemoLightUuid = demoDirectional.uuid;
-    this.shadowDemoParticipantUuids = new Set([demoDirectional.uuid, cube.uuid, plane.uuid]);
-    this.fitDirectionalLightShadowToObjects(demoDirectional, [cube, plane], { padding: 0.8, depthPadding: 2.5 });
-
-    return {
-      light: demoDirectional,
-      lightTarget: demoDirectional.target,
-      cube,
-      plane
-    };
   }
 
   private invalidateSceneMaterials() {
@@ -1670,97 +1622,6 @@ export class ThreeEditor {
     });
   }
 
-  /**
-   * 让 DirectionalLight 的阴影视锥包住一组对象。
-   * 这里用于 bootstrap demo，避免接收面/投射体初始就卡在 frustum 边缘，
-   * 一旦用户轻微缩放/移动就出现“阴影像失效一样消失”的错觉。
-   */
-  private fitDirectionalLightShadowToObjects(
-    light: THREE.DirectionalLight,
-    objects: THREE.Object3D[],
-    options?: { padding?: number; depthPadding?: number }
-  ) {
-    const shadowCamera = light.shadow.camera as THREE.OrthographicCamera | undefined;
-    if (!shadowCamera?.isOrthographicCamera) return;
-
-    const padding = Math.max(0, options?.padding ?? 0.5);
-    const depthPadding = Math.max(0.1, options?.depthPadding ?? 1.5);
-    const bounds = new THREE.Box3();
-    const objectBounds = new THREE.Box3();
-    let hasBounds = false;
-
-    light.updateMatrixWorld(true);
-    light.target.updateMatrixWorld(true);
-
-    for (const obj of objects) {
-      obj.updateMatrixWorld(true);
-      objectBounds.setFromObject(obj);
-      if (objectBounds.isEmpty()) continue;
-      if (!hasBounds) {
-        bounds.copy(objectBounds);
-        hasBounds = true;
-      } else {
-        bounds.union(objectBounds);
-      }
-    }
-    if (!hasBounds || bounds.isEmpty()) return;
-
-    light.shadow.camera.updateProjectionMatrix();
-    light.shadow.camera.updateMatrixWorld(true);
-    light.shadow.updateMatrices(light);
-
-    const corners = [
-      new THREE.Vector3(bounds.min.x, bounds.min.y, bounds.min.z),
-      new THREE.Vector3(bounds.min.x, bounds.min.y, bounds.max.z),
-      new THREE.Vector3(bounds.min.x, bounds.max.y, bounds.min.z),
-      new THREE.Vector3(bounds.min.x, bounds.max.y, bounds.max.z),
-      new THREE.Vector3(bounds.max.x, bounds.min.y, bounds.min.z),
-      new THREE.Vector3(bounds.max.x, bounds.min.y, bounds.max.z),
-      new THREE.Vector3(bounds.max.x, bounds.max.y, bounds.min.z),
-      new THREE.Vector3(bounds.max.x, bounds.max.y, bounds.max.z)
-    ];
-
-    const lightSpaceMin = new THREE.Vector3(Infinity, Infinity, Infinity);
-    const lightSpaceMax = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
-    for (const corner of corners) {
-      corner.applyMatrix4(shadowCamera.matrixWorldInverse);
-      lightSpaceMin.min(corner);
-      lightSpaceMax.max(corner);
-    }
-
-    shadowCamera.left = lightSpaceMin.x - padding;
-    shadowCamera.right = lightSpaceMax.x + padding;
-    shadowCamera.bottom = lightSpaceMin.y - padding;
-    shadowCamera.top = lightSpaceMax.y + padding;
-    shadowCamera.near = Math.max(0.1, -lightSpaceMax.z - depthPadding);
-    shadowCamera.far = Math.max(shadowCamera.near + 1, -lightSpaceMin.z + depthPadding);
-    shadowCamera.updateProjectionMatrix();
-    shadowCamera.updateMatrixWorld(true);
-    light.shadow.updateMatrices(light);
-  }
-
-  private isShadowDemoParticipant(obj: THREE.Object3D | null | undefined) {
-    return Boolean(obj && this.shadowDemoParticipantUuids.has(obj.uuid));
-  }
-
-  /**
-   * demo 场景里的 cube/plane/light 发生变换后，重新拟合阴影视锥。
-   * 不把它做成全局策略，只修 bootstrap demo 这条链路，避免扩大影响面。
-   */
-  private updateShadowDemoShadowFit() {
-    if (!this.shadowDemoLightUuid) return;
-    const light = this.scene.getObjectByProperty('uuid', this.shadowDemoLightUuid) as THREE.DirectionalLight | undefined;
-    if (!light?.isDirectionalLight) return;
-
-    const participants = Array.from(this.shadowDemoParticipantUuids)
-      .filter((uuid) => uuid !== this.shadowDemoLightUuid)
-      .map((uuid) => this.scene.getObjectByProperty('uuid', uuid) as THREE.Object3D | undefined)
-      .filter((obj): obj is THREE.Object3D => Boolean(obj));
-
-    if (participants.length === 0) return;
-    this.fitDirectionalLightShadowToObjects(light, participants, { padding: 0.8, depthPadding: 2.5 });
-    this.lightHelpersDirty = true;
-  }
 
   private syncSceneTreeState() {
     const tree = this.getSceneTree();
@@ -1851,9 +1712,6 @@ export class ThreeEditor {
 
     this.transformObjectChangeHandler = () => {
       this.applyMultiSelectionTransform();
-      if (this.selectedObjects.some((obj) => this.isShadowDemoParticipant(obj))) {
-        this.updateShadowDemoShadowFit();
-      }
       if ((this.selected as any)?.isLight) {
         this.lightHelpersDirty = true;
       }
@@ -1980,9 +1838,6 @@ export class ThreeEditor {
     obj.rotation.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z);
     obj.scale.set(snapshot.scale.x, snapshot.scale.y, snapshot.scale.z);
     obj.updateMatrixWorld(true);
-    if (this.isShadowDemoParticipant(obj)) {
-      this.updateShadowDemoShadowFit();
-    }
     this.requestShadowMapUpdate();
     this.syncSceneTreeState();
     this.render();
@@ -2182,9 +2037,6 @@ export class ThreeEditor {
         maybeObj3d.updateMatrix?.();
       }
       maybeObj3d.updateMatrixWorld?.(true);
-      if (this.isShadowDemoParticipant(maybeObj3d as THREE.Object3D)) {
-        this.updateShadowDemoShadowFit();
-      }
     }
     this.requestShadowMapUpdate();
     this.syncSceneTreeState();
