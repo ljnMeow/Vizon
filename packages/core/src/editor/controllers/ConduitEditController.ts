@@ -86,6 +86,11 @@ function buildStraightTubeGeometry(
   return new TubeGeometryCtor(curve, opts.tubularSegments, opts.radius, opts.radialSegments, opts.closed);
 }
 
+/**
+ * 管道（Tube 导线）交互编辑：在选中「可编辑管道」Mesh 时挂载端点/控制点球体，
+ * 拖拽端点调整路径、双击管身插入新点，并重建 `TubeGeometry`。
+ * 拖拽时会暂时禁用 OrbitControls，避免与场景旋转冲突。
+ */
 export class ConduitEditController {
   private dom: HTMLElement | null = null;
   private abort: AbortController | null = null;
@@ -119,6 +124,7 @@ export class ConduitEditController {
     configureRaycasterForScenePicking(this.raycaster);
   }
 
+  /** 绑定 pointer 事件的 DOM（一般为 renderer 的 canvas 父层或 canvas 自身）。 */
   setDomElement(dom: HTMLElement) {
     this.dom = dom;
     this.rebindPointerEvents();

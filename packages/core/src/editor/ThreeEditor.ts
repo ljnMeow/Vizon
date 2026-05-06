@@ -339,23 +339,31 @@ export class ThreeEditor {
 
   on = this.events.on.bind(this.events);
 
+  /** 返回当前撤销栈展示用的历史记录列表（浅拷贝视图，具体语义见 `HistoryManager`）。 */
   getHistoryRecords(): EditorHistoryRecord[] {
     return this.history.getRecords();
   }
 
+  /** 是否还能撤销一步。 */
   canUndo() {
     return this.history.canUndo();
   }
 
+  /** 是否还能重做一步。 */
   canRedo() {
     return this.history.canRedo();
   }
 
+  /**
+   * 执行一条自定义历史操作（`do` / `undo`），并触发 `historyChange` 事件。
+   * 供内部与扩展能力复用；一般 UI 应优先走 `undo`/`redo`/`setSceneSettings` 等封装方法。
+   */
   async executeHistoryOperation(operation: EditorHistoryOperation) {
     await this.history.execute(operation);
     this.emitHistoryChange();
   }
 
+  /** 撤销一步：同步场景树并请求一帧渲染。 */
   async undo() {
     const ok = await this.history.undo();
     if (!ok) return false;
@@ -365,6 +373,7 @@ export class ThreeEditor {
     return true;
   }
 
+  /** 重做一步：同步场景树并请求一帧渲染。 */
   async redo() {
     const ok = await this.history.redo();
     if (!ok) return false;
@@ -374,10 +383,15 @@ export class ThreeEditor {
     return true;
   }
 
+  /** 剪贴板中是否有可粘贴对象（由最近一次 `copySelected` 写入）。 */
   canPaste() {
     return Boolean(this.clipboardObject);
   }
 
+  /**
+   * 将当前多选克隆到内存剪贴板：单选深拷贝节点；多选则包进临时 `Group` 便于整批粘贴。
+   * @returns 是否成功写入剪贴板
+   */
   copySelected() {
     if (this.selectedObjects.length === 0) return false;
     const targets = this.selectedObjects.filter((obj) => !isNonSelectableInHierarchy(obj));
@@ -397,6 +411,10 @@ export class ThreeEditor {
     return true;
   }
 
+  /**
+   * 从剪贴板克隆并挂到场景，生成一条可撤销的「粘贴」历史。
+   * @returns 是否执行了粘贴（剪贴板为空则 false）
+   */
   async pasteFromClipboard() {
     if (!this.clipboardObject) return false;
     const pasted = this.clipboardObject.clone(true);
@@ -416,6 +434,10 @@ export class ThreeEditor {
     return true;
   }
 
+  /**
+   * 删除当前多选（按子节点顺序从后往前摘离，便于撤销时按原 index 插回）。
+   * @returns 是否有节点被删除
+   */
   async deleteSelected() {
     const targets = this.selectedObjects.filter((target) => target.parent && !isNonSelectableInHierarchy(target));
     if (targets.length === 0) return false;
@@ -446,14 +468,20 @@ export class ThreeEditor {
     return true;
   }
 
+  /** 当前是否至少有两个可选中节点在同一父级下，满足「组合」前置条件。 */
   canGroupSelected() {
     return this.selectedObjects.filter((obj) => obj.parent && !isNonSelectableInHierarchy(obj)).length >= 2;
   }
 
+  /** 当前主选是否为非空 `Group`，可进行「取消组合」。 */
   canUngroupSelected() {
     return Boolean(this.selected && this.selected.type === 'Group' && this.selected.parent && this.selected.children.length > 0);
   }
 
+  /**
+   * 将多选打成一个新 `Group`：以选中物体世界坐标质心为组原点，再 `attach` 各子节点。
+   * 含边界情况：已选满某 Group 的全部可编辑子节点时不再嵌套；组内部分组合且只剩一个可编辑子时会自动拆壳。
+   */
   async groupSelected() {
     const targets = this.selectedObjects.filter((obj) => obj.parent && !isNonSelectableInHierarchy(obj));
     if (targets.length < 2) return false;
@@ -575,6 +603,10 @@ export class ThreeEditor {
     return true;
   }
 
+  /**
+   * 取消组合：把当前选中 `Group` 的子节点按顺序提升到父级，并移除空组。
+   * 撤销时会恢复组与子层级关系。
+   */
   async ungroupSelected() {
     const group = this.selected && this.selected.type === 'Group' && this.selected.parent && this.selected.children.length > 0 ? this.selected : null;
     if (!group) return false;
@@ -623,6 +655,10 @@ export class ThreeEditor {
     return true;
   }
 
+  /**
+   * 清空场景中所有用户可编辑根节点（网格、gizmo 等不可选子树会被 `isNonSelectableInHierarchy` 排除）。
+   * 用于「清空画布」类操作，可整批撤销。
+   */
   async clearSceneNodes() {
     const roots = this.scene.children.filter((child) => !isNonSelectableInHierarchy(child));
     if (roots.length === 0) return false;
@@ -647,6 +683,10 @@ export class ThreeEditor {
     return true;
   }
 
+  /**
+   * 重置工作区：移除所有用户节点并把 `SceneSettings` 恢复为默认工厂值（相机/雾/网格等一并重置）。
+   * 与 `clearSceneNodes` 不同之处在于同时还原全局场景配置。
+   */
   async resetWorkspace() {
     const roots = this.scene.children.filter((child) => !isNonSelectableInHierarchy(child));
     const snapshot = roots.map((node) => ({ node, parent: node.parent, index: node.parent ? node.parent.children.indexOf(node) : -1 }));
@@ -675,6 +715,11 @@ export class ThreeEditor {
     return true;
   }
 
+  /**
+   * 按「点路径」写入场景中某对象的嵌套属性（如 `position.x`、`intensity`），并可选记入历史。
+   * - `recordHistory: false`：进入「预览」模式，多次写入合并到同一条 pending，直到带 `recordHistory: true` 的提交；
+   * - 默认 `true`：立即生成可撤销条目（支持 `mergeKey` 防抖合并，见 `HistoryManager`）。
+   */
   async setObjectPropertyByUuid(
     uuid: string,
     path: string,
@@ -754,6 +799,7 @@ export class ThreeEditor {
     };
   }
 
+  /** 当前 WebGLRenderer 相关序列化配置的快照（抗锯齿、色调映射、阴影贴图类型等）。 */
   getRendererSettings(): RendererSettings {
     return { ...this.sceneSettings.renderer };
   }
@@ -800,6 +846,10 @@ export class ThreeEditor {
     this.applyRendererSettings(nextScene.renderer, prevRenderer);
   }
 
+  /**
+   * 将 `RendererSettings` 应用到运行中的 `WebGLRenderer`：
+   * `antialias` 变更会整实例重建并重新绑定 Orbit/Transform/特效与管道编辑控制器。
+   */
   private applyRendererSettings(nextRenderer: RendererSettings, prevRenderer: RendererSettings) {
     if (nextRenderer.antialias !== prevRenderer.antialias) {
       const orbitTarget = this.orbit.target.clone();
@@ -838,6 +888,7 @@ export class ThreeEditor {
     this.requestShadowMapUpdate();
   }
 
+  /** 把 `SceneSettings.camera` 中的位置、目标点、FOV 等同步到视口相机与 OrbitControls。 */
   private applyCameraSettings(nextCamera: SceneSettings['camera']) {
     const width = Math.max(1, this.canvas.clientWidth || 1);
     const height = Math.max(1, this.canvas.clientHeight || 1);
@@ -940,6 +991,10 @@ export class ThreeEditor {
     this.effectsController.render(this.renderer);
   }
 
+  /**
+   * 阴影开启时每帧遍历场景内 `castShadow` 灯光，强制更新 shadow camera 与矩阵，
+   * 避免编辑态下视锥/投影与物体不同步导致的阴影撕裂或消失。
+   */
   private syncShadowCastingLights() {
     this.scene.traverse((obj: any) => {
       if (!obj?.isLight || !obj.castShadow) return;
@@ -965,11 +1020,13 @@ export class ThreeEditor {
     this.camera.updateProjectionMatrix();
   }
 
+  /** 多选时的「主选」：等于 `getSelectedObjects()` 的最后一项；无选中时为 `null`。 */
   getSelected() {
     // 当前选中的对象（可能为 null，表示没有可编辑对象）
     return this.selected;
   }
 
+  /** 当前多选列表的浅拷贝（顺序与最后一次点击 / toggle 结果一致）。 */
   getSelectedObjects() {
     return [...this.selectedObjects];
   }
@@ -1028,7 +1085,8 @@ export class ThreeEditor {
   }
 
   /**
-   * 设置当前选中对象。会同步 TransformControls 的 attach/detach。
+   * 目标是否可以作为 TransformControls 的附着对象：
+   * 必须位于 `scene` 子树下，且不能是视口主相机（主相机不在场景图内）。
    */
   private canAttachTransformTarget(object: THREE.Object3D | null): object is THREE.Object3D {
     if (!object) return false;
@@ -1042,6 +1100,10 @@ export class ThreeEditor {
     return false;
   }
 
+  /**
+   * 更新选中状态并广播 `select` 事件；同时维护 Gizmo 挂载、多选冻结、灯光/相机 helper 脏标记与阴影刷新。
+   * @param options.toggle `true` 时在集合中切换该对象（典型：Shift+点选），并打开多选描边高亮；`false` 时单选或清空。
+   */
   select(object: THREE.Object3D | null, options?: { toggle?: boolean }) {
     const safe = object && !isNonSelectableInHierarchy(object) ? object : null;
     const prev = this.selected;
@@ -1157,6 +1219,9 @@ export class ThreeEditor {
     this.transform.visible = false;
   }
 
+  /**
+   * 向场景根添加对象；默认包一层可撤销历史。会处理平行光/聚光灯的 `target`、相机与灯光 helper 的挂接，以及静态冻结子树。
+   */
   add(object: THREE.Object3D, options?: { recordHistory?: boolean; operationName?: string }) {
     if (options?.recordHistory ?? true) {
       const parent = object.parent;
@@ -1217,6 +1282,9 @@ export class ThreeEditor {
     this.syncSceneTreeState();
   }
 
+  /**
+   * 按 uuid 切换物体 `visible`；若隐藏导致当前选中链不可见则清空选择。支持历史合并（同 uuid 短时间多次切换）。
+   */
   setObjectVisibleByUuid(
     uuid: string,
     visible: boolean,
@@ -1253,6 +1321,10 @@ export class ThreeEditor {
     return true;
   }
 
+  /**
+   * 从父节点移除对象（不记历史，适合已由外层包装撤销的调用）。
+   * 同步移除关联的 CameraHelper / LightHelper 映射。
+   */
   removeObjectByUuid(uuid: string): boolean {
     const obj = this.scene.getObjectByProperty('uuid', uuid);
     if (!obj || !obj.parent || isNonSelectableInHierarchy(obj)) return false;
@@ -1416,6 +1488,10 @@ export class ThreeEditor {
     });
   }
 
+  /**
+   * 执行场景树拖拽排序或改父级（不自带历史，一般由 UI 在确认后包一层 `executeHistoryOperation`）。
+   * `inside` 使用 `attach` 保持世界变换；`before`/`after` 先挂到目标父级再按 index 插入。
+   */
   moveObjectByUuid(
     sourceUuid: string,
     targetUuid: string,
@@ -1533,6 +1609,10 @@ export class ThreeEditor {
     return out;
   }
 
+  /**
+   * 根据 `calcSceneSettingsDiff` 结果增量应用环境/渲染器/相机/网格/辅助器；
+   * `seq` 与 `getLatestSeq` 用于丢弃过期的异步 HDRI 回调。
+   */
   private async applySceneSettings(next: SceneSettings, prev: SceneSettings, seq: number, force = false) {
     const diff = calcSceneSettingsDiff(next, prev) as ReturnType<typeof calcSceneSettingsDiff> & {
       helpersChanged?: boolean;

@@ -25,6 +25,7 @@ export class ViewPresetController {
     this.orbit = nextOrbit;
   }
 
+  /** WebGLRenderer 重建后注入新的视口透视相机引用，保证视角动画作用在正确实例上。 */
   setCamera(nextCamera: THREE.PerspectiveCamera) {
     this.camera = nextCamera;
   }
