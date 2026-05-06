@@ -237,6 +237,40 @@ export class EffectsController {
   }
 
   /**
+   * EffectComposer 会在一次 frame 内多次调用 `renderer.render(...)`：
+   * - RenderPass：真实业务 scene
+   * - ShaderPass / OutputPass：内部 fullscreen quad scene
+   *
+   * 当 `renderer.shadowMap.autoUpdate=true` 时，如果不做额外约束，
+   * shadow map 可能在业务 scene 渲染完后，又被 fullscreen quad 的内部 scene 覆盖。
+   * 这里在 composer.render 之前“借用一次手动更新”：
+   * - autoUpdate=true：改成 `autoUpdate=false + needsUpdate=true`，让本次 frame 只在第一个 RenderPass 更新一次
+   * - autoUpdate=false：保持原有行为，不篡改用户的手动更新策略
+   */
+  private beginComposerShadowFrame(renderer: THREE.WebGLRenderer) {
+    const shadowMap = renderer.shadowMap;
+    if (!shadowMap.enabled) return null;
+    const prev = {
+      autoUpdate: shadowMap.autoUpdate,
+      needsUpdate: shadowMap.needsUpdate
+    };
+    if (prev.autoUpdate) {
+      shadowMap.autoUpdate = false;
+      shadowMap.needsUpdate = true;
+    }
+    return prev;
+  }
+
+  private endComposerShadowFrame(
+    renderer: THREE.WebGLRenderer,
+    prev: { autoUpdate: boolean; needsUpdate: boolean } | null
+  ) {
+    if (!prev) return;
+    renderer.shadowMap.autoUpdate = prev.autoUpdate;
+    renderer.shadowMap.needsUpdate = prev.autoUpdate ? false : renderer.shadowMap.needsUpdate;
+  }
+
+  /**
    * 与 renderer 建立后处理链。
    *
    * 这里维护两条链路：
@@ -406,10 +440,11 @@ export class EffectsController {
       | Record<string, { value: unknown }>
       | undefined;
 
-    // 没有任何 glow 对象时，不再跑 bloom，但仍走 finalComposer，避免开关特效导致整条管线变掉。
+    // 没有任何 glow 对象时，直接走基础渲染路径。
+    // 这能避免 EffectComposer 的 fullscreen quad pass 在 autoUpdate=true 时干扰 shadow map 生命周期。
+    // 真实产品里如果需要“始终同一管线”，可以在此处增加 feature flag 再切换策略。
     if (glowCount === 0) {
-      if (mixUniforms?.['bloomFactor']) mixUniforms['bloomFactor'].value = 0;
-      this.finalComposer.render();
+      renderer.render(this.scene, this.camera);
       return;
     }
 
@@ -425,9 +460,14 @@ export class EffectsController {
     const oldFog = this.scene.fog;
     const oldClearColor = renderer.getClearColor(new THREE.Color());
     const oldClearAlpha = renderer.getClearAlpha();
+    const prevShadowAutoUpdate = renderer.shadowMap.autoUpdate;
+    const prevShadowNeedsUpdate = renderer.shadowMap.needsUpdate;
     this.scene.background = null;
     this.scene.fog = null;
     renderer.setClearColor(0x000000, 1);
+    // 关键：bloom 预处理会临时替换/隐藏对象，不能让这些“临时态”触发 shadow map 重建。
+    renderer.shadowMap.autoUpdate = false;
+    renderer.shadowMap.needsUpdate = false;
 
     // bloom pass 中非辉光 mesh 仍保留黑色占位，避免直接隐藏后丢失遮挡关系。
     // 顺序上先渲染 glowSource，再渲染 bloom，这样 mix shader 才能正确提取 halo。
@@ -442,6 +482,15 @@ export class EffectsController {
     this.scene.background = oldBackground;
     this.scene.fog = oldFog;
     renderer.setClearColor(oldClearColor, oldClearAlpha);
+    renderer.shadowMap.autoUpdate = prevShadowAutoUpdate;
+    if (prevShadowAutoUpdate) {
+      // autoUpdate=true 时，不要让后续 fullscreen quad pass 继续碰 shadow map。
+      // 下面会切到“本帧仅在真实场景 RenderPass 更新一次”的模式。
+      renderer.shadowMap.needsUpdate = false;
+    } else {
+      // autoUpdate=false 时，把“更新机会”留给最终 RenderPass（真实场景态），而不是 bloom 临时态。
+      renderer.shadowMap.needsUpdate = true;
+    }
 
     // 把本帧计算出的强度/阈值回填到 mix shader，最后统一从 finalComposer 输出。
     if (mixUniforms?.['bloomTexture']) mixUniforms['bloomTexture'].value = this.bloomComposer.renderTarget2.texture;
@@ -449,7 +498,9 @@ export class EffectsController {
     if (mixUniforms?.['bloomFactor']) mixUniforms['bloomFactor'].value = mapGlowMixFactor(avgGlowRange, avgGlowBrightness);
     if (mixUniforms?.['haloThreshold']) mixUniforms['haloThreshold'].value = mapHaloThreshold(avgGlowRange);
     if (mixUniforms?.['haloSoftness']) mixUniforms['haloSoftness'].value = mapHaloSoftness(avgGlowRange);
+    const shadowFrame = this.beginComposerShadowFrame(renderer);
     this.finalComposer.render();
+    this.endComposerShadowFrame(renderer, shadowFrame);
     return;
 
     renderer.render(this.scene, this.camera);

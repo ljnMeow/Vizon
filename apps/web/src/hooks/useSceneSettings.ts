@@ -357,6 +357,8 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
       }
       if (!editor) {
         setRendererSettings(next);
+        setSceneSettings((prev) => ({ ...prev, renderer: next }));
+        sceneSettingsRef.current = { ...sceneSettingsRef.current, renderer: next };
         return;
       }
 
@@ -373,6 +375,10 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
         });
       }
       setRendererSettings(next);
+      // renderer 单独更新时，也要同步 sceneSettings 的 renderer 字段；
+      // 否则后续 Orbit 拖拽触发 setSceneSettings 时会把旧值（例如 shadowMapEnabled=false）回写到 core。
+      setSceneSettings((prev) => ({ ...prev, renderer: next }));
+      sceneSettingsRef.current = { ...sceneSettingsRef.current, renderer: next };
     },
     [editor]
   );

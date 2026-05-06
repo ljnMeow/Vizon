@@ -121,7 +121,8 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
     light.position.set(4, 8, 4); // 稍抬高主光高度，减少近距离硬阴影
     applyCommon(light, key, opts);
     light.target.position.copy(getTarget(opts)); // Directional 需 target 才有朝向语义
-    (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] = true;
+    // 默认不显示阴影视锥（视锥线框较干扰；需要时可在属性面板手动开启）
+    (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] = false;
     light.castShadow = false;
     light.shadow.mapSize.set(2048, 2048);
     light.shadow.camera.left = -4;
