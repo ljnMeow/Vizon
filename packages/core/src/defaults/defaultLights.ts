@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import { VIZON_USER_DATA_KEYS } from '../infra/utils';
+import { getVizonUserData } from '../infra/utils';
 import { DEFAULT_LIGHT_HELPER_COLOR, DEFAULT_LIGHTS } from './registry';
 
 /** 可创建的灯光种类枚举（与 UI 列表 key 对齐） */
@@ -97,6 +98,44 @@ function configureLightHelper(helper: THREE.Object3D, light: THREE.Light) {
   helper.renderOrder = 8_000; // 较晚绘制，减少被透明物体误挡
 }
 
+function isShadowHelperVisible(light: THREE.Light) {
+  const ud = getVizonUserData(light);
+  return Boolean(light.castShadow && ud[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false);
+}
+
+function createShadowLightHelperGroup(args: {
+  name: string;
+  light: THREE.Light;
+  lightHelper: THREE.Object3D & { update?: () => void };
+  shadowCamera: THREE.Camera & { updateProjectionMatrix?: () => void; updateMatrixWorld?: (force?: boolean) => void };
+  updateMatrices: () => void;
+}) {
+  const { name, light, lightHelper, shadowCamera, updateMatrices } = args;
+  const helperGroup = new THREE.Group();
+  helperGroup.name = name;
+
+  const shadowHelper = new THREE.CameraHelper(shadowCamera);
+  shadowHelper.visible = isShadowHelperVisible(light);
+  helperGroup.add(lightHelper);
+  helperGroup.add(shadowHelper);
+
+  (helperGroup as any).update = () => {
+    updateMatrices();
+    (lightHelper as any).update?.();
+    shadowCamera.updateProjectionMatrix?.();
+    shadowCamera.updateMatrixWorld?.(true);
+    shadowHelper.visible = isShadowHelperVisible(light);
+    shadowHelper.update();
+  };
+
+  configureLightHelper(helperGroup, light);
+  helperGroup.traverse((child) => {
+    if (child === helperGroup) return;
+    configureLightHelper(child, light);
+  });
+  return helperGroup;
+}
+
 /**
  * 按 key 创建一盏合理的默认灯；调用方需自行 `scene.add` 或走 `ThreeEditor.add`。
  */
@@ -130,31 +169,18 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
     light.shadow.radius = 1.5;
     light.target.updateMatrixWorld();
     if (helperEnabled) {
-      const helperGroup = new THREE.Group();
-      helperGroup.name = 'DirectionalLightHelpers';
-      const lightHelper = new THREE.DirectionalLightHelper(light, 1.2);
-      const shadowHelper = new THREE.CameraHelper(light.shadow.camera);
-      shadowHelper.visible = Boolean(light.castShadow && (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false);
-      helperGroup.add(lightHelper);
-      helperGroup.add(shadowHelper);
-      (helperGroup as any).update = () => {
-        light.updateMatrixWorld(true);
-        light.target.updateMatrixWorld(true);
-        light.shadow.updateMatrices(light);
-        lightHelper.update();
-        light.shadow.camera.updateProjectionMatrix();
-        light.shadow.camera.updateMatrixWorld(true);
-        shadowHelper.visible = Boolean(
-          light.castShadow && (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false
-        );
-        shadowHelper.update();
-      };
-      configureLightHelper(helperGroup, light);
-      helperGroup.traverse((child) => {
-        if (child === helperGroup) return;
-        configureLightHelper(child, light);
+      const helperGroup = createShadowLightHelperGroup({
+        name: 'DirectionalLightHelpers',
+        light,
+        lightHelper: new THREE.DirectionalLightHelper(light, 1.2),
+        shadowCamera: light.shadow.camera,
+        updateMatrices: () => {
+          light.updateMatrixWorld(true);
+          light.target.updateMatrixWorld(true);
+          light.shadow.updateMatrices(light);
+        }
       });
-      (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helperGroup; // editor 取出并 scene.add
+      (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helperGroup;
     }
     return light;
   }
@@ -174,28 +200,15 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
     light.shadow.normalBias = 0.02;
     light.shadow.radius = 1.5;
     if (helperEnabled) {
-      const helperGroup = new THREE.Group();
-      helperGroup.name = 'PointLightHelpers';
-      const lightHelper = new THREE.PointLightHelper(light, 0.45);
-      const shadowHelper = new THREE.CameraHelper(light.shadow.camera);
-      shadowHelper.visible = Boolean(light.castShadow && (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false);
-      helperGroup.add(lightHelper);
-      helperGroup.add(shadowHelper);
-      (helperGroup as any).update = () => {
-        light.updateMatrixWorld(true);
-        light.shadow.updateMatrices(light);
-        lightHelper.update();
-        light.shadow.camera.updateProjectionMatrix();
-        light.shadow.camera.updateMatrixWorld(true);
-        shadowHelper.visible = Boolean(
-          light.castShadow && (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false
-        );
-        shadowHelper.update();
-      };
-      configureLightHelper(helperGroup, light);
-      helperGroup.traverse((child) => {
-        if (child === helperGroup) return;
-        configureLightHelper(child, light);
+      const helperGroup = createShadowLightHelperGroup({
+        name: 'PointLightHelpers',
+        light,
+        lightHelper: new THREE.PointLightHelper(light, 0.45),
+        shadowCamera: light.shadow.camera,
+        updateMatrices: () => {
+          light.updateMatrixWorld(true);
+          light.shadow.updateMatrices(light);
+        }
       });
       (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helperGroup;
     }
@@ -223,29 +236,16 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
     light.shadow.radius = 1.5;
     light.target.updateMatrixWorld();
     if (helperEnabled) {
-      const helperGroup = new THREE.Group();
-      helperGroup.name = 'SpotLightHelpers';
-      const lightHelper = new THREE.SpotLightHelper(light);
-      const shadowHelper = new THREE.CameraHelper(light.shadow.camera);
-      shadowHelper.visible = Boolean(light.castShadow && (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false);
-      helperGroup.add(lightHelper);
-      helperGroup.add(shadowHelper);
-      (helperGroup as any).update = () => {
-        light.updateMatrixWorld(true);
-        light.target.updateMatrixWorld(true);
-        light.shadow.updateMatrices(light);
-        lightHelper.update();
-        light.shadow.camera.updateProjectionMatrix();
-        light.shadow.camera.updateMatrixWorld(true);
-        shadowHelper.visible = Boolean(
-          light.castShadow && (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false
-        );
-        shadowHelper.update();
-      };
-      configureLightHelper(helperGroup, light);
-      helperGroup.traverse((child) => {
-        if (child === helperGroup) return;
-        configureLightHelper(child, light);
+      const helperGroup = createShadowLightHelperGroup({
+        name: 'SpotLightHelpers',
+        light,
+        lightHelper: new THREE.SpotLightHelper(light),
+        shadowCamera: light.shadow.camera,
+        updateMatrices: () => {
+          light.updateMatrixWorld(true);
+          light.target.updateMatrixWorld(true);
+          light.shadow.updateMatrices(light);
+        }
       });
       (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helperGroup;
     }

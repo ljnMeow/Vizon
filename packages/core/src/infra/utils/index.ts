@@ -113,4 +113,6 @@ export function computeAverageCenterVec3(points: XYZ[], out?: THREE.Vector3): TH
 }
 
 export { VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS, VIZON_HISTORY_KEYS } from './keys';
+export type { VizonUserData, VizonObject3D } from '../userData';
+export { getVizonUserData } from '../userData';
 

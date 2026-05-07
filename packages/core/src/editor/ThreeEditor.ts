@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { OrbitControls, TransformControls } from 'three-stdlib';
 import { Emitter } from '../infra/events';
-import { VIZON_HISTORY_KEYS, VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '../infra/utils';
+import { getVizonUserData, VIZON_HISTORY_KEYS, VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '../infra/utils';
 import type { RendererSettings, SceneSettings } from '../settings/sceneSettings';
 import type { SceneTreeNode } from '../settings/sceneTree';
 import { createDefaultSceneSettings, normalizeSceneSettings } from '../settings/sceneSettings';
@@ -210,6 +210,58 @@ export class ThreeEditor {
   private dirtyStats = { renderer: 0, shadow: 0, scene: 0 };
   /** dirty debug 日志节流时间戳。 */
   private dirtyStatsLastLogAt = 0;
+
+  private isRendererSettingsEqual(a: RendererSettings, b: RendererSettings) {
+    return (
+      a.antialias === b.antialias &&
+      a.outputColorSpace === b.outputColorSpace &&
+      a.toneMapping === b.toneMapping &&
+      a.toneMappingExposure === b.toneMappingExposure &&
+      a.shadowMapEnabled === b.shadowMapEnabled &&
+      a.shadowMapType === b.shadowMapType &&
+      a.shadowMapAutoUpdate === b.shadowMapAutoUpdate
+    );
+  }
+
+  private isSceneSettingsEqualForHistory(a: SceneSettings, b: SceneSettings) {
+    // 说明：
+    // - `sceneTree` 属于运行时派生状态，不应参与“设置是否变化”的判定（否则容易误触发历史与 apply）。
+    // - 该比较用于 setSceneSettings 的早退与历史合并判断，不影响最终 normalize/apply。
+    const aHdri = a.environment.hdri;
+    const bHdri = b.environment.hdri;
+    const hdriEqual =
+      aHdri.type === bHdri.type &&
+      (aHdri.type === 'uploaded' && bHdri.type === 'uploaded' ? aHdri.url === bHdri.url : true);
+
+    return (
+      a.version === b.version &&
+      a.basic.sceneName === b.basic.sceneName &&
+      a.basic.description === b.basic.description &&
+      a.environment.backgroundMode === b.environment.backgroundMode &&
+      a.environment.backgroundColor === b.environment.backgroundColor &&
+      a.environment.environmentStrength === b.environment.environmentStrength &&
+      hdriEqual &&
+      a.environment.fog.enabled === b.environment.fog.enabled &&
+      a.environment.fog.color === b.environment.fog.color &&
+      a.environment.fog.near === b.environment.fog.near &&
+      a.environment.fog.far === b.environment.fog.far &&
+      a.camera.fov === b.camera.fov &&
+      a.camera.near === b.camera.near &&
+      a.camera.far === b.camera.far &&
+      a.camera.position.x === b.camera.position.x &&
+      a.camera.position.y === b.camera.position.y &&
+      a.camera.position.z === b.camera.position.z &&
+      a.camera.target.x === b.camera.target.x &&
+      a.camera.target.y === b.camera.target.y &&
+      a.camera.target.z === b.camera.target.z &&
+      a.grid.enabled === b.grid.enabled &&
+      a.grid.color === b.grid.color &&
+      a.grid.opacity === b.grid.opacity &&
+      a.helpers.axes.enabled === b.helpers.axes.enabled &&
+      a.helpers.axes.size === b.helpers.axes.size &&
+      this.isRendererSettingsEqual(a.renderer, b.renderer)
+    );
+  }
 
   constructor(options: ThreeEditorOptions) {
     // 保存宿主画布引用；后续 Renderer 与 Orbit 都挂在其上
@@ -906,11 +958,7 @@ export class ThreeEditor {
     if (options?.recordHistory ?? true) {
       const prevRenderer = this.pendingRendererHistoryBefore ? { ...this.pendingRendererHistoryBefore } : { ...this.sceneSettings.renderer };
       this.pendingRendererHistoryBefore = null;
-      try {
-        if (JSON.stringify(prevRenderer) === JSON.stringify(next)) return;
-      } catch {
-        // ignore serialization failure
-      }
+      if (this.isRendererSettingsEqual(prevRenderer, next)) return;
       void this.executeHistoryOperation({
         name: options?.operationName ?? '修改渲染器设置',
         mergeKey: 'renderer-settings',
@@ -996,16 +1044,13 @@ export class ThreeEditor {
     if (options?.recordHistory ?? true) {
       const prev = this.pendingSceneHistoryBefore ? this.pendingSceneHistoryBefore : this.getSceneSettings();
       this.pendingSceneHistoryBefore = null;
-      try {
-        if (JSON.stringify(prev) === JSON.stringify(next)) return;
-      } catch {
-        // ignore serialization failure
-      }
+      const normalizedNext = normalizeSceneSettings(next);
+      if (this.isSceneSettingsEqualForHistory(prev, normalizedNext)) return;
       await this.executeHistoryOperation({
         name: options?.operationName ?? '修改场景设置',
         mergeKey: 'scene-settings',
         mergeWindowMs: 280,
-        do: () => this.setSceneSettings(next, { recordHistory: false }),
+        do: () => this.setSceneSettings(normalizedNext, { recordHistory: false }),
         undo: () => this.setSceneSettings(prev, { recordHistory: false })
       });
       return;
@@ -1447,7 +1492,7 @@ export class ThreeEditor {
   private bindHelpersForSubtree(root: THREE.Object3D) {
     root.traverse((node: any) => {
       if (node?.isCamera) {
-        const helper = (node.userData as any)?.[VIZON_USER_DATA_KEYS.HELPERS.CAMERA_HELPER] as THREE.CameraHelper | undefined;
+        const helper = getVizonUserData(node)[VIZON_USER_DATA_KEYS.HELPERS.CAMERA_HELPER];
         if (helper && !this.cameraHelpers.has(node.uuid)) {
           this.cameraHelpers.set(node.uuid, helper);
           this.scene.add(helper);
@@ -1456,7 +1501,7 @@ export class ThreeEditor {
         }
       }
       if (node?.isLight) {
-        const helper = (node.userData as any)?.[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] as THREE.Object3D | undefined;
+        const helper = getVizonUserData(node)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER];
         if (helper && !this.lightHelpers.has(node.uuid)) {
           this.lightHelpers.set(node.uuid, helper);
           this.scene.add(helper);
@@ -2198,7 +2243,7 @@ export class ThreeEditor {
 
   private syncShadowFrustumHelperVisibility(light: THREE.Light, helper: THREE.Object3D) {
     this.ensureShadowCameraHelper(light, helper);
-    const userVisible = (light.userData as any)?.[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false;
+    const userVisible = getVizonUserData(light)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false;
     const castShadow = Boolean((light as any)?.castShadow);
     // 阴影视锥辅助器用于调试阴影参数，应允许在全局 shadowMap 关闭时也可见。
     const nextVisible = userVisible && castShadow;
