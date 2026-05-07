@@ -68,10 +68,39 @@ type DirectionalLightShadowState = {
   bias: number;
   normalBias: number;
   radius: number;
+  mapSizeWidth: number;
+  mapSizeHeight: number;
   left: number;
   right: number;
   top: number;
   bottom: number;
+  near: number;
+  far: number;
+  helperVisible: boolean;
+  canEdit: boolean;
+};
+
+type SpotLightShadowState = {
+  intensity: number;
+  bias: number;
+  normalBias: number;
+  radius: number;
+  mapSizeWidth: number;
+  mapSizeHeight: number;
+  near: number;
+  far: number;
+  fov: number;
+  helperVisible: boolean;
+  canEdit: boolean;
+};
+
+type PointLightShadowState = {
+  intensity: number;
+  bias: number;
+  normalBias: number;
+  radius: number;
+  mapSizeWidth: number;
+  mapSizeHeight: number;
   near: number;
   far: number;
   helperVisible: boolean;
@@ -229,6 +258,8 @@ export function BaseSetting({
   lightColorState,
   lightIntensityState,
   directionalLightShadowState,
+  spotLightShadowState,
+  pointLightShadowState,
   onNamePreviewChange,
   onNameCommit,
   copyUuid,
@@ -254,7 +285,13 @@ export function BaseSetting({
   commitLightIntensity,
   previewDirectionalShadowNumber,
   commitDirectionalShadowNumber,
-  setDirectionalShadowHelperVisible
+  setDirectionalShadowHelperVisible,
+  previewSpotShadowNumber,
+  commitSpotShadowNumber,
+  setSpotShadowHelperVisible,
+  previewPointShadowNumber,
+  commitPointShadowNumber,
+  setPointShadowHelperVisible
 }: {
   labels: PropertiesLabels;
   selectedInfo: SelectedObjectInfo;
@@ -266,6 +303,8 @@ export function BaseSetting({
   lightColorState: LightColorState | null;
   lightIntensityState: LightIntensityState | null;
   directionalLightShadowState: DirectionalLightShadowState | null;
+  spotLightShadowState: SpotLightShadowState | null;
+  pointLightShadowState: PointLightShadowState | null;
   onNamePreviewChange: (nextName: string) => void;
   onNameCommit: (nextName: string) => void;
   copyUuid: () => void | Promise<void>;
@@ -295,6 +334,8 @@ export function BaseSetting({
       | 'shadow.bias'
       | 'shadow.normalBias'
       | 'shadow.radius'
+      | 'shadow.mapSize.width'
+      | 'shadow.mapSize.height'
       | 'shadow.camera.left'
       | 'shadow.camera.right'
       | 'shadow.camera.top'
@@ -309,6 +350,8 @@ export function BaseSetting({
       | 'shadow.bias'
       | 'shadow.normalBias'
       | 'shadow.radius'
+      | 'shadow.mapSize.width'
+      | 'shadow.mapSize.height'
       | 'shadow.camera.left'
       | 'shadow.camera.right'
       | 'shadow.camera.top'
@@ -318,25 +361,86 @@ export function BaseSetting({
     nextValue: number
   ) => void;
   setDirectionalShadowHelperVisible: (nextVisible: boolean) => void;
+  previewSpotShadowNumber: (
+    path:
+      | 'shadow.intensity'
+      | 'shadow.bias'
+      | 'shadow.normalBias'
+      | 'shadow.radius'
+      | 'shadow.mapSize.width'
+      | 'shadow.mapSize.height'
+      | 'shadow.camera.near'
+      | 'shadow.camera.far'
+      | 'shadow.camera.fov',
+    nextValue: number
+  ) => void;
+  commitSpotShadowNumber: (
+    path:
+      | 'shadow.intensity'
+      | 'shadow.bias'
+      | 'shadow.normalBias'
+      | 'shadow.radius'
+      | 'shadow.mapSize.width'
+      | 'shadow.mapSize.height'
+      | 'shadow.camera.near'
+      | 'shadow.camera.far'
+      | 'shadow.camera.fov',
+    nextValue: number
+  ) => void;
+  setSpotShadowHelperVisible: (nextVisible: boolean) => void;
+  previewPointShadowNumber: (
+    path:
+      | 'shadow.intensity'
+      | 'shadow.bias'
+      | 'shadow.normalBias'
+      | 'shadow.radius'
+      | 'shadow.mapSize.width'
+      | 'shadow.mapSize.height'
+      | 'shadow.camera.near'
+      | 'shadow.camera.far',
+    nextValue: number
+  ) => void;
+  commitPointShadowNumber: (
+    path:
+      | 'shadow.intensity'
+      | 'shadow.bias'
+      | 'shadow.normalBias'
+      | 'shadow.radius'
+      | 'shadow.mapSize.width'
+      | 'shadow.mapSize.height'
+      | 'shadow.camera.near'
+      | 'shadow.camera.far',
+    nextValue: number
+  ) => void;
+  setPointShadowHelperVisible: (nextVisible: boolean) => void;
 }) {
   const isDisabled = !selectedInfo;
-  const canShowShadow =
+  const isLightObject = Boolean(selectedInfo?.type?.endsWith('Light'));
+  const isShadowCapableLight =
+    selectedInfo?.type === 'DirectionalLight' || selectedInfo?.type === 'SpotLight' || selectedInfo?.type === 'PointLight';
+  const baseShadowAvailability =
     Boolean(shadow?.canCastShadow) || Boolean(shadow?.canReceiveShadow) || Boolean(shadow?.canFrustumCulled);
+  const canShowShadow = isLightObject ? isShadowCapableLight && baseShadowAvailability : baseShadowAvailability;
   const canShowPickable = Boolean(visibilityPickFreeze?.canPickable);
   const canShowFreeze = Boolean(visibilityPickFreeze?.canFreeze);
   const canShowOpacity = Boolean(opacityState?.canOpacity);
   const canShowLightColor = Boolean(lightColorState?.canColor);
   const canShowLightIntensity = Boolean(lightIntensityState?.canIntensity);
   const canShowDirectionalLightShadow = Boolean(shadow?.castShadow) && Boolean(directionalLightShadowState?.canEdit);
-  const isLightObject = Boolean(selectedInfo?.type?.endsWith('Light'));
+  const canShowSpotLightShadow = Boolean(shadow?.castShadow) && Boolean(spotLightShadowState?.canEdit);
+  const canShowPointLightShadow = Boolean(shadow?.castShadow) && Boolean(pointLightShadowState?.canEdit);
   const lightColorLabel = ((labels as any).colorLabel as string | undefined) ?? 'Color';
   const shadowCameraRangeTitleLabel = ((labels as any).shadowCameraRangeTitleLabel as string | undefined) ?? 'Shadow Camera Range';
+  const shadowMapSizeTitleLabel = ((labels as any).shadowMapSizeTitleLabel as string | undefined) ?? 'Shadow Map Size';
+  const shadowMapSizeWidthLabel = ((labels as any).shadowMapSizeWidthLabel as string | undefined) ?? 'Width';
+  const shadowMapSizeHeightLabel = ((labels as any).shadowMapSizeHeightLabel as string | undefined) ?? 'Height';
   const shadowCameraLeftLabel = ((labels as any).shadowCameraLeftLabel as string | undefined) ?? 'Left';
   const shadowCameraRightLabel = ((labels as any).shadowCameraRightLabel as string | undefined) ?? 'Right';
   const shadowCameraTopLabel = ((labels as any).shadowCameraTopLabel as string | undefined) ?? 'Top';
   const shadowCameraBottomLabel = ((labels as any).shadowCameraBottomLabel as string | undefined) ?? 'Bottom';
   const shadowCameraNearLabel = ((labels as any).shadowCameraNearLabel as string | undefined) ?? 'Near';
   const shadowCameraFarLabel = ((labels as any).shadowCameraFarLabel as string | undefined) ?? 'Far';
+  const shadowCameraFovLabel = ((labels as any).shadowCameraFovLabel as string | undefined) ?? 'FOV';
   const shadowHelperVisibleLabel = ((labels as any).shadowHelperVisibleLabel as string | undefined) ?? 'Show Shadow Frustum Helper';
 
   return (
@@ -595,6 +699,52 @@ export function BaseSetting({
                 </label>
               </div>
               <div className="border-t border-[var(--border-subtle)] pt-2">
+                <div className="mb-2 text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{shadowMapSizeTitleLabel}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <LabeledNumberInput
+                    label={shadowMapSizeWidthLabel}
+                    value={directionalLightShadowState?.mapSizeWidth ?? 1024}
+                    disabled={isDisabled}
+                    step={1}
+                    min={1}
+                    onPreviewChange={(v) => previewDirectionalShadowNumber('shadow.mapSize.width', v)}
+                    onCommit={(v) => commitDirectionalShadowNumber('shadow.mapSize.width', v)}
+                  />
+                  <LabeledNumberInput
+                    label={shadowMapSizeHeightLabel}
+                    value={directionalLightShadowState?.mapSizeHeight ?? 1024}
+                    disabled={isDisabled}
+                    step={1}
+                    min={1}
+                    onPreviewChange={(v) => previewDirectionalShadowNumber('shadow.mapSize.height', v)}
+                    onCommit={(v) => commitDirectionalShadowNumber('shadow.mapSize.height', v)}
+                  />
+                </div>
+              </div>
+              <div className="border-t border-[var(--border-subtle)] pt-2">
+                <div className="mb-2 text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{shadowMapSizeTitleLabel}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <LabeledNumberInput
+                    label={shadowMapSizeWidthLabel}
+                    value={spotLightShadowState?.mapSizeWidth ?? 1024}
+                    disabled={isDisabled}
+                    step={1}
+                    min={1}
+                    onPreviewChange={(v) => previewSpotShadowNumber('shadow.mapSize.width', v)}
+                    onCommit={(v) => commitSpotShadowNumber('shadow.mapSize.width', v)}
+                  />
+                  <LabeledNumberInput
+                    label={shadowMapSizeHeightLabel}
+                    value={spotLightShadowState?.mapSizeHeight ?? 1024}
+                    disabled={isDisabled}
+                    step={1}
+                    min={1}
+                    onPreviewChange={(v) => previewSpotShadowNumber('shadow.mapSize.height', v)}
+                    onCommit={(v) => commitSpotShadowNumber('shadow.mapSize.height', v)}
+                  />
+                </div>
+              </div>
+              <div className="border-t border-[var(--border-subtle)] pt-2">
                 <div className="mb-2 text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">
                   {shadowCameraRangeTitleLabel}
                 </div>
@@ -646,6 +796,224 @@ export function BaseSetting({
                     step={0.1}
                     onPreviewChange={(v) => previewDirectionalShadowNumber('shadow.camera.far', v)}
                     onCommit={(v) => commitDirectionalShadowNumber('shadow.camera.far', v)}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {canShowSpotLightShadow ? (
+            <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <LabeledNumberInput
+                  label={labels.shadowIntensityLabel}
+                  value={spotLightShadowState?.intensity ?? 1}
+                  disabled={isDisabled}
+                  step={0.05}
+                  min={0}
+                  max={1}
+                  onPreviewChange={(v) => previewSpotShadowNumber('shadow.intensity', v)}
+                  onCommit={(v) => commitSpotShadowNumber('shadow.intensity', v)}
+                />
+                <LabeledNumberInput
+                  label={labels.shadowRadiusLabel}
+                  value={spotLightShadowState?.radius ?? 1}
+                  disabled={isDisabled}
+                  step={0.1}
+                  min={0}
+                  onPreviewChange={(v) => previewSpotShadowNumber('shadow.radius', v)}
+                  onCommit={(v) => commitSpotShadowNumber('shadow.radius', v)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <LabeledNumberInput
+                  label={labels.shadowBiasLabel}
+                  value={spotLightShadowState?.bias ?? 0}
+                  disabled={isDisabled}
+                  step={0.0001}
+                  onPreviewChange={(v) => previewSpotShadowNumber('shadow.bias', v)}
+                  onCommit={(v) => commitSpotShadowNumber('shadow.bias', v)}
+                />
+                <LabeledNumberInput
+                  label={labels.shadowNormalBiasLabel}
+                  value={spotLightShadowState?.normalBias ?? 0}
+                  disabled={isDisabled}
+                  step={0.001}
+                  min={0}
+                  onPreviewChange={(v) => previewSpotShadowNumber('shadow.normalBias', v)}
+                  onCommit={(v) => commitSpotShadowNumber('shadow.normalBias', v)}
+                />
+              </div>
+              <div className="border-t border-[var(--border-subtle)] pt-2">
+                <label className="flex cursor-pointer items-center justify-between gap-2">
+                  <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">
+                    {shadowHelperVisibleLabel}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={spotLightShadowState?.helperVisible ?? true}
+                    disabled={isDisabled}
+                    onChange={(e) => setSpotShadowHelperVisible(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                </label>
+              </div>
+              <div className="border-t border-[var(--border-subtle)] pt-2">
+                <div className="mb-2 text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{shadowMapSizeTitleLabel}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <LabeledNumberInput
+                    label={shadowMapSizeWidthLabel}
+                    value={spotLightShadowState?.mapSizeWidth ?? 1024}
+                    disabled={isDisabled}
+                    step={1}
+                    min={1}
+                    onPreviewChange={(v) => previewSpotShadowNumber('shadow.mapSize.width', v)}
+                    onCommit={(v) => commitSpotShadowNumber('shadow.mapSize.width', v)}
+                  />
+                  <LabeledNumberInput
+                    label={shadowMapSizeHeightLabel}
+                    value={spotLightShadowState?.mapSizeHeight ?? 1024}
+                    disabled={isDisabled}
+                    step={1}
+                    min={1}
+                    onPreviewChange={(v) => previewSpotShadowNumber('shadow.mapSize.height', v)}
+                    onCommit={(v) => commitSpotShadowNumber('shadow.mapSize.height', v)}
+                  />
+                </div>
+              </div>
+              <div className="border-t border-[var(--border-subtle)] pt-2">
+                <div className="mb-2 text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">
+                  {shadowCameraRangeTitleLabel}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <LabeledNumberInput
+                    label={shadowCameraNearLabel}
+                    value={spotLightShadowState?.near ?? 0.1}
+                    disabled={isDisabled}
+                    step={0.1}
+                    onPreviewChange={(v) => previewSpotShadowNumber('shadow.camera.near', v)}
+                    onCommit={(v) => commitSpotShadowNumber('shadow.camera.near', v)}
+                  />
+                  <LabeledNumberInput
+                    label={shadowCameraFarLabel}
+                    value={spotLightShadowState?.far ?? 20}
+                    disabled={isDisabled}
+                    step={0.1}
+                    onPreviewChange={(v) => previewSpotShadowNumber('shadow.camera.far', v)}
+                    onCommit={(v) => commitSpotShadowNumber('shadow.camera.far', v)}
+                  />
+                  <LabeledNumberInput
+                    label={shadowCameraFovLabel}
+                    value={spotLightShadowState?.fov ?? 45}
+                    disabled={isDisabled}
+                    step={0.1}
+                    min={0.1}
+                    max={179.9}
+                    onPreviewChange={(v) => previewSpotShadowNumber('shadow.camera.fov', v)}
+                    onCommit={(v) => commitSpotShadowNumber('shadow.camera.fov', v)}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {canShowPointLightShadow ? (
+            <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <LabeledNumberInput
+                  label={labels.shadowIntensityLabel}
+                  value={pointLightShadowState?.intensity ?? 1}
+                  disabled={isDisabled}
+                  step={0.05}
+                  min={0}
+                  max={1}
+                  onPreviewChange={(v) => previewPointShadowNumber('shadow.intensity', v)}
+                  onCommit={(v) => commitPointShadowNumber('shadow.intensity', v)}
+                />
+                <LabeledNumberInput
+                  label={labels.shadowRadiusLabel}
+                  value={pointLightShadowState?.radius ?? 1}
+                  disabled={isDisabled}
+                  step={0.1}
+                  min={0}
+                  onPreviewChange={(v) => previewPointShadowNumber('shadow.radius', v)}
+                  onCommit={(v) => commitPointShadowNumber('shadow.radius', v)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <LabeledNumberInput
+                  label={labels.shadowBiasLabel}
+                  value={pointLightShadowState?.bias ?? 0}
+                  disabled={isDisabled}
+                  step={0.0001}
+                  onPreviewChange={(v) => previewPointShadowNumber('shadow.bias', v)}
+                  onCommit={(v) => commitPointShadowNumber('shadow.bias', v)}
+                />
+                <LabeledNumberInput
+                  label={labels.shadowNormalBiasLabel}
+                  value={pointLightShadowState?.normalBias ?? 0}
+                  disabled={isDisabled}
+                  step={0.001}
+                  min={0}
+                  onPreviewChange={(v) => previewPointShadowNumber('shadow.normalBias', v)}
+                  onCommit={(v) => commitPointShadowNumber('shadow.normalBias', v)}
+                />
+              </div>
+              <div className="border-t border-[var(--border-subtle)] pt-2">
+                <label className="flex cursor-pointer items-center justify-between gap-2">
+                  <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">
+                    {shadowHelperVisibleLabel}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={pointLightShadowState?.helperVisible ?? true}
+                    disabled={isDisabled}
+                    onChange={(e) => setPointShadowHelperVisible(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                </label>
+              </div>
+              <div className="border-t border-[var(--border-subtle)] pt-2">
+                <div className="mb-2 text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{shadowMapSizeTitleLabel}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <LabeledNumberInput
+                    label={shadowMapSizeWidthLabel}
+                    value={pointLightShadowState?.mapSizeWidth ?? 1024}
+                    disabled={isDisabled}
+                    step={1}
+                    min={1}
+                    onPreviewChange={(v) => previewPointShadowNumber('shadow.mapSize.width', v)}
+                    onCommit={(v) => commitPointShadowNumber('shadow.mapSize.width', v)}
+                  />
+                  <LabeledNumberInput
+                    label={shadowMapSizeHeightLabel}
+                    value={pointLightShadowState?.mapSizeHeight ?? 1024}
+                    disabled={isDisabled}
+                    step={1}
+                    min={1}
+                    onPreviewChange={(v) => previewPointShadowNumber('shadow.mapSize.height', v)}
+                    onCommit={(v) => commitPointShadowNumber('shadow.mapSize.height', v)}
+                  />
+                </div>
+              </div>
+              <div className="border-t border-[var(--border-subtle)] pt-2">
+                <div className="mb-2 text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">
+                  {shadowCameraRangeTitleLabel}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <LabeledNumberInput
+                    label={shadowCameraNearLabel}
+                    value={pointLightShadowState?.near ?? 0.1}
+                    disabled={isDisabled}
+                    step={0.1}
+                    onPreviewChange={(v) => previewPointShadowNumber('shadow.camera.near', v)}
+                    onCommit={(v) => commitPointShadowNumber('shadow.camera.near', v)}
+                  />
+                  <LabeledNumberInput
+                    label={shadowCameraFarLabel}
+                    value={pointLightShadowState?.far ?? 20}
+                    disabled={isDisabled}
+                    step={0.1}
+                    onPreviewChange={(v) => previewPointShadowNumber('shadow.camera.far', v)}
+                    onCommit={(v) => commitPointShadowNumber('shadow.camera.far', v)}
                   />
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   ThreeEditor,
   createDefaultCamera,
@@ -7,12 +7,12 @@ import {
   type DefaultCameraKey,
   type DefaultLightKey,
   type DefaultModelKey,
-  type ViewPreset
-} from 'vizon-3d-core';
-import { TransformToolbar, type ViewportTool } from './tools/TransformToolbar';
-import { ViewPresetToolbar } from './tools/ViewPresetToolbar';
-import { DATA_TRANSFER_KEYS } from '../../../utils/keys';
-import { encodeHistoryI18nName } from '../../../utils/historyI18n';
+  type ViewPreset,
+} from "vizon-3d-core";
+import { TransformToolbar, type ViewportTool } from "./tools/TransformToolbar";
+import { ViewPresetToolbar } from "./tools/ViewPresetToolbar";
+import { DATA_TRANSFER_KEYS } from "../../../utils/keys";
+import { encodeHistoryI18nName } from "../../../utils/historyI18n";
 
 /**
  * 生成添加相机操作的国际化历史记录名称。
@@ -20,12 +20,12 @@ import { encodeHistoryI18nName } from '../../../utils/historyI18n';
  */
 function getAddCameraHistoryName(cameraKey: DefaultCameraKey, uuid: string) {
   const cameraName =
-    cameraKey === 'orthographic'
-      ? { 'zh-CN': '正交相机', 'en-US': 'Orthographic Camera' }
-      : { 'zh-CN': '透视相机', 'en-US': 'Perspective Camera' };
+    cameraKey === "orthographic"
+      ? { "zh-CN": "正交相机", "en-US": "Orthographic Camera" }
+      : { "zh-CN": "透视相机", "en-US": "Perspective Camera" };
   return encodeHistoryI18nName({
-    'zh-CN': `添加${cameraName['zh-CN']} - ${uuid}`,
-    'en-US': `Add ${cameraName['en-US']} - ${uuid}`
+    "zh-CN": `添加${cameraName["zh-CN"]} - ${uuid}`,
+    "en-US": `Add ${cameraName["en-US"]} - ${uuid}`,
   });
 }
 
@@ -33,18 +33,21 @@ function getAddCameraHistoryName(cameraKey: DefaultCameraKey, uuid: string) {
  * 生成添加灯光操作的国际化历史记录名称。
  */
 function getAddLightHistoryName(lightKey: DefaultLightKey, uuid: string) {
-  const lightNameMap: Record<DefaultLightKey, { 'zh-CN': string; 'en-US': string }> = {
-    ambientLight: { 'zh-CN': '环境光', 'en-US': 'Ambient Light' },
-    directionalLight: { 'zh-CN': '平行光', 'en-US': 'Directional Light' },
-    pointLight: { 'zh-CN': '点光源', 'en-US': 'Point Light' },
-    spotLight: { 'zh-CN': '聚光灯', 'en-US': 'Spot Light' },
-    hemisphereLight: { 'zh-CN': '半球光', 'en-US': 'Hemisphere Light' },
-    rectAreaLight: { 'zh-CN': '矩形光', 'en-US': 'Rect Area Light' }
+  const lightNameMap: Record<
+    DefaultLightKey,
+    { "zh-CN": string; "en-US": string }
+  > = {
+    ambientLight: { "zh-CN": "环境光", "en-US": "Ambient Light" },
+    directionalLight: { "zh-CN": "平行光", "en-US": "Directional Light" },
+    pointLight: { "zh-CN": "点光源", "en-US": "Point Light" },
+    spotLight: { "zh-CN": "聚光灯", "en-US": "Spot Light" },
+    hemisphereLight: { "zh-CN": "半球光", "en-US": "Hemisphere Light" },
+    rectAreaLight: { "zh-CN": "矩形光", "en-US": "Rect Area Light" },
   };
   const lightName = lightNameMap[lightKey];
   return encodeHistoryI18nName({
-    'zh-CN': `添加${lightName['zh-CN']} - ${uuid}`,
-    'en-US': `Add ${lightName['en-US']} - ${uuid}`
+    "zh-CN": `添加${lightName["zh-CN"]} - ${uuid}`,
+    "en-US": `Add ${lightName["en-US"]} - ${uuid}`,
   });
 }
 
@@ -53,19 +56,23 @@ function getAddLightHistoryName(lightKey: DefaultLightKey, uuid: string) {
  * 负责初始化 ThreeEditor 实例，处理视口工具切换、视角预设，
  * 以及将拖拽放置的模型/相机/灯光插入到场景中。
  */
-export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: ThreeEditor) => void }) {
+export function ThreeViewport({
+  onEditorReady,
+}: {
+  onEditorReady?: (editor: ThreeEditor) => void;
+}) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const toolRef = useRef<ViewportTool | null>('translate');
+  const toolRef = useRef<ViewportTool | null>("translate");
   const shiftSelectingRef = useRef(false);
   const MODEL_DRAG_MIME = DATA_TRANSFER_KEYS.MODEL_MIME;
   const CAMERA_DRAG_MIME = DATA_TRANSFER_KEYS.CAMERA_MIME;
   const LIGHT_DRAG_MIME = DATA_TRANSFER_KEYS.LIGHT_MIME;
 
   const editor = useMemo(() => ({ current: null as ThreeEditor | null }), []);
-  const [view, setView] = useState<ViewPreset>('default');
+  const [view, setView] = useState<ViewPreset>("default");
   // 工具非必选：未选中时不允许拾取/变换交互
-  const [tool, setTool] = useState<ViewportTool | null>('translate');
+  const [tool, setTool] = useState<ViewportTool | null>("translate");
   const [hideViewportTool, setHideViewportTool] = useState(false);
 
   useEffect(() => {
@@ -76,7 +83,7 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
     const inst = new ThreeEditor({
       canvas,
       // 实验开关：先验证静态对象矩阵冻结对编辑器性能的收益。
-      freezeStaticObjects: true
+      freezeStaticObjects: true,
     });
     editor.current = inst;
     inst.start();
@@ -86,22 +93,22 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
       (window as any).vizonEditor = inst;
     }
     inst.setViewPreset(view);
-    inst.setTransformMode('translate');
+    inst.setTransformMode("translate");
     inst.setTransformToolEnabled(true);
     inst.setTransformHandleVisible(true);
-    const offSelect = inst.on('select', ({ object }) => {
+    const offSelect = inst.on("select", ({ object }) => {
       if (shiftSelectingRef.current) return;
       // 当工具未激活时，树节点选中对象后自动回到默认工具（第一个：translate）。
       if (!object) return;
       if (toolRef.current != null) return;
-      toolRef.current = 'translate';
-      setTool('translate');
-      inst.setTransformMode('translate');
+      toolRef.current = "translate";
+      setTool("translate");
+      inst.setTransformMode("translate");
       inst.setTransformToolEnabled(true);
     });
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Shift') return;
+      if (event.key !== "Shift") return;
       if (shiftSelectingRef.current) return;
       shiftSelectingRef.current = true;
       setHideViewportTool(true);
@@ -109,7 +116,7 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
       inst.select(null);
     };
     const onKeyUp = (event: KeyboardEvent) => {
-      if (event.key !== 'Shift') return;
+      if (event.key !== "Shift") return;
       if (!shiftSelectingRef.current) return;
       shiftSelectingRef.current = false;
       setHideViewportTool(false);
@@ -133,9 +140,9 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
       inst.setTransformMode(nextTool);
       inst.setTransformHandleVisible(true);
     };
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    window.addEventListener('blur', onWindowBlur);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onWindowBlur);
 
     const resize = () => {
       const rect = host.getBoundingClientRect();
@@ -148,14 +155,15 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
 
     return () => {
       offSelect();
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      window.removeEventListener('blur', onWindowBlur);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onWindowBlur);
       ro.disconnect();
       inst.dispose();
       editor.current = null;
       if (import.meta.env.DEV) {
-        if ((window as any).vizonEditor === inst) (window as any).vizonEditor = null;
+        if ((window as any).vizonEditor === inst)
+          (window as any).vizonEditor = null;
       }
     };
   }, [editor, onEditorReady]);
@@ -181,7 +189,7 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
   const onDragOver = (e: DragEvent<HTMLDivElement>) => {
     // 必须阻止默认行为，否则 drop 不会触发
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
+    e.dataTransfer.dropEffect = "copy";
   };
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -196,7 +204,10 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
     const x = (e.clientX - rect.left) / Math.max(1, rect.width);
     const y = (e.clientY - rect.top) / Math.max(1, rect.height);
 
-    const point = inst.getDropPointFromViewport(x, y, { groundPlaneY: 0, defaultDistance: 6 });
+    const point = inst.getDropPointFromViewport(x, y, {
+      groundPlaneY: 0,
+      defaultDistance: 6,
+    });
     if (!point) return;
 
     const modelKey = e.dataTransfer.getData(MODEL_DRAG_MIME);
@@ -205,9 +216,9 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
       const obj = createDefaultModel(typedKey, { position: point });
       inst.add(obj, {
         operationName: encodeHistoryI18nName({
-          'zh-CN': `添加物体 - ${obj.uuid}`,
-          'en-US': `Add object - ${obj.uuid}`
-        })
+          "zh-CN": `添加物体 - ${obj.uuid}`,
+          "en-US": `Add object - ${obj.uuid}`,
+        }),
       });
       inst.select(obj);
       return;
@@ -218,7 +229,7 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
       const typedKey = cameraKey as DefaultCameraKey;
       const cam = createDefaultCamera(typedKey, { position: point });
       inst.add(cam, {
-        operationName: getAddCameraHistoryName(typedKey, cam.uuid)
+        operationName: getAddCameraHistoryName(typedKey, cam.uuid),
       });
       inst.select(cam);
       return;
@@ -227,20 +238,30 @@ export function ThreeViewport({ onEditorReady }: { onEditorReady?: (editor: Thre
     const lightKey = e.dataTransfer.getData(LIGHT_DRAG_MIME);
     if (lightKey) {
       const typedKey = lightKey as DefaultLightKey;
-      const light = createDefaultLight(typedKey, { position: point, target: { x: 0, y: 0, z: 0 } });
+      const light = createDefaultLight(typedKey, {
+        target: { x: 0, y: 0, z: 0 },
+      });
+      // 拖拽落点主要决定平面位置；灯光默认高度保留，避免 Spot/Directional 贴地创建。
+      light.position.set(point.x, Math.max(point.y, light.position.y), point.z);
       inst.add(light, {
-        operationName: getAddLightHistoryName(typedKey, light.uuid)
+        operationName: getAddLightHistoryName(typedKey, light.uuid),
       });
       inst.select(light);
     }
   };
 
   return (
-    <div ref={hostRef} className="relative h-full w-full" onDragOver={onDragOver} onDrop={onDrop}>
+    <div
+      ref={hostRef}
+      className="relative h-full w-full"
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
       <ViewPresetToolbar value={view} onChange={setPreset} />
-      {!hideViewportTool ? <TransformToolbar value={tool} onChange={setViewportTool} /> : null}
+      {!hideViewportTool ? (
+        <TransformToolbar value={tool} onChange={setViewportTool} />
+      ) : null}
     </div>
   );
 }
-

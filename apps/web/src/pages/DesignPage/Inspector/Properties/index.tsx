@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Accordion } from '../../../../components/Accordion';
-import { Color } from 'three';
 import { BaseSetting } from './BaseSetting';
 import { ObjectAttributes } from './ObjectAttributes';
 import { message } from '../../../../components/GlobalMessage';
@@ -73,10 +72,39 @@ type DirectionalLightShadowState = {
   bias: number;
   normalBias: number;
   radius: number;
+  mapSizeWidth: number;
+  mapSizeHeight: number;
   left: number;
   right: number;
   top: number;
   bottom: number;
+  near: number;
+  far: number;
+  helperVisible: boolean;
+  canEdit: boolean;
+};
+
+type SpotLightShadowState = {
+  intensity: number;
+  bias: number;
+  normalBias: number;
+  radius: number;
+  mapSizeWidth: number;
+  mapSizeHeight: number;
+  near: number;
+  far: number;
+  fov: number;
+  helperVisible: boolean;
+  canEdit: boolean;
+};
+
+type PointLightShadowState = {
+  intensity: number;
+  bias: number;
+  normalBias: number;
+  radius: number;
+  mapSizeWidth: number;
+  mapSizeHeight: number;
   near: number;
   far: number;
   helperVisible: boolean;
@@ -162,7 +190,9 @@ function boolTextI18n(v: boolean): { zh: string; en: string } {
 function readSelectedShadow(obj: any): ShadowState | null {
   if (!obj) return null;
 
-  const canCastShadow = typeof (obj as any).castShadow === 'boolean';
+  const isLight = Boolean((obj as any)?.isLight);
+  const canLightCastShadow = Boolean((obj as any)?.isDirectionalLight || (obj as any)?.isSpotLight || (obj as any)?.isPointLight);
+  const canCastShadow = isLight ? canLightCastShadow : typeof (obj as any).castShadow === 'boolean';
   const canReceiveShadow = typeof (obj as any).receiveShadow === 'boolean';
   const canFrustumCulled = typeof (obj as any).frustumCulled === 'boolean';
 
@@ -299,12 +329,51 @@ function readSelectedDirectionalLightShadow(obj: any): DirectionalLightShadowSta
     bias: typeof shadow.bias === 'number' ? Number(shadow.bias) : 0,
     normalBias: typeof shadow.normalBias === 'number' ? Number(shadow.normalBias) : 0,
     radius: typeof shadow.radius === 'number' ? Number(shadow.radius) : 1,
+    mapSizeWidth: typeof shadow.mapSize?.width === 'number' ? Number(shadow.mapSize.width) : 1024,
+    mapSizeHeight: typeof shadow.mapSize?.height === 'number' ? Number(shadow.mapSize.height) : 1024,
     left: typeof shadow.camera?.left === 'number' ? Number(shadow.camera.left) : -5,
     right: typeof shadow.camera?.right === 'number' ? Number(shadow.camera.right) : 5,
     top: typeof shadow.camera?.top === 'number' ? Number(shadow.camera.top) : 5,
     bottom: typeof shadow.camera?.bottom === 'number' ? Number(shadow.camera.bottom) : -5,
     near: typeof shadow.camera?.near === 'number' ? Number(shadow.camera.near) : 0.5,
     far: typeof shadow.camera?.far === 'number' ? Number(shadow.camera.far) : 500,
+    helperVisible: (obj as any)?.userData?.[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false,
+    canEdit: true
+  };
+}
+
+function readSelectedSpotLightShadow(obj: any): SpotLightShadowState | null {
+  if (!obj || !(obj as any)?.isSpotLight) return null;
+  const shadow = (obj as any)?.shadow;
+  if (!shadow) return null;
+  return {
+    intensity: typeof shadow.intensity === 'number' ? Number(shadow.intensity) : 1,
+    bias: typeof shadow.bias === 'number' ? Number(shadow.bias) : 0,
+    normalBias: typeof shadow.normalBias === 'number' ? Number(shadow.normalBias) : 0,
+    radius: typeof shadow.radius === 'number' ? Number(shadow.radius) : 1,
+    mapSizeWidth: typeof shadow.mapSize?.width === 'number' ? Number(shadow.mapSize.width) : 1024,
+    mapSizeHeight: typeof shadow.mapSize?.height === 'number' ? Number(shadow.mapSize.height) : 1024,
+    near: typeof shadow.camera?.near === 'number' ? Number(shadow.camera.near) : 0.1,
+    far: typeof shadow.camera?.far === 'number' ? Number(shadow.camera.far) : 20,
+    fov: typeof shadow.camera?.fov === 'number' ? Number(shadow.camera.fov) : 45,
+    helperVisible: (obj as any)?.userData?.[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false,
+    canEdit: true
+  };
+}
+
+function readSelectedPointLightShadow(obj: any): PointLightShadowState | null {
+  if (!obj || !(obj as any)?.isPointLight) return null;
+  const shadow = (obj as any)?.shadow;
+  if (!shadow) return null;
+  return {
+    intensity: typeof shadow.intensity === 'number' ? Number(shadow.intensity) : 1,
+    bias: typeof shadow.bias === 'number' ? Number(shadow.bias) : 0,
+    normalBias: typeof shadow.normalBias === 'number' ? Number(shadow.normalBias) : 0,
+    radius: typeof shadow.radius === 'number' ? Number(shadow.radius) : 1,
+    mapSizeWidth: typeof shadow.mapSize?.width === 'number' ? Number(shadow.mapSize.width) : 1024,
+    mapSizeHeight: typeof shadow.mapSize?.height === 'number' ? Number(shadow.mapSize.height) : 1024,
+    near: typeof shadow.camera?.near === 'number' ? Number(shadow.camera.near) : 0.1,
+    far: typeof shadow.camera?.far === 'number' ? Number(shadow.camera.far) : 20,
     helperVisible: (obj as any)?.userData?.[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false,
     canEdit: true
   };
@@ -324,6 +393,8 @@ export function PropertiesSettings() {
   const [lightColorState, setLightColorState] = useState<LightColorState | null>(null);
   const [lightIntensityState, setLightIntensityState] = useState<LightIntensityState | null>(null);
   const [directionalLightShadowState, setDirectionalLightShadowState] = useState<DirectionalLightShadowState | null>(null);
+  const [spotLightShadowState, setSpotLightShadowState] = useState<SpotLightShadowState | null>(null);
+  const [pointLightShadowState, setPointLightShadowState] = useState<PointLightShadowState | null>(null);
   const lightColorHistoryBaseRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -340,6 +411,8 @@ export function PropertiesSettings() {
     setLightColorState(selectedLightColor);
     setLightIntensityState(selected ? readSelectedLightIntensity(selected) : null);
     setDirectionalLightShadowState(selected ? readSelectedDirectionalLightShadow(selected) : null);
+    setSpotLightShadowState(selected ? readSelectedSpotLightShadow(selected) : null);
+    setPointLightShadowState(selected ? readSelectedPointLightShadow(selected) : null);
     lightColorHistoryBaseRef.current = selectedLightColor?.color?.toLowerCase() ?? null;
 
     const off = editor.on('select', ({ object }) => {
@@ -353,6 +426,8 @@ export function PropertiesSettings() {
         setLightColorState(null);
         setLightIntensityState(null);
         setDirectionalLightShadowState(null);
+        setSpotLightShadowState(null);
+        setPointLightShadowState(null);
         lightColorHistoryBaseRef.current = null;
         return;
       }
@@ -370,6 +445,8 @@ export function PropertiesSettings() {
       setLightColorState(nextLightColor);
       setLightIntensityState(readSelectedLightIntensity(object));
       setDirectionalLightShadowState(readSelectedDirectionalLightShadow(object));
+      setSpotLightShadowState(readSelectedSpotLightShadow(object));
+      setPointLightShadowState(readSelectedPointLightShadow(object));
       lightColorHistoryBaseRef.current = nextLightColor?.color?.toLowerCase() ?? null;
     });
 
@@ -395,6 +472,8 @@ export function PropertiesSettings() {
       setLightColorState(readSelectedLightColor(obj));
       setLightIntensityState(readSelectedLightIntensity(obj));
       setDirectionalLightShadowState(readSelectedDirectionalLightShadow(obj));
+      setSpotLightShadowState(readSelectedSpotLightShadow(obj));
+      setPointLightShadowState(readSelectedPointLightShadow(obj));
     };
 
     // 立即刷新一次，确保选中刚切换时是最新值
@@ -755,7 +834,6 @@ export function PropertiesSettings() {
     const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
     if (!obj?.isLight || !obj?.color || typeof obj.color.getHexString !== 'function') return;
     const normalizedNext = nextColor.startsWith('#') ? nextColor : `#${nextColor}`;
-    obj.color = obj.color ?? new Color();
     obj.color.set(normalizedNext);
     setLightColorState({ color: normalizedNext.toLowerCase(), canColor: true });
     editor.render();
@@ -774,14 +852,12 @@ export function PropertiesSettings() {
         `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.colorLabel} = ${normalizedNext}`
       ),
       do: () => {
-        obj.color = obj.color ?? new Color();
         obj.color.set(normalizedNext);
         setLightColorState({ color: normalizedNext.toLowerCase(), canColor: true });
         lightColorHistoryBaseRef.current = normalizedNext.toLowerCase();
         editor.render();
       },
       undo: () => {
-        obj.color = obj.color ?? new Color();
         obj.color.set(beforeColor);
         setLightColorState({ color: beforeColor, canColor: true });
         lightColorHistoryBaseRef.current = beforeColor;
@@ -819,6 +895,8 @@ export function PropertiesSettings() {
       | 'shadow.bias'
       | 'shadow.normalBias'
       | 'shadow.radius'
+      | 'shadow.mapSize.width'
+      | 'shadow.mapSize.height'
       | 'shadow.camera.left'
       | 'shadow.camera.right'
       | 'shadow.camera.top'
@@ -830,19 +908,25 @@ export function PropertiesSettings() {
     if (!editor || !selectedInfo) return;
     const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
     if (!obj?.isDirectionalLight || !obj.shadow) return;
-    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, nextValue, { recordHistory: false });
+    const normalizedValue =
+      path === 'shadow.mapSize.width' || path === 'shadow.mapSize.height'
+        ? Math.max(1, Math.min(8192, Math.round(nextValue)))
+        : nextValue;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, normalizedValue, { recordHistory: false });
     setDirectionalLightShadowState((prev) => {
       if (!prev) return prev;
-      if (path === 'shadow.intensity') return { ...prev, intensity: nextValue };
-      if (path === 'shadow.bias') return { ...prev, bias: nextValue };
-      if (path === 'shadow.normalBias') return { ...prev, normalBias: nextValue };
-      if (path === 'shadow.radius') return { ...prev, radius: nextValue };
-      if (path === 'shadow.camera.left') return { ...prev, left: nextValue };
-      if (path === 'shadow.camera.right') return { ...prev, right: nextValue };
-      if (path === 'shadow.camera.top') return { ...prev, top: nextValue };
-      if (path === 'shadow.camera.bottom') return { ...prev, bottom: nextValue };
-      if (path === 'shadow.camera.near') return { ...prev, near: nextValue };
-      return { ...prev, far: nextValue };
+      if (path === 'shadow.intensity') return { ...prev, intensity: normalizedValue };
+      if (path === 'shadow.bias') return { ...prev, bias: normalizedValue };
+      if (path === 'shadow.normalBias') return { ...prev, normalBias: normalizedValue };
+      if (path === 'shadow.radius') return { ...prev, radius: normalizedValue };
+      if (path === 'shadow.mapSize.width') return { ...prev, mapSizeWidth: normalizedValue };
+      if (path === 'shadow.mapSize.height') return { ...prev, mapSizeHeight: normalizedValue };
+      if (path === 'shadow.camera.left') return { ...prev, left: normalizedValue };
+      if (path === 'shadow.camera.right') return { ...prev, right: normalizedValue };
+      if (path === 'shadow.camera.top') return { ...prev, top: normalizedValue };
+      if (path === 'shadow.camera.bottom') return { ...prev, bottom: normalizedValue };
+      if (path === 'shadow.camera.near') return { ...prev, near: normalizedValue };
+      return { ...prev, far: normalizedValue };
     });
   };
 
@@ -852,6 +936,8 @@ export function PropertiesSettings() {
       | 'shadow.bias'
       | 'shadow.normalBias'
       | 'shadow.radius'
+      | 'shadow.mapSize.width'
+      | 'shadow.mapSize.height'
       | 'shadow.camera.left'
       | 'shadow.camera.right'
       | 'shadow.camera.top'
@@ -863,11 +949,17 @@ export function PropertiesSettings() {
     if (!editor || !selectedInfo) return;
     const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
     if (!obj?.isDirectionalLight || !obj.shadow) return;
+    const normalizedValue =
+      path === 'shadow.mapSize.width' || path === 'shadow.mapSize.height'
+        ? Math.max(1, Math.min(8192, Math.round(nextValue)))
+        : nextValue;
     const labelMap = {
       'shadow.intensity': { zh: labelsZh.shadowIntensityLabel, en: labelsEn.shadowIntensityLabel },
       'shadow.bias': { zh: labelsZh.shadowBiasLabel, en: labelsEn.shadowBiasLabel },
       'shadow.normalBias': { zh: labelsZh.shadowNormalBiasLabel, en: labelsEn.shadowNormalBiasLabel },
       'shadow.radius': { zh: labelsZh.shadowRadiusLabel, en: labelsEn.shadowRadiusLabel },
+      'shadow.mapSize.width': { zh: labelsZh.shadowMapSizeWidthLabel, en: labelsEn.shadowMapSizeWidthLabel },
+      'shadow.mapSize.height': { zh: labelsZh.shadowMapSizeHeightLabel, en: labelsEn.shadowMapSizeHeightLabel },
       'shadow.camera.left': { zh: labelsZh.shadowCameraLeftLabel, en: labelsEn.shadowCameraLeftLabel },
       'shadow.camera.right': { zh: labelsZh.shadowCameraRightLabel, en: labelsEn.shadowCameraRightLabel },
       'shadow.camera.top': { zh: labelsZh.shadowCameraTopLabel, en: labelsEn.shadowCameraTopLabel },
@@ -875,8 +967,8 @@ export function PropertiesSettings() {
       'shadow.camera.near': { zh: labelsZh.shadowCameraNearLabel, en: labelsEn.shadowCameraNearLabel },
       'shadow.camera.far': { zh: labelsZh.shadowCameraFarLabel, en: labelsEn.shadowCameraFarLabel }
     } as const;
-    const displayValue = Number(nextValue.toFixed(6));
-    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, nextValue, {
+    const displayValue = Number(normalizedValue.toFixed(6));
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, normalizedValue, {
       recordHistory: true,
       operationName: historyName(
         `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelMap[path].zh} = ${displayValue}`,
@@ -885,16 +977,18 @@ export function PropertiesSettings() {
     });
     setDirectionalLightShadowState((prev) => {
       if (!prev) return prev;
-      if (path === 'shadow.intensity') return { ...prev, intensity: nextValue };
-      if (path === 'shadow.bias') return { ...prev, bias: nextValue };
-      if (path === 'shadow.normalBias') return { ...prev, normalBias: nextValue };
-      if (path === 'shadow.radius') return { ...prev, radius: nextValue };
-      if (path === 'shadow.camera.left') return { ...prev, left: nextValue };
-      if (path === 'shadow.camera.right') return { ...prev, right: nextValue };
-      if (path === 'shadow.camera.top') return { ...prev, top: nextValue };
-      if (path === 'shadow.camera.bottom') return { ...prev, bottom: nextValue };
-      if (path === 'shadow.camera.near') return { ...prev, near: nextValue };
-      return { ...prev, far: nextValue };
+      if (path === 'shadow.intensity') return { ...prev, intensity: normalizedValue };
+      if (path === 'shadow.bias') return { ...prev, bias: normalizedValue };
+      if (path === 'shadow.normalBias') return { ...prev, normalBias: normalizedValue };
+      if (path === 'shadow.radius') return { ...prev, radius: normalizedValue };
+      if (path === 'shadow.mapSize.width') return { ...prev, mapSizeWidth: normalizedValue };
+      if (path === 'shadow.mapSize.height') return { ...prev, mapSizeHeight: normalizedValue };
+      if (path === 'shadow.camera.left') return { ...prev, left: normalizedValue };
+      if (path === 'shadow.camera.right') return { ...prev, right: normalizedValue };
+      if (path === 'shadow.camera.top') return { ...prev, top: normalizedValue };
+      if (path === 'shadow.camera.bottom') return { ...prev, bottom: normalizedValue };
+      if (path === 'shadow.camera.near') return { ...prev, near: normalizedValue };
+      return { ...prev, far: normalizedValue };
     });
   };
 
@@ -910,6 +1004,205 @@ export function PropertiesSettings() {
       )
     });
     setDirectionalLightShadowState((prev) => (prev ? { ...prev, helperVisible: nextVisible } : prev));
+  };
+
+  const previewSpotShadowNumber = (
+    path:
+      | 'shadow.intensity'
+      | 'shadow.bias'
+      | 'shadow.normalBias'
+      | 'shadow.radius'
+      | 'shadow.mapSize.width'
+      | 'shadow.mapSize.height'
+      | 'shadow.camera.near'
+      | 'shadow.camera.far'
+      | 'shadow.camera.fov',
+    nextValue: number
+  ) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isSpotLight || !obj.shadow) return;
+    const normalizedValue =
+      path === 'shadow.mapSize.width' || path === 'shadow.mapSize.height'
+        ? Math.max(1, Math.min(8192, Math.round(nextValue)))
+        : nextValue;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, normalizedValue, { recordHistory: false });
+    setSpotLightShadowState((prev) => {
+      if (!prev) return prev;
+      if (path === 'shadow.intensity') return { ...prev, intensity: normalizedValue };
+      if (path === 'shadow.bias') return { ...prev, bias: normalizedValue };
+      if (path === 'shadow.normalBias') return { ...prev, normalBias: normalizedValue };
+      if (path === 'shadow.radius') return { ...prev, radius: normalizedValue };
+      if (path === 'shadow.mapSize.width') return { ...prev, mapSizeWidth: normalizedValue };
+      if (path === 'shadow.mapSize.height') return { ...prev, mapSizeHeight: normalizedValue };
+      if (path === 'shadow.camera.near') return { ...prev, near: normalizedValue };
+      if (path === 'shadow.camera.far') return { ...prev, far: normalizedValue };
+      return { ...prev, fov: normalizedValue };
+    });
+  };
+
+  const commitSpotShadowNumber = (
+    path:
+      | 'shadow.intensity'
+      | 'shadow.bias'
+      | 'shadow.normalBias'
+      | 'shadow.radius'
+      | 'shadow.mapSize.width'
+      | 'shadow.mapSize.height'
+      | 'shadow.camera.near'
+      | 'shadow.camera.far'
+      | 'shadow.camera.fov',
+    nextValue: number
+  ) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isSpotLight || !obj.shadow) return;
+    const normalizedValue =
+      path === 'shadow.mapSize.width' || path === 'shadow.mapSize.height'
+        ? Math.max(1, Math.min(8192, Math.round(nextValue)))
+        : nextValue;
+    const labelMap = {
+      'shadow.intensity': { zh: labelsZh.shadowIntensityLabel, en: labelsEn.shadowIntensityLabel },
+      'shadow.bias': { zh: labelsZh.shadowBiasLabel, en: labelsEn.shadowBiasLabel },
+      'shadow.normalBias': { zh: labelsZh.shadowNormalBiasLabel, en: labelsEn.shadowNormalBiasLabel },
+      'shadow.radius': { zh: labelsZh.shadowRadiusLabel, en: labelsEn.shadowRadiusLabel },
+      'shadow.mapSize.width': { zh: labelsZh.shadowMapSizeWidthLabel, en: labelsEn.shadowMapSizeWidthLabel },
+      'shadow.mapSize.height': { zh: labelsZh.shadowMapSizeHeightLabel, en: labelsEn.shadowMapSizeHeightLabel },
+      'shadow.camera.near': { zh: labelsZh.shadowCameraNearLabel, en: labelsEn.shadowCameraNearLabel },
+      'shadow.camera.far': { zh: labelsZh.shadowCameraFarLabel, en: labelsEn.shadowCameraFarLabel },
+      'shadow.camera.fov': { zh: labelsZh.shadowCameraFovLabel, en: labelsEn.shadowCameraFovLabel }
+    } as const;
+    const displayValue = Number(normalizedValue.toFixed(6));
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, normalizedValue, {
+      recordHistory: true,
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelMap[path].zh} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelMap[path].en} = ${displayValue}`
+      )
+    });
+    setSpotLightShadowState((prev) => {
+      if (!prev) return prev;
+      if (path === 'shadow.intensity') return { ...prev, intensity: normalizedValue };
+      if (path === 'shadow.bias') return { ...prev, bias: normalizedValue };
+      if (path === 'shadow.normalBias') return { ...prev, normalBias: normalizedValue };
+      if (path === 'shadow.radius') return { ...prev, radius: normalizedValue };
+      if (path === 'shadow.mapSize.width') return { ...prev, mapSizeWidth: normalizedValue };
+      if (path === 'shadow.mapSize.height') return { ...prev, mapSizeHeight: normalizedValue };
+      if (path === 'shadow.camera.near') return { ...prev, near: normalizedValue };
+      if (path === 'shadow.camera.far') return { ...prev, far: normalizedValue };
+      return { ...prev, fov: normalizedValue };
+    });
+  };
+
+  const setSpotShadowHelperVisible = (nextVisible: boolean) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isSpotLight) return;
+    const v = boolTextI18n(nextVisible);
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, `userData.${VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE}`, nextVisible, {
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.shadowHelperVisibleLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.shadowHelperVisibleLabel} = ${v.en}`
+      )
+    });
+    setSpotLightShadowState((prev) => (prev ? { ...prev, helperVisible: nextVisible } : prev));
+  };
+
+  const previewPointShadowNumber = (
+    path:
+      | 'shadow.intensity'
+      | 'shadow.bias'
+      | 'shadow.normalBias'
+      | 'shadow.radius'
+      | 'shadow.mapSize.width'
+      | 'shadow.mapSize.height'
+      | 'shadow.camera.near'
+      | 'shadow.camera.far',
+    nextValue: number
+  ) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isPointLight || !obj.shadow) return;
+    const normalizedValue =
+      path === 'shadow.mapSize.width' || path === 'shadow.mapSize.height'
+        ? Math.max(1, Math.min(8192, Math.round(nextValue)))
+        : nextValue;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, normalizedValue, { recordHistory: false });
+    setPointLightShadowState((prev) => {
+      if (!prev) return prev;
+      if (path === 'shadow.intensity') return { ...prev, intensity: normalizedValue };
+      if (path === 'shadow.bias') return { ...prev, bias: normalizedValue };
+      if (path === 'shadow.normalBias') return { ...prev, normalBias: normalizedValue };
+      if (path === 'shadow.radius') return { ...prev, radius: normalizedValue };
+      if (path === 'shadow.mapSize.width') return { ...prev, mapSizeWidth: normalizedValue };
+      if (path === 'shadow.mapSize.height') return { ...prev, mapSizeHeight: normalizedValue };
+      if (path === 'shadow.camera.near') return { ...prev, near: normalizedValue };
+      return { ...prev, far: normalizedValue };
+    });
+  };
+
+  const commitPointShadowNumber = (
+    path:
+      | 'shadow.intensity'
+      | 'shadow.bias'
+      | 'shadow.normalBias'
+      | 'shadow.radius'
+      | 'shadow.mapSize.width'
+      | 'shadow.mapSize.height'
+      | 'shadow.camera.near'
+      | 'shadow.camera.far',
+    nextValue: number
+  ) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isPointLight || !obj.shadow) return;
+    const normalizedValue =
+      path === 'shadow.mapSize.width' || path === 'shadow.mapSize.height'
+        ? Math.max(1, Math.min(8192, Math.round(nextValue)))
+        : nextValue;
+    const labelMap = {
+      'shadow.intensity': { zh: labelsZh.shadowIntensityLabel, en: labelsEn.shadowIntensityLabel },
+      'shadow.bias': { zh: labelsZh.shadowBiasLabel, en: labelsEn.shadowBiasLabel },
+      'shadow.normalBias': { zh: labelsZh.shadowNormalBiasLabel, en: labelsEn.shadowNormalBiasLabel },
+      'shadow.radius': { zh: labelsZh.shadowRadiusLabel, en: labelsEn.shadowRadiusLabel },
+      'shadow.mapSize.width': { zh: labelsZh.shadowMapSizeWidthLabel, en: labelsEn.shadowMapSizeWidthLabel },
+      'shadow.mapSize.height': { zh: labelsZh.shadowMapSizeHeightLabel, en: labelsEn.shadowMapSizeHeightLabel },
+      'shadow.camera.near': { zh: labelsZh.shadowCameraNearLabel, en: labelsEn.shadowCameraNearLabel },
+      'shadow.camera.far': { zh: labelsZh.shadowCameraFarLabel, en: labelsEn.shadowCameraFarLabel }
+    } as const;
+    const displayValue = Number(normalizedValue.toFixed(6));
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, normalizedValue, {
+      recordHistory: true,
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelMap[path].zh} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelMap[path].en} = ${displayValue}`
+      )
+    });
+    setPointLightShadowState((prev) => {
+      if (!prev) return prev;
+      if (path === 'shadow.intensity') return { ...prev, intensity: normalizedValue };
+      if (path === 'shadow.bias') return { ...prev, bias: normalizedValue };
+      if (path === 'shadow.normalBias') return { ...prev, normalBias: normalizedValue };
+      if (path === 'shadow.radius') return { ...prev, radius: normalizedValue };
+      if (path === 'shadow.mapSize.width') return { ...prev, mapSizeWidth: normalizedValue };
+      if (path === 'shadow.mapSize.height') return { ...prev, mapSizeHeight: normalizedValue };
+      if (path === 'shadow.camera.near') return { ...prev, near: normalizedValue };
+      return { ...prev, far: normalizedValue };
+    });
+  };
+
+  const setPointShadowHelperVisible = (nextVisible: boolean) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isPointLight) return;
+    const v = boolTextI18n(nextVisible);
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, `userData.${VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE}`, nextVisible, {
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.shadowHelperVisibleLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.shadowHelperVisibleLabel} = ${v.en}`
+      )
+    });
+    setPointLightShadowState((prev) => (prev ? { ...prev, helperVisible: nextVisible } : prev));
   };
 
   return (
@@ -932,6 +1225,8 @@ export function PropertiesSettings() {
               lightColorState={lightColorState}
               lightIntensityState={lightIntensityState}
               directionalLightShadowState={directionalLightShadowState}
+              spotLightShadowState={spotLightShadowState}
+              pointLightShadowState={pointLightShadowState}
               onNamePreviewChange={onNamePreviewChange}
               onNameCommit={onNameCommit}
               copyUuid={copyUuid}
@@ -958,6 +1253,12 @@ export function PropertiesSettings() {
               previewDirectionalShadowNumber={previewDirectionalShadowNumber}
               commitDirectionalShadowNumber={commitDirectionalShadowNumber}
               setDirectionalShadowHelperVisible={setDirectionalShadowHelperVisible}
+              previewSpotShadowNumber={previewSpotShadowNumber}
+              commitSpotShadowNumber={commitSpotShadowNumber}
+              setSpotShadowHelperVisible={setSpotShadowHelperVisible}
+              previewPointShadowNumber={previewPointShadowNumber}
+              commitPointShadowNumber={commitPointShadowNumber}
+              setPointShadowHelperVisible={setPointShadowHelperVisible}
             />
           )
         },

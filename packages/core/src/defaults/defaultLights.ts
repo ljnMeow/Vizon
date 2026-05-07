@@ -167,28 +167,94 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
   }
 
   if (key === 'pointLight') {
-    const light = new THREE.PointLight(DEFAULT_LIGHT_HELPER_COLOR, 1.0, 0, 2); // distance 0 表示无限衰减距离（three 语义）
+    const light = new THREE.PointLight(DEFAULT_LIGHT_HELPER_COLOR, 5.0, 0, 2); // distance 0 表示无限衰减距离（three 语义）
     light.position.set(0, 2, 0);
     applyCommon(light, key, opts);
+    // 默认不显示阴影视锥（需要时在属性面板手动开启）
+    (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] = false;
+    light.castShadow = false;
+    light.shadow.mapSize.set(1024, 1024);
+    light.shadow.camera.near = 0.1;
+    light.shadow.camera.far = 20;
+    light.shadow.intensity = 1;
+    light.shadow.bias = -0.0001;
+    light.shadow.normalBias = 0.02;
+    light.shadow.radius = 1.5;
     if (helperEnabled) {
-      const helper = new THREE.PointLightHelper(light, 0.45);
-      configureLightHelper(helper, light);
-      (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helper;
+      const helperGroup = new THREE.Group();
+      helperGroup.name = 'PointLightHelpers';
+      const lightHelper = new THREE.PointLightHelper(light, 0.45);
+      const shadowHelper = new THREE.CameraHelper(light.shadow.camera);
+      shadowHelper.visible = Boolean(light.castShadow && (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false);
+      helperGroup.add(lightHelper);
+      helperGroup.add(shadowHelper);
+      (helperGroup as any).update = () => {
+        light.updateMatrixWorld(true);
+        light.shadow.updateMatrices(light);
+        lightHelper.update();
+        light.shadow.camera.updateProjectionMatrix();
+        light.shadow.camera.updateMatrixWorld(true);
+        shadowHelper.visible = Boolean(
+          light.castShadow && (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false
+        );
+        shadowHelper.update();
+      };
+      configureLightHelper(helperGroup, light);
+      helperGroup.traverse((child) => {
+        if (child === helperGroup) return;
+        configureLightHelper(child, light);
+      });
+      (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helperGroup;
     }
     return light;
   }
 
   if (key === 'spotLight') {
     // 锥角较窄、范围有限，避免 SpotLightHelper 几何巨大挡满视口
-    const light = new THREE.SpotLight(DEFAULT_LIGHT_HELPER_COLOR, 1.2, 12, Math.PI / 10, 0.2, 1);
+    // SpotLightShadow 的 fov 会在 updateMatrices 中由 angle/focus 推导：
+    // fov ≈ radToDeg(2 * angle * focus)。这里让默认 angle 与 fov=45 对齐，避免面板读值不一致。
+    const light = new THREE.SpotLight(DEFAULT_LIGHT_HELPER_COLOR, 5.0, 12, Math.PI / 8, 0.2, 1);
     light.position.set(2, 4, 2);
     applyCommon(light, key, opts);
     light.target.position.copy(getTarget(opts));
+    // 默认不显示阴影视锥（需要时在属性面板手动开启）
+    (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] = false;
+    light.castShadow = false;
+    light.shadow.mapSize.set(2048, 2048);
+    light.shadow.camera.near = 0.1;
+    light.shadow.camera.far = 20;
+    light.shadow.camera.fov = 45;
+    light.shadow.intensity = 1;
+    light.shadow.bias = -0.0001;
+    light.shadow.normalBias = 0.02;
+    light.shadow.radius = 1.5;
     light.target.updateMatrixWorld();
     if (helperEnabled) {
-      const helper = new THREE.SpotLightHelper(light);
-      configureLightHelper(helper, light);
-      (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helper;
+      const helperGroup = new THREE.Group();
+      helperGroup.name = 'SpotLightHelpers';
+      const lightHelper = new THREE.SpotLightHelper(light);
+      const shadowHelper = new THREE.CameraHelper(light.shadow.camera);
+      shadowHelper.visible = Boolean(light.castShadow && (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false);
+      helperGroup.add(lightHelper);
+      helperGroup.add(shadowHelper);
+      (helperGroup as any).update = () => {
+        light.updateMatrixWorld(true);
+        light.target.updateMatrixWorld(true);
+        light.shadow.updateMatrices(light);
+        lightHelper.update();
+        light.shadow.camera.updateProjectionMatrix();
+        light.shadow.camera.updateMatrixWorld(true);
+        shadowHelper.visible = Boolean(
+          light.castShadow && (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false
+        );
+        shadowHelper.update();
+      };
+      configureLightHelper(helperGroup, light);
+      helperGroup.traverse((child) => {
+        if (child === helperGroup) return;
+        configureLightHelper(child, light);
+      });
+      (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helperGroup;
     }
     return light;
   }

@@ -21,8 +21,8 @@ export function SystemAssets() {
 
   const tabs: TabItem<SystemAssetTab>[] = [
     { key: 'models', label: t.modelsTab },
-    { key: 'cameras', label: t.camerasTab },
     { key: 'lights', label: t.lightsTab },
+    { key: 'cameras', label: t.camerasTab },
     { key: 'materials', label: t.materialsTab }
   ];
 

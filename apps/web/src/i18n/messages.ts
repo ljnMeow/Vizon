@@ -311,12 +311,16 @@ export interface AppMessages {
         shadowRadiusLabel: string;
         shadowHelperVisibleLabel: string;
         shadowCameraRangeTitleLabel: string;
+        shadowMapSizeTitleLabel: string;
+        shadowMapSizeWidthLabel: string;
+        shadowMapSizeHeightLabel: string;
         shadowCameraLeftLabel: string;
         shadowCameraRightLabel: string;
         shadowCameraTopLabel: string;
         shadowCameraBottomLabel: string;
         shadowCameraNearLabel: string;
         shadowCameraFarLabel: string;
+        shadowCameraFovLabel: string;
         frustumCulledLabel: string;
         shadowTitleLabel: string;
         yesLabel: string;
@@ -787,12 +791,16 @@ export const appMessages: Record<Locale, AppMessages> = {
           shadowRadiusLabel: '阴影半径',
           shadowHelperVisibleLabel: '显示阴影视锥辅助器',
           shadowCameraRangeTitleLabel: '阴影视锥范围',
+          shadowMapSizeTitleLabel: '阴影贴图尺寸',
+          shadowMapSizeWidthLabel: '宽度',
+          shadowMapSizeHeightLabel: '高度',
           shadowCameraLeftLabel: '左边界',
           shadowCameraRightLabel: '右边界',
           shadowCameraTopLabel: '上边界',
           shadowCameraBottomLabel: '下边界',
           shadowCameraNearLabel: '近平面',
           shadowCameraFarLabel: '远平面',
+          shadowCameraFovLabel: '视角',
           frustumCulledLabel: '视锥体裁剪',
           shadowTitleLabel: '阴影',
           yesLabel: '是',
@@ -1256,12 +1264,16 @@ export const appMessages: Record<Locale, AppMessages> = {
           shadowRadiusLabel: 'Shadow Radius',
           shadowHelperVisibleLabel: 'Show Shadow Frustum Helper',
           shadowCameraRangeTitleLabel: 'Shadow Camera Range',
+          shadowMapSizeTitleLabel: 'Shadow Map Size',
+          shadowMapSizeWidthLabel: 'Width',
+          shadowMapSizeHeightLabel: 'Height',
           shadowCameraLeftLabel: 'Left',
           shadowCameraRightLabel: 'Right',
           shadowCameraTopLabel: 'Top',
           shadowCameraBottomLabel: 'Bottom',
           shadowCameraNearLabel: 'Near',
           shadowCameraFarLabel: 'Far',
+          shadowCameraFovLabel: 'FOV',
           frustumCulledLabel: 'Frustum Culling',
           shadowTitleLabel: 'Shadow',
           yesLabel: 'Yes',

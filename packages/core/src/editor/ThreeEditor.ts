@@ -1161,7 +1161,7 @@ export class ThreeEditor {
     }
     this.conduitEditController?.syncFromSelection(nextPrimary);
     this.events.emit('select', { object: nextPrimary, objects: [...nextObjects] });
-    if ((nextPrimary as any)?.isDirectionalLight || (nextPrimary as any)?.isSpotLight) {
+    if ((nextPrimary as any)?.isDirectionalLight || (nextPrimary as any)?.isSpotLight || (nextPrimary as any)?.isPointLight) {
       const light = nextPrimary as any;
       light.updateMatrixWorld?.(true);
       light.target?.updateMatrixWorld?.(true);
@@ -2156,14 +2156,40 @@ export class ThreeEditor {
   }
 
   private syncShadowFrustumHelperVisibility(light: THREE.Light, helper: THREE.Object3D) {
-    const isShadowEnabled = Boolean(this.renderer?.shadowMap?.enabled);
+    this.ensureShadowCameraHelper(light, helper);
     const userVisible = (light.userData as any)?.[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false;
     const castShadow = Boolean((light as any)?.castShadow);
-    const nextVisible = isShadowEnabled && userVisible && castShadow;
+    // 阴影视锥辅助器用于调试阴影参数，应允许在全局 shadowMap 关闭时也可见。
+    const nextVisible = userVisible && castShadow;
     helper.traverse((node: any) => {
       if (!(node?.isCameraHelper || node?.type === 'CameraHelper')) return;
       node.visible = nextVisible;
     });
+  }
+
+  /**
+   * 兼容旧场景里“仅 Spot/Directional 主 helper、缺少 CameraHelper”的数据：
+   * 在首次同步可见性时懒创建阴影视锥 helper，避免开关打开却无任何显示。
+   */
+  private ensureShadowCameraHelper(light: THREE.Light, helper: THREE.Object3D) {
+    const anyLight = light as any;
+    const isShadowLight = Boolean(anyLight?.isDirectionalLight || anyLight?.isSpotLight || anyLight?.isPointLight);
+    const shadowCamera = anyLight?.shadow?.camera as THREE.Camera | undefined;
+    if (!isShadowLight || !shadowCamera) return;
+
+    let hasCameraHelper = false;
+    helper.traverse((node: any) => {
+      if (node?.isCameraHelper || node?.type === 'CameraHelper') hasCameraHelper = true;
+    });
+    if (hasCameraHelper) return;
+
+    const shadowHelper = new THREE.CameraHelper(shadowCamera);
+    shadowHelper.userData[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE] = true;
+    shadowHelper.userData[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR] = true;
+    shadowHelper.userData[VIZON_USER_DATA_KEYS.COMMON.PICK_TARGET] = light;
+    helper.add(shadowHelper);
+    this.syncLightHelperColor(light, shadowHelper);
+    this.lightHelpersDirty = true;
   }
 
   private applyShadowFrustumVisibilityForAllLights() {
