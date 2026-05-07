@@ -16,6 +16,12 @@ export type SceneSettingsDiff = {
   helpersChanged: boolean;
 };
 
+export type SceneSettingsDirtyFlags = {
+  rendererDirty: boolean;
+  shadowDirty: boolean;
+  sceneDirty: boolean;
+};
+
 /**
  * 计算下一帧/下一状态与上一帧/上一状态的差异标记。
  *
@@ -75,5 +81,16 @@ export function calcSceneSettingsDiff(next: SceneSettings, prev: SceneSettings):
     next.helpers.axes.size !== prev.helpers.axes.size;
 
   return { environmentChanged, rendererChanged, cameraChanged, gridChanged, helpersChanged };
+}
+
+/**
+ * 将 scene settings 的结构化 diff 映射为编辑器内部 dirty flags。
+ * 该映射仅用于调度提示，不直接改变运行行为。
+ */
+export function mapSceneDiffToDirtyFlags(diff: SceneSettingsDiff): SceneSettingsDirtyFlags {
+  const sceneDirty = diff.environmentChanged || diff.cameraChanged || diff.gridChanged || diff.helpersChanged;
+  const rendererDirty = diff.rendererChanged;
+  const shadowDirty = diff.rendererChanged || diff.environmentChanged;
+  return { rendererDirty, shadowDirty, sceneDirty };
 }
 

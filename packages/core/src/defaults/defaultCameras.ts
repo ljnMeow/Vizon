@@ -6,6 +6,7 @@
  */
 import * as THREE from 'three';
 import { VIZON_USER_DATA_KEYS } from '../infra/utils';
+import { DEFAULT_CAMERAS } from './registry';
 
 export type DefaultCameraKey = 'orthographic' | 'perspective';
 
@@ -28,8 +29,7 @@ export type DefaultCameraMeta = {
 };
 
 export const defaultCameras: DefaultCameraMeta[] = [
-  { key: 'orthographic', label: 'orthographic' },
-  { key: 'perspective', label: 'perspective' }
+  ...DEFAULT_CAMERAS
 ];
 
 function applyCommon(camera: THREE.Camera, key: DefaultCameraKey, opts?: CreateDefaultCameraOptions) {

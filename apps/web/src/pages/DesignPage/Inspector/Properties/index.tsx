@@ -447,6 +447,21 @@ export function PropertiesSettings() {
       setDirectionalLightShadowState(readSelectedDirectionalLightShadow(object));
       setSpotLightShadowState(readSelectedSpotLightShadow(object));
       setPointLightShadowState(readSelectedPointLightShadow(object));
+      // 防御：切换灯光类型时强制清理其他 shadow state，避免旧状态残留造成面板“混合显示”。
+      if ((object as any)?.isDirectionalLight) {
+        setSpotLightShadowState(null);
+        setPointLightShadowState(null);
+      } else if ((object as any)?.isSpotLight) {
+        setDirectionalLightShadowState(null);
+        setPointLightShadowState(null);
+      } else if ((object as any)?.isPointLight) {
+        setDirectionalLightShadowState(null);
+        setSpotLightShadowState(null);
+      } else {
+        setDirectionalLightShadowState(null);
+        setSpotLightShadowState(null);
+        setPointLightShadowState(null);
+      }
       lightColorHistoryBaseRef.current = nextLightColor?.color?.toLowerCase() ?? null;
     });
 

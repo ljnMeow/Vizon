@@ -5,7 +5,7 @@ import { VIZON_HISTORY_KEYS, VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '..
 import type { RendererSettings, SceneSettings } from '../settings/sceneSettings';
 import type { SceneTreeNode } from '../settings/sceneTree';
 import { createDefaultSceneSettings, normalizeSceneSettings } from '../settings/sceneSettings';
-import { calcSceneSettingsDiff } from '../settings/sceneSettingsDiff';
+import { calcSceneSettingsDiff, mapSceneDiffToDirtyFlags } from '../settings/sceneSettingsDiff';
 import { AssetLoader } from './controllers/AssetLoader';
 import { CameraController } from './controllers/CameraController';
 import { EnvironmentController } from './controllers/EnvironmentController';
@@ -24,6 +24,8 @@ import {
   configureRaycasterForScenePicking,
   enableEditorViewLayers
 } from './picking/pickLayers';
+import { RenderPipelineService } from './services/RenderPipelineService';
+import { SceneGraphService } from './services/SceneGraphService';
 
 /** TransformControls 工作模式：平移 / 旋转 / 缩放 */
 export type TransformMode = 'translate' | 'rotate' | 'scale';
@@ -107,10 +109,8 @@ export class ThreeEditor {
   readonly events = new Emitter<ThreeEditorEvents>();
 
   // —— 动画循环与选择态 ——
-  /** `render` 循环用时钟，供未来扩展动画 dt */
-  private clock = new THREE.Clock();
-  /** `requestAnimationFrame` 句柄；非 null 表示循环在跑 */
-  private frame: number | null = null;
+  private renderPipeline: RenderPipelineService;
+  private sceneGraph: SceneGraphService;
   /** 当前选中可编辑对象；经 `isNonSelectableInHierarchy` 过滤 */
   private selected: THREE.Object3D | null = null;
   /** 当前多选对象列表（最后一个元素等于 `selected`） */
@@ -200,6 +200,16 @@ export class ThreeEditor {
   private pendingSceneHistoryBefore: SceneSettings | null = null;
   /** 预览阶段暂存的渲染器配置“历史前值” */
   private pendingRendererHistoryBefore: RendererSettings | null = null;
+  /** 渲染配置变更标记：当前仅用于观测，不影响现有渲染行为。 */
+  private rendererDirty = false;
+  /** 阴影相关变更标记：用于后续替换每帧阴影兜底。 */
+  private shadowDirty = false;
+  /** 场景/可视状态变更标记。 */
+  private sceneDirty = false;
+  /** dirty 命中计数，便于评估后续按需更新收益。 */
+  private dirtyStats = { renderer: 0, shadow: 0, scene: 0 };
+  /** dirty debug 日志节流时间戳。 */
+  private dirtyStatsLastLogAt = 0;
 
   constructor(options: ThreeEditorOptions) {
     // 保存宿主画布引用；后续 Renderer 与 Orbit 都挂在其上
@@ -320,6 +330,38 @@ export class ThreeEditor {
     this.bindTransformDragHooks();
     this.viewPresetController = new ViewPresetController(this.camera, this.orbit);
 
+    // SceneGraphService 必须在 bootstrapScene() 前初始化：
+    // bootstrap 内会同步 sceneTree，而该方法已被委托到 service。
+    this.sceneGraph = new SceneGraphService({
+      getScene: () => this.scene,
+      getCameraRoot: () => this.camera,
+      getSceneTree: () => this.sceneTreeController.getSceneTree(this.scene, this.camera),
+      updateSceneSettingsSceneTree: (tree) => {
+        this.sceneSettings = {
+          ...this.sceneSettings,
+          sceneTree: tree
+        };
+      },
+      emitSceneTreeChange: (tree) => this.events.emit('sceneTreeChange', { tree }),
+      bindHelpersForSubtree: (root) => this.bindHelpersForSubtree(root),
+      unbindHelpersForSubtree: (root) => this.unbindHelpersForSubtree(root),
+      freezeObjectTreeIfEnabled: (root) => {
+        if (this.freezeStaticObjects) this.staticObjectFreezeController.freezeObjectTree(root);
+      },
+      shouldFreezeStaticObjects: () => this.freezeStaticObjects,
+      requestShadowMapUpdate: () => this.requestShadowMapUpdate(),
+      renderOnce: () => {
+        // renderPipeline 在后续才初始化；这里做安全兜底避免构造早期误调用崩溃。
+        if ((this as any).renderPipeline) this.render();
+      },
+      clearSelectionIfContains: (obj) => {
+        if (this.selectedObjects.includes(obj)) this.select(null);
+      },
+      isNonSelectableInHierarchy: (obj) => isNonSelectableInHierarchy(obj),
+      isVisibleInHierarchy: (obj) => isVisibleInHierarchy(obj),
+      syncHelperVisibilityForSubtree: (root) => this.syncHelperVisibilityForSubtree(root)
+    });
+
     // 向 scene 挂上 Grid/Axes 并 emit 初始 sceneTree
     this.bootstrapScene();
 
@@ -332,6 +374,48 @@ export class ThreeEditor {
     const w = options.initialSize?.width ?? this.canvas.clientWidth ?? 1;
     const h = options.initialSize?.height ?? this.canvas.clientHeight ?? 1;
     this.resize(w, h, options.pixelRatio);
+
+    this.renderPipeline = new RenderPipelineService({
+      getCanvas: () => this.canvas,
+      getRenderer: () => this.renderer,
+      getSceneSettings: () => this.sceneSettings,
+      getOrbit: () => this.orbit,
+      maybeLogDirtyStats: () => this.maybeLogDirtyStats(),
+      isPerFrameRendererSyncEnabled: () => this.isPerFrameRendererSyncEnabled(),
+      applyRendererSettingsPerFrame: () => this.rendererController.applyRendererSettings(this.renderer, this.sceneSettings.renderer),
+      getShadowDirty: () => this.shadowDirty,
+      setShadowDirty: (next) => {
+        this.shadowDirty = next;
+      },
+      syncShadowCastingLights: () => this.syncShadowCastingLights(),
+      syncHelpersPerFrame: () => {
+        this.helperController.syncHelpers({ selected: this.selected, transformMode: this.transformMode });
+      },
+      syncCameraAndLightHelpersPerFrame: () => {
+        const selectedIsCamera = Boolean((this.selected as any)?.isCamera);
+        const selectedIsLight = Boolean((this.selected as any)?.isLight);
+        if (this.cameraHelpersDirty || selectedIsCamera) {
+          for (const helper of this.cameraHelpers.values()) {
+            helper.update();
+          }
+          this.cameraHelpersDirty = false;
+        }
+        if (this.lightHelpersDirty || selectedIsLight) {
+          for (const [uuid, helper] of this.lightHelpers.entries()) {
+            const light = this.scene.getObjectByProperty('uuid', uuid) as any;
+            if (light?.isLight) this.syncLightHelperColor(light, helper);
+            (helper as any).update?.();
+            if (light?.isLight) this.syncShadowFrustumHelperVisibility(light as THREE.Light, helper);
+          }
+          this.lightHelpersDirty = false;
+        }
+      },
+      updateConduitEndpointsPerFrame: () => {
+        this.conduitEditController?.update();
+      },
+      updateSelectionBoxHelperPerFrame: () => this.updateSelectionBoxHelper(),
+      renderEffects: () => this.effectsController.render(this.renderer)
+    });
 
     // 构造内不能 await，于是 fire-and-forget：刷新环境贴图/雾等（force=true 跳过 diff 短路）
     void this.applySceneSettings(this.sceneSettings, this.sceneSettings, ++this.sceneSettingsApplyingSeq, true);
@@ -808,7 +892,7 @@ export class ThreeEditor {
    * 获取用于 UI 展示的场景树（相机 + scene 层级）。
    */
   getSceneTree(): SceneTreeNode[] {
-    return this.sceneTreeController.getSceneTree(this.scene, this.camera);
+    return this.sceneGraph.getSceneTree();
   }
 
   /**
@@ -842,6 +926,8 @@ export class ThreeEditor {
       ...this.sceneSettings,
       renderer: next
     } as SceneSettings);
+    const rendererChanged = calcSceneSettingsDiff(nextScene, this.sceneSettings).rendererChanged;
+    if (rendererChanged) this.markDirty({ renderer: true, shadow: true });
     this.sceneSettings = nextScene;
     this.applyRendererSettings(nextScene.renderer, prevRenderer);
   }
@@ -851,6 +937,7 @@ export class ThreeEditor {
    * `antialias` 变更会整实例重建并重新绑定 Orbit/Transform/特效与管道编辑控制器。
    */
   private applyRendererSettings(nextRenderer: RendererSettings, prevRenderer: RendererSettings) {
+    this.markDirty({ renderer: true, shadow: true });
     if (nextRenderer.antialias !== prevRenderer.antialias) {
       const orbitTarget = this.orbit.target.clone();
       const orbitEnabled = this.orbit.enabled;
@@ -885,7 +972,7 @@ export class ThreeEditor {
       this.applyShadowFrustumVisibilityForAllLights();
     }
     this.lightHelpersDirty = true;
-    this.requestShadowMapUpdate();
+    this.requestShadowMapUpdate({ force: true });
   }
 
   /** 把 `SceneSettings.camera` 中的位置、目标点、FOV 等同步到视口相机与 OrbitControls。 */
@@ -925,6 +1012,13 @@ export class ThreeEditor {
     }
     const normalized = normalizeSceneSettings(next);
     const prev = this.sceneSettings;
+    const diff = calcSceneSettingsDiff(normalized, prev);
+    const mapped = mapSceneDiffToDirtyFlags(diff);
+    this.markDirty({
+      renderer: mapped.rendererDirty,
+      shadow: mapped.shadowDirty,
+      scene: mapped.sceneDirty
+    });
     this.sceneSettings = normalized;
     const seq = ++this.sceneSettingsApplyingSeq;
     await this.applySceneSettings(normalized, prev, seq);
@@ -934,61 +1028,21 @@ export class ThreeEditor {
    * 启动 RAF 渲染循环。重复调用是安全的（幂等）。
    */
   start() {
-    if (this.frame != null) return;
-    this.clock.start();
-    const tick = () => {
-      const dt = this.clock.getDelta();
-      this.orbit.update();
-      this.render(dt);
-      this.frame = requestAnimationFrame(tick);
-    };
-    this.frame = requestAnimationFrame(tick);
+    this.renderPipeline.start();
   }
 
   /**
    * 停止 RAF 渲染循环。
    */
   stop() {
-    if (this.frame == null) return;
-    cancelAnimationFrame(this.frame);
-    this.frame = null;
+    this.renderPipeline.stop();
   }
 
   /**
    * 单帧渲染。上层也可以自己驱动（例如与自定义时间轴/后处理集成）。
    */
   render(_dt?: number) {
-    // 兜底：每帧渲染前把 renderer 阴影运行态对齐到 sceneSettings，避免中间流程带偏状态。
-    this.rendererController.applyRendererSettings(this.renderer, this.sceneSettings.renderer);
-    if (this.renderer?.shadowMap?.enabled) {
-      this.syncShadowCastingLights();
-      this.renderer.shadowMap.needsUpdate = true;
-    }
-    // 预留：未来可在这里消费 _dt 做动画；当前 helper 同步不依赖 dt
-    this.helperController.syncHelpers({ selected: this.selected, transformMode: this.transformMode });
-    // 选中场景内相机时，每帧更新 CameraHelper 与视锥线框；否则仅在有 dirty 时批量更新省 CPU
-    const selectedIsCamera = Boolean((this.selected as any)?.isCamera);
-    const selectedIsLight = Boolean((this.selected as any)?.isLight);
-    if (this.cameraHelpersDirty || selectedIsCamera) {
-      for (const helper of this.cameraHelpers.values()) {
-        helper.update(); // 同步 world-space 视锥
-      }
-      this.cameraHelpersDirty = false; // 本帧已消化
-    }
-    if (this.lightHelpersDirty || selectedIsLight) {
-      for (const [uuid, helper] of this.lightHelpers.entries()) {
-        const light = this.scene.getObjectByProperty('uuid', uuid) as any;
-        if (light?.isLight) this.syncLightHelperColor(light, helper);
-        (helper as any).update?.(); // Spot/Directional 等 helper 需跟目标姿态
-        if (light?.isLight) this.syncShadowFrustumHelperVisibility(light as THREE.Light, helper);
-      }
-      this.lightHelpersDirty = false;
-    }
-    // 管道编辑节点（端点）需要跟随对象 transform 实时更新。
-    this.conduitEditController?.update();
-    this.updateSelectionBoxHelper(); // 可能创建/更新 BoxHelper
-
-    this.effectsController.render(this.renderer);
+    this.renderPipeline.render(_dt);
   }
 
   /**
@@ -1011,9 +1065,15 @@ export class ThreeEditor {
    * 注意：这里的 width/height 是 CSS 像素，renderer 内部会乘以 DPR。
    */
   resize(width: number, height: number, pixelRatio?: number) {
+    // 构造期 `renderPipeline` 可能尚未初始化：此时直接用旧逻辑兜底，避免启动崩溃。
+    if ((this as any).renderPipeline) {
+      this.renderPipeline.resize(width, height, pixelRatio);
+    } else {
+      const dpr = pixelRatio ?? Math.min(window.devicePixelRatio || 1, 2);
+      this.renderer.setPixelRatio(dpr);
+      this.renderer.setSize(width, height, false);
+    }
     const dpr = pixelRatio ?? Math.min(window.devicePixelRatio || 1, 2);
-    this.renderer.setPixelRatio(dpr);
-    this.renderer.setSize(width, height, false);
     this.effectsController.resize(width, height, dpr);
     const aspect = Math.max(1e-6, width) / Math.max(1e-6, height);
     this.camera.aspect = aspect;
@@ -1251,34 +1311,13 @@ export class ThreeEditor {
       lightTarget.updateMatrixWorld(true);
       object.updateMatrixWorld?.(true);
     }
-    // 默认相机 helper：作为独立对象加入 scene，避免作为子节点导致二次变换偏移。
-    if ((object as any).isCamera) {
-      const helper = (object.userData as any)?.[VIZON_USER_DATA_KEYS.HELPERS.CAMERA_HELPER] as
-        | THREE.CameraHelper
-        | undefined;
-      if (helper && !this.cameraHelpers.has(object.uuid)) {
-        this.cameraHelpers.set(object.uuid, helper);
-        this.scene.add(helper);
-        helper.update();
-        this.cameraHelpersDirty = true;
-      }
-    }
-    if ((object as any).isLight) {
-      const helper = (object.userData as any)?.[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] as
-        | THREE.Object3D
-        | undefined;
-      if (helper && !this.lightHelpers.has(object.uuid)) {
-        this.lightHelpers.set(object.uuid, helper);
-        this.scene.add(helper);
-        this.syncLightHelperColor(object as THREE.Light, helper);
-        this.syncShadowFrustumHelperVisibility(object as THREE.Light, helper);
-        (helper as any).update?.();
-        this.lightHelpersDirty = true;
-      }
-    }
+    // helper 绑定逻辑仍保持在 ThreeEditor（T007 阶段先不搬迁）。
+    this.bindHelpersForSubtree(object);
     if (this.freezeStaticObjects) {
       this.staticObjectFreezeController.freezeObjectTree(object);
     }
+    // 新增/重挂对象后，阴影投射关系可能变化，触发下一帧阴影重建。
+    this.requestShadowMapUpdate();
     this.syncSceneTreeState();
   }
 
@@ -1328,23 +1367,10 @@ export class ThreeEditor {
   removeObjectByUuid(uuid: string): boolean {
     const obj = this.scene.getObjectByProperty('uuid', uuid);
     if (!obj || !obj.parent || isNonSelectableInHierarchy(obj)) return false;
+    // 先做原有 helper 解绑/清理，再交由 service 执行结构移除与树同步。
     if (this.selectedObjects.includes(obj)) this.select(null);
-    obj.parent.remove(obj);
-    // 同步移除相机 helper（如果存在）。
-    const helper = this.cameraHelpers.get(uuid);
-    if (helper) {
-      helper.parent?.remove(helper);
-      this.cameraHelpers.delete(uuid);
-      this.cameraHelpersDirty = true;
-    }
-    const lightHelper = this.lightHelpers.get(uuid);
-    if (lightHelper) {
-      lightHelper.parent?.remove(lightHelper);
-      this.lightHelpers.delete(uuid);
-      this.lightHelpersDirty = true;
-    }
-    this.syncSceneTreeState();
-    return true;
+    this.unbindHelpersForSubtree(obj);
+    return this.sceneGraph.removeObjectByUuid(uuid);
   }
 
   /**
@@ -1361,9 +1387,7 @@ export class ThreeEditor {
     targetUuid: string,
     placement: 'before' | 'after' | 'inside'
   ): boolean {
-    const resolved = this.resolveMoveObjects(sourceUuid, targetUuid);
-    if (!resolved) return false;
-    return this.isMovePlacementValid(resolved.source, resolved.target, placement);
+    return this.sceneGraph.canMoveObjectByUuid(sourceUuid, targetUuid, placement);
   }
 
   private resolveMoveObjects(
@@ -1413,16 +1437,11 @@ export class ThreeEditor {
   }
 
   private insertChildAt(parent: THREE.Object3D, child: THREE.Object3D, index: number): void {
-    if (child.parent) child.parent.remove(child);
-    const n = Math.max(0, Math.min(index, parent.children.length));
-    parent.children.splice(n, 0, child);
-    child.parent = parent;
-    this.bindHelpersForSubtree(child);
+    this.sceneGraph.insertChildAt(parent, child, index);
   }
 
   private detachObjectFromParent(child: THREE.Object3D) {
-    this.unbindHelpersForSubtree(child);
-    child.parent?.remove(child);
+    this.sceneGraph.detachObjectFromParent(child);
   }
 
   private bindHelpersForSubtree(root: THREE.Object3D) {
@@ -1497,40 +1516,16 @@ export class ThreeEditor {
     targetUuid: string,
     placement: 'before' | 'after' | 'inside'
   ): boolean {
-    const resolved = this.resolveMoveObjects(sourceUuid, targetUuid);
-    if (!resolved) return false;
-    const { source, target } = resolved;
-    if (!this.isMovePlacementValid(source, target, placement)) return false;
-
-    if (placement === 'inside') {
-      // reparent：保持 source 的 world transform 不变（避免挂载后“位置跳变”）
-      this.scene.updateMatrixWorld(true);
-      target.updateMatrixWorld(true);
-      target.attach(source);
-      if ((source as any).isCamera) this.cameraHelpersDirty = true;
-      if ((source as any).isLight) this.lightHelpersDirty = true;
-      this.syncSceneTreeState();
-      return true;
+    // move 会导致 helper 绑定关系变化（attach/remove/insert），保持原逻辑：重绑 subtree。
+    const obj = this.scene.getObjectByProperty('uuid', sourceUuid);
+    if (obj) this.unbindHelpersForSubtree(obj);
+    const ok = this.sceneGraph.moveObjectByUuid(sourceUuid, targetUuid, placement);
+    if (ok && obj) this.bindHelpersForSubtree(obj);
+    if (ok) {
+      if ((obj as any)?.isCamera) this.cameraHelpersDirty = true;
+      if ((obj as any)?.isLight) this.lightHelpersDirty = true;
     }
-
-    const parent = target.parent;
-    if (!parent) return false;
-    this.scene.updateMatrixWorld(true);
-    parent.updateMatrixWorld(true);
-    parent.attach(source);
-
-    const targetIndex = parent.children.indexOf(target);
-    if (targetIndex < 0) return false;
-    parent.remove(source);
-    const refreshedTargetIndex = parent.children.indexOf(target);
-    if (refreshedTargetIndex < 0) return false;
-    const insertIndex = placement === 'before' ? refreshedTargetIndex : refreshedTargetIndex + 1;
-    this.insertChildAt(parent, source, insertIndex);
-    if ((source as any).isCamera) this.cameraHelpersDirty = true;
-    if ((source as any).isLight) this.lightHelpersDirty = true;
-
-    this.syncSceneTreeState();
-    return true;
+    return ok;
   }
 
   /**
@@ -1704,12 +1699,7 @@ export class ThreeEditor {
 
 
   private syncSceneTreeState() {
-    const tree = this.getSceneTree();
-    this.sceneSettings = {
-      ...this.sceneSettings,
-      sceneTree: tree
-    };
-    this.events.emit('sceneTreeChange', { tree });
+    this.sceneGraph.syncSceneTreeState();
   }
 
   private bindTransformDragHooks() {
@@ -2128,10 +2118,61 @@ export class ThreeEditor {
    * - autoUpdate=false：这是必要触发；
    * - autoUpdate=true：在编辑态交互（缩放/选中/拖拽）后主动置位，可避免阴影偶发丢帧/失效观感。
    */
-  private requestShadowMapUpdate() {
+  private requestShadowMapUpdate(opts?: { force?: boolean }) {
     const shadowMap = this.renderer?.shadowMap;
     if (!shadowMap?.enabled) return;
+    // 当用户关闭 Auto Update 时，应冻结阴影贴图，避免移动灯光/物体仍触发实时更新。
+    // force=true 用于 renderer 设置变更等“显式请求”场景。
+    if (!this.sceneSettings.renderer.shadowMapAutoUpdate && !opts?.force) return;
+    this.markDirty({ shadow: true });
     shadowMap.needsUpdate = true;
+  }
+
+  private markDirty(next: { renderer?: boolean; shadow?: boolean; scene?: boolean }) {
+    if (next.renderer) {
+      this.rendererDirty = true;
+      this.dirtyStats.renderer += 1;
+    }
+    if (next.shadow) {
+      this.shadowDirty = true;
+      this.dirtyStats.shadow += 1;
+    }
+    if (next.scene) {
+      this.sceneDirty = true;
+      this.dirtyStats.scene += 1;
+    }
+  }
+
+  private maybeLogDirtyStats() {
+    if (!this.isDirtyStatsDebugEnabled()) return;
+    const now = Date.now();
+    if (now - this.dirtyStatsLastLogAt < 1000) return;
+    this.dirtyStatsLastLogAt = now;
+    if (!this.rendererDirty && !this.shadowDirty && !this.sceneDirty) return;
+    console.debug('[ThreeEditor][dirty]', {
+      flags: {
+        rendererDirty: this.rendererDirty,
+        shadowDirty: this.shadowDirty,
+        sceneDirty: this.sceneDirty
+      },
+      hits: this.dirtyStats
+    });
+  }
+
+  private isDirtyStatsDebugEnabled() {
+    try {
+      return window.localStorage?.getItem('VIZON_EDITOR_DEBUG_DIRTY') === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  private isPerFrameRendererSyncEnabled() {
+    try {
+      return window.localStorage?.getItem('VIZON_EDITOR_FORCE_RENDERER_SYNC') === '1';
+    } catch {
+      return false;
+    }
   }
 
   private syncLightHelperColor(light: THREE.Light, helper: THREE.Object3D) {

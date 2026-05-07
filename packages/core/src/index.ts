@@ -52,6 +52,14 @@ export { createDefaultCamera, defaultCameras } from './defaults/defaultCameras';
 export type { DefaultCameraKey, CreateDefaultCameraOptions, DefaultCameraMeta } from './defaults/defaultCameras';
 export { createDefaultLight, defaultLights } from './defaults/defaultLights';
 export type { DefaultLightKey, CreateDefaultLightOptions, DefaultLightMeta } from './defaults/defaultLights';
+export {
+  DEFAULT_SCENE_SETTINGS,
+  DEFAULT_MODELS,
+  DEFAULT_CAMERAS,
+  DEFAULT_LIGHTS,
+  DEFAULT_MESH_COLOR,
+  DEFAULT_LIGHT_HELPER_COLOR
+} from './defaults/registry';
 
 /** 贴图加载（避免 apps 直接依赖 three.js API） */
 export {

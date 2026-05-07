@@ -11,14 +11,16 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "test:defaults": "vitest run --config vitest.config.ts src/defaults/__tests__/defaults-consistency.test.ts"
   },
   "peerDependencies": {
     "three": "^0.180.0"
   },
   "devDependencies": {
     "@types/three": "^0.183.1",
-    "three": "^0.180.0"
+    "three": "^0.180.0",
+    "vitest": "^2.1.9"
   },
   "dependencies": {
     "three-stdlib": "^2.36.1"

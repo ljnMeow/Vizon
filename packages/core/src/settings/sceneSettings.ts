@@ -1,5 +1,6 @@
 import type { SceneTreeNode } from './sceneTree';
 import { clamp, parseHexColor, toFiniteNumber } from '../infra/utils';
+import { DEFAULT_SCENE_SETTINGS } from '../defaults/registry';
 
 /**
  * SceneSettings：可序列化「场景真理源」，位于 `settings/` 目录。
@@ -138,52 +139,23 @@ export type SceneSettings = {
  */
 export function createDefaultSceneSettings(): SceneSettings {
   return {
-    version: 3,
-    basic: {
-      sceneName: '',
-      description: ''
-    },
+    ...DEFAULT_SCENE_SETTINGS,
+    basic: { ...DEFAULT_SCENE_SETTINGS.basic },
     environment: {
-      backgroundMode: 'solid',
-      // 默认使用偏灰背景，提升辅助线可读性
-      backgroundColor: '#f3f4f6',
-      hdri: { type: 'none' },
-      environmentStrength: 1,
-      fog: {
-        enabled: false,
-        color: '#c7d2fe',
-        near: 0.5,
-        far: 10
-      }
+      ...DEFAULT_SCENE_SETTINGS.environment,
+      hdri: { ...DEFAULT_SCENE_SETTINGS.environment.hdri },
+      fog: { ...DEFAULT_SCENE_SETTINGS.environment.fog }
     },
     camera: {
-      fov: 50,
-      near: 0.01,
-      far: 10_000,
-      // 默认“初始化视图”相机拉远：避免贴脸，视觉上更容易观察整体。
-      position: { x: 9.4, y: 6.0, z: 9.4 },
-      target: { x: 0, y: 0.8, z: 0 }
+      ...DEFAULT_SCENE_SETTINGS.camera,
+      position: { ...DEFAULT_SCENE_SETTINGS.camera.position },
+      target: { ...DEFAULT_SCENE_SETTINGS.camera.target }
     },
-    grid: {
-      enabled: true,
-      color: '#334155',
-      opacity: 0.8,
-    },
+    grid: { ...DEFAULT_SCENE_SETTINGS.grid },
     helpers: {
-      axes: {
-        enabled: false,
-        size: 1.5
-      }
+      axes: { ...DEFAULT_SCENE_SETTINGS.helpers.axes }
     },
-    renderer: {
-      antialias: true,
-      outputColorSpace: 'SRGBColorSpace',
-      toneMapping: 'NoToneMapping',
-      toneMappingExposure: 1,
-      shadowMapEnabled: false,
-      shadowMapType: 'PCFShadowMap',
-      shadowMapAutoUpdate: true
-    },
+    renderer: { ...DEFAULT_SCENE_SETTINGS.renderer },
     sceneTree: []
   };
 }

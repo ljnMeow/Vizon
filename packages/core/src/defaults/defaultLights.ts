@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import { VIZON_USER_DATA_KEYS } from '../infra/utils';
+import { DEFAULT_LIGHT_HELPER_COLOR, DEFAULT_LIGHTS } from './registry';
 
 /** 可创建的灯光种类枚举（与 UI 列表 key 对齐） */
 export type DefaultLightKey =
@@ -43,16 +44,8 @@ export type DefaultLightMeta = {
 
 /** 内置顺序即面板默认排列顺序 */
 export const defaultLights: DefaultLightMeta[] = [
-  { key: 'ambientLight', label: 'ambientLight' },
-  { key: 'directionalLight', label: 'directionalLight' },
-  { key: 'pointLight', label: 'pointLight' },
-  { key: 'spotLight', label: 'spotLight' },
-  { key: 'hemisphereLight', label: 'hemisphereLight' },
-  { key: 'rectAreaLight', label: 'rectAreaLight' }
+  ...DEFAULT_LIGHTS
 ];
-
-/** 所有灯光 helper 的统一线框色（高对比暖色，便于深灰网格背景辨认） */
-const DEFAULT_LIGHT_HELPER_COLOR = 0xffb703;
 
 /**
  * RectAreaLight 着色器依赖全局 uniform 注册表；进程级只需 init 一次。

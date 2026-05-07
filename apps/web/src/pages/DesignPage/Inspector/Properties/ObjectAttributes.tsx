@@ -499,7 +499,9 @@ export function ObjectAttributes({
                         </label>
                       ) : (
                         <input
-                          key={`${it.paramKey}-${refreshKey}`}
+                          // 使用 defaultValue（非受控）时，切换选中对象不会自动刷新初始值；
+                          // 因此 key 必须包含 uuid，确保 selection 切换后重新挂载输入框。
+                          key={`${selectedInfo?.uuid ?? 'none'}-${it.paramKey}-${refreshKey}`}
                           type="number"
                           inputMode="decimal"
                           step={step}

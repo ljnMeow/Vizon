@@ -5,6 +5,7 @@
  */
 import * as THREE from 'three';
 import { VIZON_USER_DATA_KEYS } from '../infra/utils';
+import { DEFAULT_MESH_COLOR, DEFAULT_MODELS } from './registry';
 
 export type DefaultModelKey =
   | 'cube'
@@ -31,18 +32,8 @@ export type DefaultModelMeta = {
 };
 
 export const defaultModels: DefaultModelMeta[] = [
-  { key: 'cube', label: 'cube' },
-  { key: 'sphere', label: 'sphere' },
-  { key: 'plane', label: 'plane' },
-  { key: 'circular', label: 'circular' },
-  { key: 'cone', label: 'cone' },
-  { key: 'cylinder', label: 'cylinder' },
-  { key: 'torus', label: 'torus' },
-  { key: 'theConduit', label: 'theConduit' },
-  { key: 'group', label: 'group' }
+  ...DEFAULT_MODELS
 ];
-
-const DEFAULT_MESH_COLOR = 0x60a5fa;
 
 function makeEmissiveMaterial(color: number) {
   // MeshBasicMaterial 不受光照影响，默认就能保证在弱光/无灯情况下可见。

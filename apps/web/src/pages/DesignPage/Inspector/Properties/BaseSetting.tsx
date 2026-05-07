@@ -722,29 +722,6 @@ export function BaseSetting({
                 </div>
               </div>
               <div className="border-t border-[var(--border-subtle)] pt-2">
-                <div className="mb-2 text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{shadowMapSizeTitleLabel}</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <LabeledNumberInput
-                    label={shadowMapSizeWidthLabel}
-                    value={spotLightShadowState?.mapSizeWidth ?? 1024}
-                    disabled={isDisabled}
-                    step={1}
-                    min={1}
-                    onPreviewChange={(v) => previewSpotShadowNumber('shadow.mapSize.width', v)}
-                    onCommit={(v) => commitSpotShadowNumber('shadow.mapSize.width', v)}
-                  />
-                  <LabeledNumberInput
-                    label={shadowMapSizeHeightLabel}
-                    value={spotLightShadowState?.mapSizeHeight ?? 1024}
-                    disabled={isDisabled}
-                    step={1}
-                    min={1}
-                    onPreviewChange={(v) => previewSpotShadowNumber('shadow.mapSize.height', v)}
-                    onCommit={(v) => commitSpotShadowNumber('shadow.mapSize.height', v)}
-                  />
-                </div>
-              </div>
-              <div className="border-t border-[var(--border-subtle)] pt-2">
                 <div className="mb-2 text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">
                   {shadowCameraRangeTitleLabel}
                 </div>
