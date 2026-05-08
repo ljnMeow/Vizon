@@ -93,6 +93,7 @@ export type ThreeEditorOptions = {
  */
 export class ThreeEditor {
   private static readonly HISTORY_OP_PREFIX = VIZON_HISTORY_KEYS.OP_PREFIX;
+  private static readonly HISTORY_I18N_PREFIX = VIZON_HISTORY_KEYS.I18N_PREFIX;
   /** 与 WebGLRenderer 绑定的同一个 canvas 引用 */
   readonly canvas: HTMLCanvasElement;
   /** 所有可编辑内容的根；主相机不在其子树中（见 `canAttachTransformTarget`） */
@@ -147,6 +148,12 @@ export class ThreeEditor {
   private transformDragStartWorldMatrices = new Map<string, THREE.Matrix4>();
   /** 多选拖拽时主对象起始 world 矩阵 */
   private transformDragPrimaryStartWorld = new THREE.Matrix4();
+  /** target handle 拖拽起点：用于在拖拽结束时生成“修改灯光 target”单条历史 */
+  private transformDragStartLightTargetSnapshot: {
+    lightUuid: string;
+    lightType: 'DirectionalLight' | 'SpotLight' | 'RectAreaLight';
+    target: { x: number; y: number; z: number };
+  } | null = null;
 
   // —— 视口投射 / 拖拽放置（复用向量，避免高频 new）——
   /** 地面求交：NDC 临时向量 */
@@ -185,6 +192,8 @@ export class ThreeEditor {
   private cameraHelpers = new Map<string, THREE.CameraHelper>();
   /** uuid(灯光) → 各类 LightHelper */
   private lightHelpers = new Map<string, THREE.Object3D>();
+  /** uuid(灯光) → 可拖拽 target 控制点 */
+  private lightTargetHandles = new Map<string, THREE.Object3D>();
   /** 有相机增删或需强制刷新时为 true，render 中批量 `helper.update()` */
   private cameraHelpersDirty = true;
   private lightHelpersDirty = true;
@@ -1209,7 +1218,7 @@ export class ThreeEditor {
    * 更新选中状态并广播 `select` 事件；同时维护 Gizmo 挂载、多选冻结、灯光/相机 helper 脏标记与阴影刷新。
    * @param options.toggle `true` 时在集合中切换该对象（典型：Shift+点选），并打开多选描边高亮；`false` 时单选或清空。
    */
-  select(object: THREE.Object3D | null, options?: { toggle?: boolean }) {
+  select(object: THREE.Object3D | null, options?: { toggle?: boolean; targetHandle?: THREE.Object3D | null }) {
     const safe = object && !isNonSelectableInHierarchy(object) ? object : null;
     const prev = this.selected;
     const prevObjects = this.selectedObjects;
@@ -1251,14 +1260,16 @@ export class ThreeEditor {
     if ((prev as any)?.isCamera || (nextPrimary as any)?.isCamera) this.cameraHelpersDirty = true;
     if ((prev as any)?.isLight || (nextPrimary as any)?.isLight) this.lightHelpersDirty = true;
 
+    const transformTarget =
+      !options?.toggle && nextObjects.length === 1 && options?.targetHandle ? options.targetHandle : nextPrimary;
     if (
       this.transformToolEnabled &&
       this.transformHandleVisible &&
       !options?.toggle &&
       nextObjects.length === 1 &&
-      this.canAttachTransformTarget(nextPrimary)
+      this.canAttachTransformTarget(transformTarget)
     ) {
-      this.transform.attach(nextPrimary);
+      this.transform.attach(transformTarget);
       this.transform.visible = true;
     } else {
       this.transform.detach();
@@ -1355,6 +1366,9 @@ export class ThreeEditor {
       if (!lightTarget.parent) this.scene.add(lightTarget);
       lightTarget.updateMatrixWorld(true);
       object.updateMatrixWorld?.(true);
+    }
+    if ((object as any).isLight) {
+      this.bindLightTargetHandle(object as THREE.Light);
     }
     // helper 绑定属于 ThreeEditor 的“端到端交互链路副作用”：
     // - SceneGraphService 只做结构变更与 sceneTree 同步；
@@ -1514,6 +1528,7 @@ export class ThreeEditor {
           (helper as any).update?.();
           this.lightHelpersDirty = true;
         }
+        this.bindLightTargetHandle(node as THREE.Light);
       }
       this.syncObjectHelperVisibility(node as THREE.Object3D);
     });
@@ -1537,6 +1552,8 @@ export class ThreeEditor {
         this.syncShadowFrustumHelperVisibility(node as THREE.Light, lightHelper);
       }
     }
+    const targetHandle = this.lightTargetHandles.get(node.uuid);
+    if (targetHandle) targetHandle.visible = effectiveVisible;
   }
 
   private unbindHelpersForSubtree(root: THREE.Object3D) {
@@ -1556,7 +1573,125 @@ export class ThreeEditor {
         this.lightHelpers.delete(node.uuid);
         this.lightHelpersDirty = true;
       }
+      this.unbindLightTargetHandle(node as THREE.Object3D);
     });
+  }
+
+  private bindLightTargetHandle(light: THREE.Light) {
+    const handle = getVizonUserData(light)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_TARGET_HANDLE] as THREE.Object3D | undefined;
+    if (!handle || this.lightTargetHandles.has(light.uuid)) return;
+    this.lightTargetHandles.set(light.uuid, handle);
+    if (!handle.parent) this.scene.add(handle);
+    this.syncLightTargetHandleFromLight(light, handle);
+  }
+
+  private unbindLightTargetHandle(node: THREE.Object3D) {
+    if (!(node as any)?.isLight) return;
+    const handle = this.lightTargetHandles.get(node.uuid);
+    if (!handle) return;
+    handle.parent?.remove(handle);
+    this.lightTargetHandles.delete(node.uuid);
+  }
+
+  private isLightTargetHandle(obj: THREE.Object3D) {
+    return Boolean((obj.userData as any)?.[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET_HANDLE]);
+  }
+
+  private resolveLightByTargetHandle(handle: THREE.Object3D): THREE.Light | null {
+    const lightUuid = (handle.userData as any)?.[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET_LIGHT_UUID] as string | undefined;
+    if (!lightUuid) return null;
+    const light = this.scene.getObjectByProperty('uuid', lightUuid) as any;
+    return light?.isLight ? (light as THREE.Light) : null;
+  }
+
+  private syncLightTargetFromHandle(handle: THREE.Object3D) {
+    const light = this.resolveLightByTargetHandle(handle);
+    if (!light) return;
+    const p = handle.position;
+    const anyLight = light as any;
+    if (anyLight?.isDirectionalLight || anyLight?.isSpotLight) {
+      anyLight.target?.position?.set?.(p.x, p.y, p.z);
+      anyLight.target?.updateMatrixWorld?.(true);
+    } else if (anyLight?.isRectAreaLight) {
+      light.userData[VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET] = { x: p.x, y: p.y, z: p.z };
+      anyLight.lookAt?.(p.x, p.y, p.z);
+    }
+    light.updateMatrixWorld?.(true);
+    anyLight.shadow?.updateMatrices?.(anyLight);
+    this.lightHelpersDirty = true;
+    this.requestShadowMapUpdate();
+  }
+
+  private syncLightTargetHandleFromLight(light: THREE.Light, handle: THREE.Object3D) {
+    const anyLight = light as any;
+    if (anyLight?.isDirectionalLight || anyLight?.isSpotLight) {
+      const t = anyLight?.target?.position;
+      if (t) handle.position.set(t.x, t.y, t.z);
+      return;
+    }
+    if (anyLight?.isRectAreaLight) {
+      const target = (light.userData as any)?.[VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET];
+      if (target && typeof target === 'object') {
+        handle.position.set(Number(target.x ?? 0), Number(target.y ?? 0), Number(target.z ?? 0));
+      }
+    }
+  }
+
+  private captureLightTargetSnapshot(light: THREE.Light) {
+    const anyLight = light as any;
+    if (anyLight?.isDirectionalLight || anyLight?.isSpotLight) {
+      const p = anyLight?.target?.position ?? { x: 0, y: 0, z: 0 };
+      return {
+        lightUuid: light.uuid,
+        lightType: anyLight.isDirectionalLight ? 'DirectionalLight' : 'SpotLight',
+        target: { x: Number(p.x ?? 0), y: Number(p.y ?? 0), z: Number(p.z ?? 0) }
+      } as const;
+    }
+    const t = (light.userData as any)?.[VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET] ?? { x: 0, y: 0, z: 0 };
+    return {
+      lightUuid: light.uuid,
+      lightType: 'RectAreaLight' as const,
+      target: { x: Number(t.x ?? 0), y: Number(t.y ?? 0), z: Number(t.z ?? 0) }
+    };
+  }
+
+  private isSameLightTargetSnapshot(
+    a: ReturnType<ThreeEditor['captureLightTargetSnapshot']>,
+    b: ReturnType<ThreeEditor['captureLightTargetSnapshot']>
+  ) {
+    const eps = 1e-6;
+    const close = (x: number, y: number) => Math.abs(x - y) <= eps;
+    return (
+      a.lightUuid === b.lightUuid &&
+      a.lightType === b.lightType &&
+      close(a.target.x, b.target.x) &&
+      close(a.target.y, b.target.y) &&
+      close(a.target.z, b.target.z)
+    );
+  }
+
+  private applyLightTargetSnapshot(snapshot: ReturnType<ThreeEditor['captureLightTargetSnapshot']>) {
+    const light = this.scene.getObjectByProperty('uuid', snapshot.lightUuid) as any;
+    if (!light?.isLight) return;
+    if (snapshot.lightType === 'DirectionalLight' || snapshot.lightType === 'SpotLight') {
+      light.target?.position?.set?.(snapshot.target.x, snapshot.target.y, snapshot.target.z);
+      light.target?.updateMatrixWorld?.(true);
+    } else {
+      light.userData[VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET] = {
+        x: snapshot.target.x,
+        y: snapshot.target.y,
+        z: snapshot.target.z
+      };
+      light.lookAt?.(snapshot.target.x, snapshot.target.y, snapshot.target.z);
+    }
+    const handle = this.lightTargetHandles.get(light.uuid);
+    if (handle) this.syncLightTargetHandleFromLight(light as THREE.Light, handle);
+    light.updateMatrixWorld?.(true);
+    light.shadow?.updateMatrices?.(light);
+    this.lightHelpersDirty = true;
+    this.requestShadowMapUpdate();
+    this.syncSceneTreeState();
+    this.render();
   }
 
   /**
@@ -1725,6 +1860,7 @@ export class ThreeEditor {
     this.disposeSelectionBoxHelper();
     this.cameraHelpers.clear();
     this.lightHelpers.clear();
+    this.lightTargetHandles.clear();
     this.history.clear();
     this.disposeSceneResources();
     this.renderer.dispose();
@@ -1761,6 +1897,13 @@ export class ThreeEditor {
       if (!this.selected) return;
       const dragging = Boolean(e?.value);
       if (dragging) {
+        const activeTransformObject = (this.transform as any)?.object as THREE.Object3D | undefined;
+        if (activeTransformObject && this.isLightTargetHandle(activeTransformObject)) {
+          const light = this.resolveLightByTargetHandle(activeTransformObject);
+          this.transformDragStartLightTargetSnapshot = light ? this.captureLightTargetSnapshot(light) : null;
+        } else {
+          this.transformDragStartLightTargetSnapshot = null;
+        }
         this.transformDragStartSnapshot = this.captureObjectTransform(this.selected);
         this.transformDragStartSnapshots.clear();
         this.transformDragStartWorldMatrices.clear();
@@ -1771,6 +1914,29 @@ export class ThreeEditor {
           this.transformDragStartWorldMatrices.set(obj.uuid, obj.matrixWorld.clone());
         }
       } else if (this.transformDragStartSnapshot) {
+        if (this.transformDragStartLightTargetSnapshot) {
+          const beforeTarget = this.transformDragStartLightTargetSnapshot;
+          this.transformDragStartLightTargetSnapshot = null;
+          const light = this.scene.getObjectByProperty('uuid', beforeTarget.lightUuid) as THREE.Light | null;
+          if (light) {
+            const afterTarget = this.captureLightTargetSnapshot(light);
+            if (!this.isSameLightTargetSnapshot(beforeTarget, afterTarget)) {
+              const lightLabels = this.getLightTypeHistoryLabels(light);
+              const propLabels = this.getLightTargetPropLabels();
+              const targetText = this.formatVec3ForHistory(afterTarget.target);
+              void this.executeHistoryOperation({
+                name: this.encodeHistoryI18nName({
+                  'zh-CN': `${lightLabels['zh-CN']} - ${light.uuid} - ${propLabels['zh-CN']} = ${targetText}`,
+                  'en-US': `${lightLabels['en-US']} - ${light.uuid} - ${propLabels['en-US']} = ${targetText}`
+                }),
+                mergeKey: `light-target:${light.uuid}`,
+                mergeWindowMs: 120,
+                do: () => this.applyLightTargetSnapshot(afterTarget),
+                undo: () => this.applyLightTargetSnapshot(beforeTarget)
+              });
+            }
+          }
+        }
         const before = this.transformDragStartSnapshot;
         this.transformDragStartSnapshot = null;
         const target = this.selected;
@@ -1834,6 +2000,10 @@ export class ThreeEditor {
 
     this.transformObjectChangeHandler = () => {
       this.applyMultiSelectionTransform();
+      const activeTransformObject = (this.transform as any)?.object as THREE.Object3D | undefined;
+      if (activeTransformObject && this.isLightTargetHandle(activeTransformObject)) {
+        this.syncLightTargetFromHandle(activeTransformObject);
+      }
       if ((this.selected as any)?.isLight) {
         this.lightHelpersDirty = true;
       }
@@ -2006,6 +2176,7 @@ export class ThreeEditor {
       obj.quaternion.copy(nextQuat);
       obj.scale.copy(nextScale);
       obj.updateMatrixWorld(true);
+      if (this.isLightTargetHandle(obj)) this.syncLightTargetFromHandle(obj);
       if ((obj as any).isCamera) this.cameraHelpersDirty = true;
       if ((obj as any).isLight) this.lightHelpersDirty = true;
     }
@@ -2088,6 +2259,27 @@ export class ThreeEditor {
     return '';
   }
 
+  private getLightTypeHistoryLabels(light: THREE.Light) {
+    const anyLight = light as any;
+    if (anyLight?.isDirectionalLight) return { 'zh-CN': '修改平行光属性', 'en-US': 'Modify directional light property' } as const;
+    if (anyLight?.isSpotLight) return { 'zh-CN': '修改聚光灯属性', 'en-US': 'Modify spot light property' } as const;
+    if (anyLight?.isRectAreaLight) return { 'zh-CN': '修改矩形光属性', 'en-US': 'Modify rect area light property' } as const;
+    return { 'zh-CN': '修改灯光属性', 'en-US': 'Modify light property' } as const;
+  }
+
+  private getLightTargetPropLabels() {
+    return { 'zh-CN': '看向点', 'en-US': 'Target' } as const;
+  }
+
+  private formatVec3ForHistory(v: { x: number; y: number; z: number }) {
+    const n = (value: number) => Number(Number(value).toFixed(4));
+    return `(${n(v.x)}, ${n(v.y)}, ${n(v.z)})`;
+  }
+
+  private encodeHistoryI18nName(name: { 'zh-CN': string; 'en-US': string }) {
+    return `${ThreeEditor.HISTORY_I18N_PREFIX}${JSON.stringify(name)}`;
+  }
+
   private isHistoryValueEqual(a: unknown, b: unknown) {
     if (Object.is(a, b)) return true;
     if (typeof a !== typeof b) return false;
@@ -2146,13 +2338,30 @@ export class ThreeEditor {
     // 这里对 Object3D 做一次兜底更新，保证 Inspector 输入实时反馈。
     const maybeObj3d = target as any;
     if (maybeObj3d?.isObject3D) {
+      if (this.isLightTargetHandle(maybeObj3d)) {
+        this.syncLightTargetFromHandle(maybeObj3d);
+      }
       if (maybeObj3d?.isLight) this.lightHelpersDirty = true;
       if (maybeObj3d?.isDirectionalLight || maybeObj3d?.isSpotLight) {
+        if (path.startsWith('target.position.')) {
+          const handle = this.lightTargetHandles.get(maybeObj3d.uuid);
+          if (handle) this.syncLightTargetHandleFromLight(maybeObj3d, handle);
+        }
         if (path.startsWith('shadow.camera.')) {
           maybeObj3d.shadow?.camera?.updateProjectionMatrix?.();
         }
         if (path.startsWith('shadow.')) {
           maybeObj3d.shadow?.camera?.updateMatrixWorld?.(true);
+        }
+      }
+      if (maybeObj3d?.isRectAreaLight) {
+        if (path.startsWith(`userData.${VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET}`)) {
+          const targetPos = (maybeObj3d.userData as any)?.[VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET];
+          if (targetPos && typeof targetPos === 'object') {
+            maybeObj3d.lookAt?.(Number(targetPos.x ?? 0), Number(targetPos.y ?? 0), Number(targetPos.z ?? 0));
+          }
+          const handle = this.lightTargetHandles.get(maybeObj3d.uuid);
+          if (handle) this.syncLightTargetHandleFromLight(maybeObj3d, handle);
         }
       }
       if (maybeObj3d.matrixAutoUpdate === false) {

@@ -305,6 +305,16 @@ export interface AppMessages {
         castShadowLabel: string;
         receiveShadowLabel: string;
         lightIntensityLabel: string;
+        lightParamsTitleLabel: string;
+        lightTargetLabel: string;
+        lightDistanceLabel: string;
+        lightDecayLabel: string;
+        spotAngleLabel: string;
+        spotPenumbraLabel: string;
+        spotFocusLabel: string;
+        hemisphereGroundColorLabel: string;
+        rectAreaWidthLabel: string;
+        rectAreaHeightLabel: string;
         shadowIntensityLabel: string;
         shadowBiasLabel: string;
         shadowNormalBiasLabel: string;
@@ -785,6 +795,16 @@ export const appMessages: Record<Locale, AppMessages> = {
           castShadowLabel: '产生阴影',
           receiveShadowLabel: '接受阴影',
           lightIntensityLabel: '光照强度',
+        lightParamsTitleLabel: '灯光参数',
+        lightTargetLabel: '看向点（Target）',
+        lightDistanceLabel: '距离（Distance）',
+        lightDecayLabel: '衰减（Decay）',
+        spotAngleLabel: '锥角（Angle）',
+        spotPenumbraLabel: '半影（Penumbra）',
+        spotFocusLabel: '聚焦（Focus）',
+        hemisphereGroundColorLabel: '地面颜色（Ground Color）',
+        rectAreaWidthLabel: '宽度（Width）',
+        rectAreaHeightLabel: '高度（Height）',
           shadowIntensityLabel: '阴影强度',
           shadowBiasLabel: '阴影偏移',
           shadowNormalBiasLabel: '阴影法线偏移',
@@ -1258,6 +1278,16 @@ export const appMessages: Record<Locale, AppMessages> = {
           castShadowLabel: 'Cast Shadow',
           receiveShadowLabel: 'Receive Shadow',
           lightIntensityLabel: 'Light Intensity',
+        lightParamsTitleLabel: 'Light Params',
+        lightTargetLabel: 'Target',
+        lightDistanceLabel: 'Distance',
+        lightDecayLabel: 'Decay',
+        spotAngleLabel: 'Angle',
+        spotPenumbraLabel: 'Penumbra',
+        spotFocusLabel: 'Focus',
+        hemisphereGroundColorLabel: 'Ground Color',
+        rectAreaWidthLabel: 'Width',
+        rectAreaHeightLabel: 'Height',
           shadowIntensityLabel: 'Shadow Intensity',
           shadowBiasLabel: 'Shadow Bias',
           shadowNormalBiasLabel: 'Shadow Normal Bias',

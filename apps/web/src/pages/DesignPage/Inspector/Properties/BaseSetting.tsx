@@ -63,6 +63,39 @@ type LightIntensityState = {
   canIntensity: boolean;
 };
 
+type LightTargetState = {
+  target: Vec3;
+  canEdit: boolean;
+};
+
+type PointLightParamsState = {
+  distance: number;
+  decay: number;
+  canEdit: boolean;
+};
+
+type SpotLightParamsState = {
+  distance: number;
+  angle: number;
+  penumbra: number;
+  decay: number;
+  focus: number;
+  target: Vec3;
+  canEdit: boolean;
+};
+
+type HemisphereLightParamsState = {
+  groundColor: string;
+  canEdit: boolean;
+};
+
+type RectAreaLightParamsState = {
+  width: number;
+  height: number;
+  target: Vec3;
+  canEdit: boolean;
+};
+
 type DirectionalLightShadowState = {
   intensity: number;
   bias: number;
@@ -257,6 +290,11 @@ export function BaseSetting({
   renderOrderState,
   lightColorState,
   lightIntensityState,
+  directionalLightTargetState,
+  spotLightParamsState,
+  pointLightParamsState,
+  hemisphereLightParamsState,
+  rectAreaLightParamsState,
   directionalLightShadowState,
   spotLightShadowState,
   pointLightShadowState,
@@ -283,6 +321,20 @@ export function BaseSetting({
   commitLightColor,
   previewLightIntensity,
   commitLightIntensity,
+  previewDirectionalTargetAxis,
+  commitDirectionalTargetAxis,
+  previewSpotParamNumber,
+  commitSpotParamNumber,
+  previewSpotTargetAxis,
+  commitSpotTargetAxis,
+  previewPointParamNumber,
+  commitPointParamNumber,
+  previewHemisphereGroundColor,
+  commitHemisphereGroundColor,
+  previewRectAreaParamNumber,
+  commitRectAreaParamNumber,
+  previewRectAreaTargetAxis,
+  commitRectAreaTargetAxis,
   previewDirectionalShadowNumber,
   commitDirectionalShadowNumber,
   setDirectionalShadowHelperVisible,
@@ -302,6 +354,11 @@ export function BaseSetting({
   renderOrderState: RenderOrderState | null;
   lightColorState: LightColorState | null;
   lightIntensityState: LightIntensityState | null;
+  directionalLightTargetState: LightTargetState | null;
+  spotLightParamsState: SpotLightParamsState | null;
+  pointLightParamsState: PointLightParamsState | null;
+  hemisphereLightParamsState: HemisphereLightParamsState | null;
+  rectAreaLightParamsState: RectAreaLightParamsState | null;
   directionalLightShadowState: DirectionalLightShadowState | null;
   spotLightShadowState: SpotLightShadowState | null;
   pointLightShadowState: PointLightShadowState | null;
@@ -328,6 +385,20 @@ export function BaseSetting({
   commitLightColor: (nextColor: string) => void;
   previewLightIntensity: (nextIntensity: number) => void;
   commitLightIntensity: (nextIntensity: number) => void;
+  previewDirectionalTargetAxis: (axis: AxisKey, next: number) => void;
+  commitDirectionalTargetAxis: (axis: AxisKey, next: number) => void;
+  previewSpotParamNumber: (path: 'distance' | 'angle' | 'penumbra' | 'decay' | 'focus', nextValue: number) => void;
+  commitSpotParamNumber: (path: 'distance' | 'angle' | 'penumbra' | 'decay' | 'focus', nextValue: number) => void;
+  previewSpotTargetAxis: (axis: AxisKey, next: number) => void;
+  commitSpotTargetAxis: (axis: AxisKey, next: number) => void;
+  previewPointParamNumber: (path: 'distance' | 'decay', nextValue: number) => void;
+  commitPointParamNumber: (path: 'distance' | 'decay', nextValue: number) => void;
+  previewHemisphereGroundColor: (nextColor: string) => void;
+  commitHemisphereGroundColor: (nextColor: string) => void;
+  previewRectAreaParamNumber: (path: 'width' | 'height', nextValue: number) => void;
+  commitRectAreaParamNumber: (path: 'width' | 'height', nextValue: number) => void;
+  previewRectAreaTargetAxis: (axis: AxisKey, next: number) => void;
+  commitRectAreaTargetAxis: (axis: AxisKey, next: number) => void;
   previewDirectionalShadowNumber: (
     path:
       | 'shadow.intensity'
@@ -426,10 +497,33 @@ export function BaseSetting({
   const canShowOpacity = Boolean(opacityState?.canOpacity);
   const canShowLightColor = Boolean(lightColorState?.canColor);
   const canShowLightIntensity = Boolean(lightIntensityState?.canIntensity);
+  const canShowDirectionalLightParams =
+    selectedInfo?.type === 'DirectionalLight' && Boolean(directionalLightTargetState?.canEdit);
+  const canShowSpotLightParams = selectedInfo?.type === 'SpotLight' && Boolean(spotLightParamsState?.canEdit);
+  const canShowPointLightParams = selectedInfo?.type === 'PointLight' && Boolean(pointLightParamsState?.canEdit);
+  const canShowHemisphereLightParams =
+    selectedInfo?.type === 'HemisphereLight' && Boolean(hemisphereLightParamsState?.canEdit);
+  const canShowRectAreaLightParams = selectedInfo?.type === 'RectAreaLight' && Boolean(rectAreaLightParamsState?.canEdit);
+  const canShowLightParams =
+    canShowDirectionalLightParams ||
+    canShowSpotLightParams ||
+    canShowPointLightParams ||
+    canShowHemisphereLightParams ||
+    canShowRectAreaLightParams;
   const canShowDirectionalLightShadow = Boolean(shadow?.castShadow) && Boolean(directionalLightShadowState?.canEdit);
   const canShowSpotLightShadow = Boolean(shadow?.castShadow) && Boolean(spotLightShadowState?.canEdit);
   const canShowPointLightShadow = Boolean(shadow?.castShadow) && Boolean(pointLightShadowState?.canEdit);
   const lightColorLabel = ((labels as any).colorLabel as string | undefined) ?? 'Color';
+  const lightParamsTitleLabel = ((labels as any).lightParamsTitleLabel as string | undefined) ?? 'Light Params';
+  const lightTargetLabel = ((labels as any).lightTargetLabel as string | undefined) ?? 'Target';
+  const lightDistanceLabel = ((labels as any).lightDistanceLabel as string | undefined) ?? 'Distance';
+  const lightDecayLabel = ((labels as any).lightDecayLabel as string | undefined) ?? 'Decay';
+  const spotAngleLabel = ((labels as any).spotAngleLabel as string | undefined) ?? 'Angle';
+  const spotPenumbraLabel = ((labels as any).spotPenumbraLabel as string | undefined) ?? 'Penumbra';
+  const spotFocusLabel = ((labels as any).spotFocusLabel as string | undefined) ?? 'Focus';
+  const hemisphereGroundColorLabel = ((labels as any).hemisphereGroundColorLabel as string | undefined) ?? 'Ground Color';
+  const rectAreaWidthLabel = ((labels as any).rectAreaWidthLabel as string | undefined) ?? 'Width';
+  const rectAreaHeightLabel = ((labels as any).rectAreaHeightLabel as string | undefined) ?? 'Height';
   const shadowCameraRangeTitleLabel = ((labels as any).shadowCameraRangeTitleLabel as string | undefined) ?? 'Shadow Camera Range';
   const shadowMapSizeTitleLabel = ((labels as any).shadowMapSizeTitleLabel as string | undefined) ?? 'Shadow Map Size';
   const shadowMapSizeWidthLabel = ((labels as any).shadowMapSizeWidthLabel as string | undefined) ?? 'Width';
@@ -605,6 +699,215 @@ export function BaseSetting({
           onPreviewChange={previewLightIntensity}
           onCommit={commitLightIntensity}
         />
+      ) : null}
+
+      {canShowLightParams ? (
+        <div className="space-y-1.5">
+          <div className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{lightParamsTitleLabel}</div>
+
+          {canShowDirectionalLightParams ? (
+            <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
+              <div className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{lightTargetLabel}</div>
+              <div className="grid grid-cols-3 gap-2">
+                <AxisNumberInput
+                  label={labels.xLabel}
+                  value={directionalLightTargetState?.target.x ?? 0}
+                  disabled={isDisabled}
+                  onPreviewChange={(v) => previewDirectionalTargetAxis('x', v)}
+                  onCommit={(v) => commitDirectionalTargetAxis('x', v)}
+                />
+                <AxisNumberInput
+                  label={labels.yLabel}
+                  value={directionalLightTargetState?.target.y ?? 0}
+                  disabled={isDisabled}
+                  onPreviewChange={(v) => previewDirectionalTargetAxis('y', v)}
+                  onCommit={(v) => commitDirectionalTargetAxis('y', v)}
+                />
+                <AxisNumberInput
+                  label={labels.zLabel}
+                  value={directionalLightTargetState?.target.z ?? 0}
+                  disabled={isDisabled}
+                  onPreviewChange={(v) => previewDirectionalTargetAxis('z', v)}
+                  onCommit={(v) => commitDirectionalTargetAxis('z', v)}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {canShowSpotLightParams ? (
+            <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <LabeledNumberInput
+                  label={lightDistanceLabel}
+                  value={spotLightParamsState?.distance ?? 0}
+                  disabled={isDisabled}
+                  step={0.1}
+                  min={0}
+                  onPreviewChange={(v) => previewSpotParamNumber('distance', v)}
+                  onCommit={(v) => commitSpotParamNumber('distance', v)}
+                />
+                <LabeledNumberInput
+                  label={lightDecayLabel}
+                  value={spotLightParamsState?.decay ?? 2}
+                  disabled={isDisabled}
+                  step={0.1}
+                  min={0}
+                  onPreviewChange={(v) => previewSpotParamNumber('decay', v)}
+                  onCommit={(v) => commitSpotParamNumber('decay', v)}
+                />
+                <LabeledNumberInput
+                  label={spotAngleLabel}
+                  value={spotLightParamsState?.angle ?? 0.5}
+                  disabled={isDisabled}
+                  step={0.01}
+                  min={0.0001}
+                  max={Math.PI / 2}
+                  onPreviewChange={(v) => previewSpotParamNumber('angle', v)}
+                  onCommit={(v) => commitSpotParamNumber('angle', v)}
+                />
+                <LabeledNumberInput
+                  label={spotPenumbraLabel}
+                  value={spotLightParamsState?.penumbra ?? 0}
+                  disabled={isDisabled}
+                  step={0.01}
+                  min={0}
+                  max={1}
+                  onPreviewChange={(v) => previewSpotParamNumber('penumbra', v)}
+                  onCommit={(v) => commitSpotParamNumber('penumbra', v)}
+                />
+                <LabeledNumberInput
+                  label={spotFocusLabel}
+                  value={spotLightParamsState?.focus ?? 1}
+                  disabled={isDisabled}
+                  step={0.01}
+                  min={0}
+                  max={1}
+                  onPreviewChange={(v) => previewSpotParamNumber('focus', v)}
+                  onCommit={(v) => commitSpotParamNumber('focus', v)}
+                />
+              </div>
+
+              <div className="border-t border-[var(--border-subtle)] pt-2 space-y-2">
+                <div className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{lightTargetLabel}</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <AxisNumberInput
+                    label={labels.xLabel}
+                    value={spotLightParamsState?.target.x ?? 0}
+                    disabled={isDisabled}
+                    onPreviewChange={(v) => previewSpotTargetAxis('x', v)}
+                    onCommit={(v) => commitSpotTargetAxis('x', v)}
+                  />
+                  <AxisNumberInput
+                    label={labels.yLabel}
+                    value={spotLightParamsState?.target.y ?? 0}
+                    disabled={isDisabled}
+                    onPreviewChange={(v) => previewSpotTargetAxis('y', v)}
+                    onCommit={(v) => commitSpotTargetAxis('y', v)}
+                  />
+                  <AxisNumberInput
+                    label={labels.zLabel}
+                    value={spotLightParamsState?.target.z ?? 0}
+                    disabled={isDisabled}
+                    onPreviewChange={(v) => previewSpotTargetAxis('z', v)}
+                    onCommit={(v) => commitSpotTargetAxis('z', v)}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {canShowPointLightParams ? (
+            <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <LabeledNumberInput
+                  label={lightDistanceLabel}
+                  value={pointLightParamsState?.distance ?? 0}
+                  disabled={isDisabled}
+                  step={0.1}
+                  min={0}
+                  onPreviewChange={(v) => previewPointParamNumber('distance', v)}
+                  onCommit={(v) => commitPointParamNumber('distance', v)}
+                />
+                <LabeledNumberInput
+                  label={lightDecayLabel}
+                  value={pointLightParamsState?.decay ?? 2}
+                  disabled={isDisabled}
+                  step={0.1}
+                  min={0}
+                  onPreviewChange={(v) => previewPointParamNumber('decay', v)}
+                  onCommit={(v) => commitPointParamNumber('decay', v)}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {canShowHemisphereLightParams ? (
+            <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
+              <label className="block text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">
+                {hemisphereGroundColorLabel}
+              </label>
+              <ColorPicker
+                value={hemisphereLightParamsState?.groundColor ?? '#ffffff'}
+                onChange={previewHemisphereGroundColor}
+                onCommit={commitHemisphereGroundColor}
+                disabled={isDisabled}
+                ariaLabel={hemisphereGroundColorLabel}
+                showValue={true}
+              />
+            </div>
+          ) : null}
+
+          {canShowRectAreaLightParams ? (
+            <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <LabeledNumberInput
+                  label={rectAreaWidthLabel}
+                  value={rectAreaLightParamsState?.width ?? 1}
+                  disabled={isDisabled}
+                  step={0.05}
+                  min={0.0001}
+                  onPreviewChange={(v) => previewRectAreaParamNumber('width', v)}
+                  onCommit={(v) => commitRectAreaParamNumber('width', v)}
+                />
+                <LabeledNumberInput
+                  label={rectAreaHeightLabel}
+                  value={rectAreaLightParamsState?.height ?? 1}
+                  disabled={isDisabled}
+                  step={0.05}
+                  min={0.0001}
+                  onPreviewChange={(v) => previewRectAreaParamNumber('height', v)}
+                  onCommit={(v) => commitRectAreaParamNumber('height', v)}
+                />
+              </div>
+              <div className="border-t border-[var(--border-subtle)] pt-2 space-y-2">
+                <div className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{lightTargetLabel}</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <AxisNumberInput
+                    label={labels.xLabel}
+                    value={rectAreaLightParamsState?.target.x ?? 0}
+                    disabled={isDisabled}
+                    onPreviewChange={(v) => previewRectAreaTargetAxis('x', v)}
+                    onCommit={(v) => commitRectAreaTargetAxis('x', v)}
+                  />
+                  <AxisNumberInput
+                    label={labels.yLabel}
+                    value={rectAreaLightParamsState?.target.y ?? 0}
+                    disabled={isDisabled}
+                    onPreviewChange={(v) => previewRectAreaTargetAxis('y', v)}
+                    onCommit={(v) => commitRectAreaTargetAxis('y', v)}
+                  />
+                  <AxisNumberInput
+                    label={labels.zLabel}
+                    value={rectAreaLightParamsState?.target.z ?? 0}
+                    disabled={isDisabled}
+                    onPreviewChange={(v) => previewRectAreaTargetAxis('z', v)}
+                    onCommit={(v) => commitRectAreaTargetAxis('z', v)}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       {/* Shadow */}

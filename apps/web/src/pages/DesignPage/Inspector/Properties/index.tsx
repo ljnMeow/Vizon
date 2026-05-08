@@ -67,6 +67,39 @@ type LightIntensityState = {
   canIntensity: boolean;
 };
 
+type LightTargetState = {
+  target: Vec3;
+  canEdit: boolean;
+};
+
+type PointLightParamsState = {
+  distance: number;
+  decay: number;
+  canEdit: boolean;
+};
+
+type SpotLightParamsState = {
+  distance: number;
+  angle: number;
+  penumbra: number;
+  decay: number;
+  focus: number;
+  target: Vec3;
+  canEdit: boolean;
+};
+
+type HemisphereLightParamsState = {
+  groundColor: string;
+  canEdit: boolean;
+};
+
+type RectAreaLightParamsState = {
+  width: number;
+  height: number;
+  target: Vec3;
+  canEdit: boolean;
+};
+
 type DirectionalLightShadowState = {
   intensity: number;
   bias: number;
@@ -320,6 +353,60 @@ function readSelectedLightIntensity(obj: any): LightIntensityState | null {
   return { intensity: Number(intensity), canIntensity: true };
 }
 
+function readSelectedDirectionalLightTarget(obj: any): LightTargetState | null {
+  if (!obj || !(obj as any)?.isDirectionalLight) return null;
+  const t = (obj as any)?.target?.position;
+  if (!t) return null;
+  return {
+    target: { x: Number(t.x ?? 0), y: Number(t.y ?? 0), z: Number(t.z ?? 0) },
+    canEdit: true
+  };
+}
+
+function readSelectedSpotLightParams(obj: any): SpotLightParamsState | null {
+  if (!obj || !(obj as any)?.isSpotLight) return null;
+  const t = (obj as any)?.target?.position;
+  if (!t) return null;
+  return {
+    distance: typeof (obj as any).distance === 'number' ? Number((obj as any).distance) : 0,
+    angle: typeof (obj as any).angle === 'number' ? Number((obj as any).angle) : Math.PI / 3,
+    penumbra: typeof (obj as any).penumbra === 'number' ? Number((obj as any).penumbra) : 0,
+    decay: typeof (obj as any).decay === 'number' ? Number((obj as any).decay) : 2,
+    focus: typeof (obj as any).focus === 'number' ? Number((obj as any).focus) : 1,
+    target: { x: Number(t.x ?? 0), y: Number(t.y ?? 0), z: Number(t.z ?? 0) },
+    canEdit: true
+  };
+}
+
+function readSelectedPointLightParams(obj: any): PointLightParamsState | null {
+  if (!obj || !(obj as any)?.isPointLight) return null;
+  return {
+    distance: typeof (obj as any).distance === 'number' ? Number((obj as any).distance) : 0,
+    decay: typeof (obj as any).decay === 'number' ? Number((obj as any).decay) : 2,
+    canEdit: true
+  };
+}
+
+function readSelectedHemisphereLightParams(obj: any): HemisphereLightParamsState | null {
+  if (!obj || !(obj as any)?.isHemisphereLight) return null;
+  const c = (obj as any)?.groundColor;
+  const canEdit = Boolean(c && typeof c.getHexString === 'function');
+  if (!canEdit) return null;
+  return { groundColor: `#${String(c.getHexString()).toLowerCase()}`, canEdit: true };
+}
+
+function readSelectedRectAreaLightParams(obj: any): RectAreaLightParamsState | null {
+  if (!obj || !(obj as any)?.isRectAreaLight) return null;
+  const width = typeof (obj as any).width === 'number' ? Number((obj as any).width) : 1;
+  const height = typeof (obj as any).height === 'number' ? Number((obj as any).height) : 1;
+  const ud = (obj as any)?.userData ?? {};
+  const t = ud?.[VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET];
+  const target = t && typeof t === 'object'
+    ? { x: Number(t.x ?? 0), y: Number(t.y ?? 0), z: Number(t.z ?? 0) }
+    : { x: 0, y: 0, z: 0 };
+  return { width, height, target, canEdit: true };
+}
+
 function readSelectedDirectionalLightShadow(obj: any): DirectionalLightShadowState | null {
   if (!obj || !(obj as any)?.isDirectionalLight) return null;
   const shadow = (obj as any)?.shadow;
@@ -392,6 +479,11 @@ export function PropertiesSettings() {
   const [renderOrderState, setRenderOrderState] = useState<RenderOrderState | null>(null);
   const [lightColorState, setLightColorState] = useState<LightColorState | null>(null);
   const [lightIntensityState, setLightIntensityState] = useState<LightIntensityState | null>(null);
+  const [directionalLightTargetState, setDirectionalLightTargetState] = useState<LightTargetState | null>(null);
+  const [spotLightParamsState, setSpotLightParamsState] = useState<SpotLightParamsState | null>(null);
+  const [pointLightParamsState, setPointLightParamsState] = useState<PointLightParamsState | null>(null);
+  const [hemisphereLightParamsState, setHemisphereLightParamsState] = useState<HemisphereLightParamsState | null>(null);
+  const [rectAreaLightParamsState, setRectAreaLightParamsState] = useState<RectAreaLightParamsState | null>(null);
   const [directionalLightShadowState, setDirectionalLightShadowState] = useState<DirectionalLightShadowState | null>(null);
   const [spotLightShadowState, setSpotLightShadowState] = useState<SpotLightShadowState | null>(null);
   const [pointLightShadowState, setPointLightShadowState] = useState<PointLightShadowState | null>(null);
@@ -410,6 +502,11 @@ export function PropertiesSettings() {
     const selectedLightColor = selected ? readSelectedLightColor(selected) : null;
     setLightColorState(selectedLightColor);
     setLightIntensityState(selected ? readSelectedLightIntensity(selected) : null);
+    setDirectionalLightTargetState(selected ? readSelectedDirectionalLightTarget(selected) : null);
+    setSpotLightParamsState(selected ? readSelectedSpotLightParams(selected) : null);
+    setPointLightParamsState(selected ? readSelectedPointLightParams(selected) : null);
+    setHemisphereLightParamsState(selected ? readSelectedHemisphereLightParams(selected) : null);
+    setRectAreaLightParamsState(selected ? readSelectedRectAreaLightParams(selected) : null);
     setDirectionalLightShadowState(selected ? readSelectedDirectionalLightShadow(selected) : null);
     setSpotLightShadowState(selected ? readSelectedSpotLightShadow(selected) : null);
     setPointLightShadowState(selected ? readSelectedPointLightShadow(selected) : null);
@@ -425,6 +522,11 @@ export function PropertiesSettings() {
         setRenderOrderState(null);
         setLightColorState(null);
         setLightIntensityState(null);
+        setDirectionalLightTargetState(null);
+        setSpotLightParamsState(null);
+        setPointLightParamsState(null);
+        setHemisphereLightParamsState(null);
+        setRectAreaLightParamsState(null);
         setDirectionalLightShadowState(null);
         setSpotLightShadowState(null);
         setPointLightShadowState(null);
@@ -444,6 +546,11 @@ export function PropertiesSettings() {
       const nextLightColor = readSelectedLightColor(object);
       setLightColorState(nextLightColor);
       setLightIntensityState(readSelectedLightIntensity(object));
+      setDirectionalLightTargetState(readSelectedDirectionalLightTarget(object));
+      setSpotLightParamsState(readSelectedSpotLightParams(object));
+      setPointLightParamsState(readSelectedPointLightParams(object));
+      setHemisphereLightParamsState(readSelectedHemisphereLightParams(object));
+      setRectAreaLightParamsState(readSelectedRectAreaLightParams(object));
       setDirectionalLightShadowState(readSelectedDirectionalLightShadow(object));
       setSpotLightShadowState(readSelectedSpotLightShadow(object));
       setPointLightShadowState(readSelectedPointLightShadow(object));
@@ -477,8 +584,12 @@ export function PropertiesSettings() {
       const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
       if (!obj) return;
       // 如果 TransformControls 当前挂载的对象已换掉，则跳过，避免旧回调覆盖新选中。
-      const attachedUuid = (editor.transform as any)?.object?.uuid;
-      if (attachedUuid && attachedUuid !== selectedInfo.uuid) return;
+      const attachedObj = (editor.transform as any)?.object as any;
+      const attachedUuid = attachedObj?.uuid as string | undefined;
+      const attachedLightUuid = attachedObj?.userData?.[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET_LIGHT_UUID] as string | undefined;
+      const attachedToCurrentSelected =
+        !attachedUuid || attachedUuid === selectedInfo.uuid || attachedLightUuid === selectedInfo.uuid;
+      if (!attachedToCurrentSelected) return;
       setTransform(readSelectedTransform(obj));
       setShadow(readSelectedShadow(obj));
       // 这些属性不涉及昂贵材质遍历，跟随 dragging/changing 实时刷新没问题
@@ -486,6 +597,11 @@ export function PropertiesSettings() {
       setRenderOrderState(readSelectedRenderOrder(obj));
       setLightColorState(readSelectedLightColor(obj));
       setLightIntensityState(readSelectedLightIntensity(obj));
+      setDirectionalLightTargetState(readSelectedDirectionalLightTarget(obj));
+      setSpotLightParamsState(readSelectedSpotLightParams(obj));
+      setPointLightParamsState(readSelectedPointLightParams(obj));
+      setHemisphereLightParamsState(readSelectedHemisphereLightParams(obj));
+      setRectAreaLightParamsState(readSelectedRectAreaLightParams(obj));
       setDirectionalLightShadowState(readSelectedDirectionalLightShadow(obj));
       setSpotLightShadowState(readSelectedSpotLightShadow(obj));
       setPointLightShadowState(readSelectedPointLightShadow(obj));
@@ -904,6 +1020,214 @@ export function PropertiesSettings() {
     setLightIntensityState({ intensity: nextIntensity, canIntensity: true });
   };
 
+  const previewDirectionalTargetAxis = (axis: AxisKey, next: number) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isDirectionalLight || !obj?.target) return;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, `target.position.${axis}`, next, { recordHistory: false });
+    setDirectionalLightTargetState((prev) => (prev ? { ...prev, target: { ...prev.target, [axis]: next } } : prev));
+  };
+
+  const commitDirectionalTargetAxis = (axis: AxisKey, next: number) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isDirectionalLight || !obj?.target) return;
+    const displayValue = Number(next.toFixed(4));
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, `target.position.${axis}`, next, {
+      recordHistory: true,
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`
+      )
+    });
+    setDirectionalLightTargetState((prev) => (prev ? { ...prev, target: { ...prev.target, [axis]: next } } : prev));
+  };
+
+  const previewSpotParamNumber = (
+    path: 'distance' | 'angle' | 'penumbra' | 'decay' | 'focus',
+    nextValue: number
+  ) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isSpotLight) return;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, nextValue, { recordHistory: false });
+    setSpotLightParamsState((prev) => (prev ? { ...prev, [path]: nextValue } : prev));
+  };
+
+  const commitSpotParamNumber = (
+    path: 'distance' | 'angle' | 'penumbra' | 'decay' | 'focus',
+    nextValue: number
+  ) => {
+    if (!editor || !selectedInfo) return;
+    const labelMap = {
+      distance: { zh: labelsZh.lightDistanceLabel, en: labelsEn.lightDistanceLabel },
+      angle: { zh: labelsZh.spotAngleLabel, en: labelsEn.spotAngleLabel },
+      penumbra: { zh: labelsZh.spotPenumbraLabel, en: labelsEn.spotPenumbraLabel },
+      decay: { zh: labelsZh.lightDecayLabel, en: labelsEn.lightDecayLabel },
+      focus: { zh: labelsZh.spotFocusLabel, en: labelsEn.spotFocusLabel }
+    } as const;
+    const displayValue = Number(nextValue.toFixed(6));
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, nextValue, {
+      recordHistory: true,
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelMap[path].zh} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelMap[path].en} = ${displayValue}`
+      )
+    });
+    setSpotLightParamsState((prev) => (prev ? { ...prev, [path]: nextValue } : prev));
+  };
+
+  const previewSpotTargetAxis = (axis: AxisKey, next: number) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isSpotLight || !obj?.target) return;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, `target.position.${axis}`, next, { recordHistory: false });
+    setSpotLightParamsState((prev) => (prev ? { ...prev, target: { ...prev.target, [axis]: next } } : prev));
+  };
+
+  const commitSpotTargetAxis = (axis: AxisKey, next: number) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isSpotLight || !obj?.target) return;
+    const displayValue = Number(next.toFixed(4));
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, `target.position.${axis}`, next, {
+      recordHistory: true,
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`
+      )
+    });
+    setSpotLightParamsState((prev) => (prev ? { ...prev, target: { ...prev.target, [axis]: next } } : prev));
+  };
+
+  const previewPointParamNumber = (path: 'distance' | 'decay', nextValue: number) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isPointLight) return;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, nextValue, { recordHistory: false });
+    setPointLightParamsState((prev) => (prev ? { ...prev, [path]: nextValue } : prev));
+  };
+
+  const commitPointParamNumber = (path: 'distance' | 'decay', nextValue: number) => {
+    if (!editor || !selectedInfo) return;
+    const labelMap = {
+      distance: { zh: labelsZh.lightDistanceLabel, en: labelsEn.lightDistanceLabel },
+      decay: { zh: labelsZh.lightDecayLabel, en: labelsEn.lightDecayLabel }
+    } as const;
+    const displayValue = Number(nextValue.toFixed(6));
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, nextValue, {
+      recordHistory: true,
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelMap[path].zh} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelMap[path].en} = ${displayValue}`
+      )
+    });
+    setPointLightParamsState((prev) => (prev ? { ...prev, [path]: nextValue } : prev));
+  };
+
+  const previewHemisphereGroundColor = (nextColor: string) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isHemisphereLight || !obj?.groundColor) return;
+    const normalizedNext = nextColor.startsWith('#') ? nextColor : `#${nextColor}`;
+    obj.groundColor.set(normalizedNext);
+    setHemisphereLightParamsState({ groundColor: normalizedNext.toLowerCase(), canEdit: true });
+    editor.render();
+  };
+
+  const commitHemisphereGroundColor = (nextColor: string) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isHemisphereLight || !obj?.groundColor) return;
+    const normalizedNext = (nextColor.startsWith('#') ? nextColor : `#${nextColor}`).toLowerCase();
+    const before = hemisphereLightParamsState?.groundColor?.toLowerCase();
+    if (!before || before === normalizedNext) return;
+    void editor.executeHistoryOperation({
+      name: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.hemisphereGroundColorLabel} = ${normalizedNext}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.hemisphereGroundColorLabel} = ${normalizedNext}`
+      ),
+      do: () => {
+        obj.groundColor.set(normalizedNext);
+        setHemisphereLightParamsState({ groundColor: normalizedNext.toLowerCase(), canEdit: true });
+        editor.render();
+      },
+      undo: () => {
+        obj.groundColor.set(before);
+        setHemisphereLightParamsState({ groundColor: before, canEdit: true });
+        editor.render();
+      }
+    });
+  };
+
+  const previewRectAreaParamNumber = (path: 'width' | 'height', nextValue: number) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isRectAreaLight) return;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, nextValue, { recordHistory: false });
+    setRectAreaLightParamsState((prev) => (prev ? { ...prev, [path]: nextValue } : prev));
+  };
+
+  const commitRectAreaParamNumber = (path: 'width' | 'height', nextValue: number) => {
+    if (!editor || !selectedInfo) return;
+    const labelMap = {
+      width: { zh: labelsZh.rectAreaWidthLabel, en: labelsEn.rectAreaWidthLabel },
+      height: { zh: labelsZh.rectAreaHeightLabel, en: labelsEn.rectAreaHeightLabel }
+    } as const;
+    const displayValue = Number(nextValue.toFixed(6));
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, nextValue, {
+      recordHistory: true,
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelMap[path].zh} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelMap[path].en} = ${displayValue}`
+      )
+    });
+    setRectAreaLightParamsState((prev) => (prev ? { ...prev, [path]: nextValue } : prev));
+  };
+
+  const previewRectAreaTargetAxis = (axis: AxisKey, next: number) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isRectAreaLight) return;
+    const prevTarget = rectAreaLightParamsState?.target ?? { x: 0, y: 0, z: 0 };
+    const nextTarget = { ...prevTarget, [axis]: next };
+    obj.userData = obj.userData ?? {};
+    obj.userData[VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET] = nextTarget;
+    obj.lookAt(nextTarget.x, nextTarget.y, nextTarget.z);
+    setRectAreaLightParamsState((prev) => (prev ? { ...prev, target: nextTarget } : prev));
+    editor.render();
+  };
+
+  const commitRectAreaTargetAxis = (axis: AxisKey, next: number) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isRectAreaLight) return;
+    const beforeTarget = rectAreaLightParamsState?.target ?? { x: 0, y: 0, z: 0 };
+    const beforeQuat = obj.quaternion.clone?.();
+    const beforeUd = { ...(obj.userData ?? {}) };
+    const nextTarget = { ...beforeTarget, [axis]: next };
+    const displayValue = Number(next.toFixed(4));
+    void editor.executeHistoryOperation({
+      name: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`
+      ),
+      do: () => {
+        obj.userData = obj.userData ?? {};
+        obj.userData[VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET] = nextTarget;
+        obj.lookAt(nextTarget.x, nextTarget.y, nextTarget.z);
+        setRectAreaLightParamsState((prev) => (prev ? { ...prev, target: nextTarget } : prev));
+        editor.render();
+      },
+      undo: () => {
+        obj.userData = { ...beforeUd };
+        if (beforeQuat && obj.quaternion?.copy) obj.quaternion.copy(beforeQuat);
+        setRectAreaLightParamsState(readSelectedRectAreaLightParams(obj));
+        editor.render();
+      }
+    });
+  };
+
   const previewDirectionalShadowNumber = (
     path:
       | 'shadow.intensity'
@@ -1239,6 +1563,11 @@ export function PropertiesSettings() {
               renderOrderState={renderOrderState}
               lightColorState={lightColorState}
               lightIntensityState={lightIntensityState}
+              directionalLightTargetState={directionalLightTargetState}
+              spotLightParamsState={spotLightParamsState}
+              pointLightParamsState={pointLightParamsState}
+              hemisphereLightParamsState={hemisphereLightParamsState}
+              rectAreaLightParamsState={rectAreaLightParamsState}
               directionalLightShadowState={directionalLightShadowState}
               spotLightShadowState={spotLightShadowState}
               pointLightShadowState={pointLightShadowState}
@@ -1265,6 +1594,20 @@ export function PropertiesSettings() {
               commitLightColor={commitLightColor}
               previewLightIntensity={previewLightIntensity}
               commitLightIntensity={commitLightIntensity}
+              previewDirectionalTargetAxis={previewDirectionalTargetAxis}
+              commitDirectionalTargetAxis={commitDirectionalTargetAxis}
+              previewSpotParamNumber={previewSpotParamNumber}
+              commitSpotParamNumber={commitSpotParamNumber}
+              previewSpotTargetAxis={previewSpotTargetAxis}
+              commitSpotTargetAxis={commitSpotTargetAxis}
+              previewPointParamNumber={previewPointParamNumber}
+              commitPointParamNumber={commitPointParamNumber}
+              previewHemisphereGroundColor={previewHemisphereGroundColor}
+              commitHemisphereGroundColor={commitHemisphereGroundColor}
+              previewRectAreaParamNumber={previewRectAreaParamNumber}
+              commitRectAreaParamNumber={commitRectAreaParamNumber}
+              previewRectAreaTargetAxis={previewRectAreaTargetAxis}
+              commitRectAreaTargetAxis={commitRectAreaTargetAxis}
               previewDirectionalShadowNumber={previewDirectionalShadowNumber}
               commitDirectionalShadowNumber={commitDirectionalShadowNumber}
               setDirectionalShadowHelperVisible={setDirectionalShadowHelperVisible}

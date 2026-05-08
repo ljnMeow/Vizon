@@ -98,6 +98,32 @@ function configureLightHelper(helper: THREE.Object3D, light: THREE.Light) {
   helper.renderOrder = 8_000; // 较晚绘制，减少被透明物体误挡
 }
 
+function createLightTargetHandle(light: THREE.Light, target: THREE.Vector3, lightType: 'DirectionalLight' | 'SpotLight' | 'RectAreaLight') {
+  const handle = new THREE.Mesh(
+    new THREE.SphereGeometry(0.14, 12, 12),
+    new THREE.MeshBasicMaterial({
+      color: DEFAULT_LIGHT_HELPER_COLOR,
+      depthTest: false,
+      depthWrite: false,
+      transparent: true,
+      opacity: 0.92,
+      toneMapped: false
+    })
+  );
+  handle.name = `${light.type}TargetHandle`;
+  handle.position.copy(target);
+  handle.renderOrder = 8_100;
+  // 点击控制点时，业务选中语义仍归属灯光本体；编辑器会用额外参数把 gizmo 挂到 handle。
+  handle.userData[VIZON_USER_DATA_KEYS.COMMON.PICK_TARGET] = light;
+  // 不在结构树展示，避免污染用户的业务节点层级；但保持可拾取可拖拽。
+  handle.userData[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR] = true;
+  handle.userData[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET_HANDLE] = true;
+  handle.userData[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET_LIGHT_UUID] = light.uuid;
+  handle.userData[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET_LIGHT_TYPE] = lightType;
+  (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_TARGET_HANDLE] = handle;
+  return handle;
+}
+
 function isShadowHelperVisible(light: THREE.Light) {
   const ud = getVizonUserData(light);
   return Boolean(light.castShadow && ud[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false);
@@ -153,6 +179,11 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
     light.position.set(4, 8, 4); // 稍抬高主光高度，减少近距离硬阴影
     applyCommon(light, key, opts);
     light.target.position.copy(getTarget(opts)); // Directional 需 target 才有朝向语义
+    (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_TARGET_HANDLE] = createLightTargetHandle(
+      light,
+      light.target.position.clone(),
+      'DirectionalLight'
+    );
     // 默认不显示阴影视锥（视锥线框较干扰；需要时可在属性面板手动开启）
     (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] = false;
     light.castShadow = false;
@@ -220,9 +251,16 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
     // SpotLightShadow 的 fov 会在 updateMatrices 中由 angle/focus 推导：
     // fov ≈ radToDeg(2 * angle * focus)。这里让默认 angle 与 fov=45 对齐，避免面板读值不一致。
     const light = new THREE.SpotLight(DEFAULT_LIGHT_HELPER_COLOR, 5.0, 12, Math.PI / 8, 0.2, 1);
+    // three 默认 focus=1，但这里显式设置，避免不同版本或序列化造成“默认值不一致”的认知偏差。
+    light.focus = 1;
     light.position.set(2, 4, 2);
     applyCommon(light, key, opts);
     light.target.position.copy(getTarget(opts));
+    (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_TARGET_HANDLE] = createLightTargetHandle(
+      light,
+      light.target.position.clone(),
+      'SpotLight'
+    );
     // 默认不显示阴影视锥（需要时在属性面板手动开启）
     (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] = false;
     light.castShadow = false;
@@ -272,7 +310,19 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
   const light = new THREE.RectAreaLight(DEFAULT_LIGHT_HELPER_COLOR, 4.0, 2.5, 2.5); // 强度与宽高为经验默认值
   light.position.set(2, 3, 2);
   applyCommon(light, key, opts);
-  light.lookAt(getTarget(opts)); // 面光法线指向 target
+  const rectTarget = getTarget(opts);
+  // RectAreaLight 没有 target 对象：用 userData 持久化“看向点”语义，便于 editor/UI 回读与撤销。
+  (light.userData as any)[VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET] = {
+    x: rectTarget.x,
+    y: rectTarget.y,
+    z: rectTarget.z,
+  };
+  light.lookAt(rectTarget); // 面光法线指向 target
+  (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_TARGET_HANDLE] = createLightTargetHandle(
+    light,
+    rectTarget.clone(),
+    'RectAreaLight'
+  );
   if (helperEnabled) {
     const helper = new RectAreaLightHelper(light);
     configureLightHelper(helper, light);

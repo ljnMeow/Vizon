@@ -41,6 +41,16 @@ export const VIZON_USER_DATA_KEYS = {
     DEFAULT_LIGHT_KEY: '__vizonDefaultLightKey',
     DEFAULT_CAMERA: '__vizonDefaultCamera',
     DEFAULT_CAMERA_KEY: '__vizonDefaultCameraKey',
+    /**
+     * RectAreaLight 没有内置 target 对象（不像 Directional/Spot）。
+     * 为了让编辑器在“看向点（lookAt）”语义下可编辑/可撤销，这里把目标点持久化到 userData。
+     *
+     * 值：{ x:number; y:number; z:number }
+     */
+    RECT_AREA_LIGHT_TARGET: '__vizonRectAreaLightTarget',
+    LIGHT_TARGET_HANDLE: '__vizonLightTargetHandle',
+    LIGHT_TARGET_LIGHT_UUID: '__vizonLightTargetLightUuid',
+    LIGHT_TARGET_LIGHT_TYPE: '__vizonLightTargetLightType',
   },
 
   /** 运行时 helper 引用 */
@@ -49,6 +59,7 @@ export const VIZON_USER_DATA_KEYS = {
     LIGHT_HELPER: '__vizonLightHelper',
     SHADOW_HELPER_VISIBLE: '__vizonShadowHelperVisible',
     BORDER_LINE_HELPER: '__vizonBorderLineHelper',
+    LIGHT_TARGET_HANDLE: '__vizonLightTargetHandle',
   },
 
   /** 导线（conduit）编辑态数据 */

@@ -21,7 +21,7 @@ import {
 export type InteractionControllerInit = {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
-  select: (object: THREE.Object3D | null, options?: { toggle?: boolean }) => void;
+  select: (object: THREE.Object3D | null, options?: { toggle?: boolean; targetHandle?: THREE.Object3D | null }) => void;
   setSelectionHighlightEnabled: (enabled: boolean) => void;
 };
 
@@ -66,6 +66,15 @@ export class InteractionController {
     while (cur) {
       const pick = (cur.userData as any)[VIZON_USER_DATA_KEYS.COMMON.PICK_TARGET] as THREE.Object3D | undefined;
       if (pick) return pick; // 命中即返回，不再往上走
+      cur = cur.parent;
+    }
+    return undefined;
+  }
+
+  private findTargetHandle(obj: THREE.Object3D): THREE.Object3D | undefined {
+    let cur: THREE.Object3D | null = obj;
+    while (cur) {
+      if ((cur.userData as any)[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET_HANDLE]) return cur;
       cur = cur.parent;
     }
     return undefined;
@@ -244,13 +253,14 @@ export class InteractionController {
           return !isNonSelectableInHierarchy(obj) && !isNonPickableInHierarchy(obj);
         });
 
+        const pickedHandle = hit?.object != null ? this.findTargetHandle(hit.object) : undefined;
         const pickTarget = hit?.object != null ? this.findPickTarget(hit.object) : undefined;
         const next = pickTarget ?? hit?.object ?? null; // 优先落到「真实」灯/相机
         if (next && !isVisibleInHierarchy(next)) {
           this.init.select(null); // 理论防御：映射目标被隐藏则清空选中
           return;
         }
-        this.init.select(next, { toggle: this.isShiftPressed }); // 委托 ThreeEditor：冻结矩阵、attach gizmo、emit
+        this.init.select(next, { toggle: this.isShiftPressed, targetHandle: pickedHandle ?? null }); // 面板选中灯光，gizmo 可挂到 target handle
       },
       { signal: this.pointerAbort.signal }
     );
