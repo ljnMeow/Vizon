@@ -1,10 +1,21 @@
+import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './hooks/useTheme';
 import { LocaleProvider } from './hooks/useLocale';
 import { GlobalDialogProvider } from './components/GlobalDialog';
 import { GlobalMessageProvider } from './components/GlobalMessage';
-import LoginPage from './pages/LoginPage';
-import DesignPage from './pages/DesignPage';
+import { RequireAuth } from '@/auth/RequireAuth';
+
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const DesignPage = lazy(() => import('./pages/DesignPage'));
+
+function RouteFallback() {
+  return (
+    <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] flex items-center justify-center">
+      <div className="text-sm text-[var(--text-muted)]">Loading…</div>
+    </div>
+  );
+}
 
 /**
  * 应用根组件：
@@ -17,12 +28,21 @@ function App() {
       <LocaleProvider>
         <GlobalMessageProvider>
           <GlobalDialogProvider>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/design" element={<DesignPage />} />
-              {/* 默认重定向到登录页，后续可以在这里做鉴权判断 */}
-              <Route path="*" element={<Navigate to="/login" replace />} />
-            </Routes>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route
+                  path="/design"
+                  element={
+                    <RequireAuth>
+                      <DesignPage />
+                    </RequireAuth>
+                  }
+                />
+                {/* 默认重定向到登录页；业务扩展时可以替换成更细粒度的路由表 */}
+                <Route path="*" element={<Navigate to="/login" replace />} />
+              </Routes>
+            </Suspense>
           </GlobalDialogProvider>
         </GlobalMessageProvider>
       </LocaleProvider>

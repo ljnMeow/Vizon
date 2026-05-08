@@ -7,6 +7,7 @@
  * - 统一鉴权头（Bearer Token）与错误结构，便于 toast/日志/埋点
  */
 
+import { getApiBaseUrl } from '@/config/env';
 import { clearAuthTokens, clearUserInfo, getAccessToken, getRefreshToken, setAuthTokens } from '../utils/authStorage';
 import { STORAGE_KEYS } from '../utils/keys';
 import type { Locale } from '../hooks/useLocale';
@@ -71,11 +72,8 @@ function resolveBaseUrl() {
    * API Base URL：
    * - 通过 Vite 环境变量 `VITE_API_BASE_URL` 配置
    * - 未配置时返回空字符串，意味着使用同域相对路径（例如 `/api/...`）
-   *
-   * 这里用 (import.meta as any).env 做一次类型兜底，避免 TS 服务没加载 vite 类型时报错。
    */
-  const base = ((import.meta as any).env?.VITE_API_BASE_URL as string | undefined) ?? undefined;
-  return base?.replace(/\/$/, '') ?? '';
+  return getApiBaseUrl();
 }
 
 function joinUrl(base: string, path: string) {
