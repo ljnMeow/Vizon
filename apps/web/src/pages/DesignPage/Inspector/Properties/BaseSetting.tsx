@@ -53,6 +53,25 @@ type RenderOrderState = {
   canRenderOrder: boolean;
 };
 
+type PerspectiveCameraParamsState = {
+  fov: number;
+  near: number;
+  far: number;
+  zoom: number;
+  canEdit: boolean;
+};
+
+type OrthographicCameraParamsState = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  near: number;
+  far: number;
+  zoom: number;
+  canEdit: boolean;
+};
+
 type LightColorState = {
   color: string;
   canColor: boolean;
@@ -288,6 +307,8 @@ export function BaseSetting({
   visibilityPickFreeze,
   opacityState,
   renderOrderState,
+  perspectiveCameraParamsState,
+  orthographicCameraParamsState,
   lightColorState,
   lightIntensityState,
   directionalLightTargetState,
@@ -314,6 +335,10 @@ export function BaseSetting({
   commitOpacity,
   previewRenderOrder,
   commitRenderOrder,
+  previewPerspectiveCameraNumber,
+  commitPerspectiveCameraNumber,
+  previewOrthographicCameraNumber,
+  commitOrthographicCameraNumber,
   setCastShadow,
   setReceiveShadow,
   setFrustumCulled,
@@ -352,6 +377,8 @@ export function BaseSetting({
   visibilityPickFreeze: VisibilityPickFreezeState | null;
   opacityState: OpacityState | null;
   renderOrderState: RenderOrderState | null;
+  perspectiveCameraParamsState: PerspectiveCameraParamsState | null;
+  orthographicCameraParamsState: OrthographicCameraParamsState | null;
   lightColorState: LightColorState | null;
   lightIntensityState: LightIntensityState | null;
   directionalLightTargetState: LightTargetState | null;
@@ -378,6 +405,16 @@ export function BaseSetting({
   commitOpacity: (nextOpacity: number) => void;
   previewRenderOrder: (nextRenderOrder: number) => void;
   commitRenderOrder: (nextRenderOrder: number) => void;
+  previewPerspectiveCameraNumber: (path: 'fov' | 'near' | 'far' | 'zoom', nextValue: number) => void;
+  commitPerspectiveCameraNumber: (path: 'fov' | 'near' | 'far' | 'zoom', nextValue: number) => void;
+  previewOrthographicCameraNumber: (
+    path: 'left' | 'right' | 'top' | 'bottom' | 'near' | 'far' | 'zoom',
+    nextValue: number
+  ) => void;
+  commitOrthographicCameraNumber: (
+    path: 'left' | 'right' | 'top' | 'bottom' | 'near' | 'far' | 'zoom',
+    nextValue: number
+  ) => void;
   setCastShadow: (nextCastShadow: boolean) => void;
   setReceiveShadow: (nextReceiveShadow: boolean) => void;
   setFrustumCulled: (nextFrustumCulled: boolean) => void;
@@ -497,6 +534,11 @@ export function BaseSetting({
   const canShowOpacity = Boolean(opacityState?.canOpacity);
   const canShowLightColor = Boolean(lightColorState?.canColor);
   const canShowLightIntensity = Boolean(lightIntensityState?.canIntensity);
+  const canShowPerspectiveCameraParams =
+    selectedInfo?.type === 'PerspectiveCamera' && Boolean(perspectiveCameraParamsState?.canEdit);
+  const canShowOrthographicCameraParams =
+    selectedInfo?.type === 'OrthographicCamera' && Boolean(orthographicCameraParamsState?.canEdit);
+  const canShowCameraParams = canShowPerspectiveCameraParams || canShowOrthographicCameraParams;
   const canShowDirectionalLightParams =
     selectedInfo?.type === 'DirectionalLight' && Boolean(directionalLightTargetState?.canEdit);
   const canShowSpotLightParams = selectedInfo?.type === 'SpotLight' && Boolean(spotLightParamsState?.canEdit);
@@ -675,6 +717,129 @@ export function BaseSetting({
           />
         </div>
       </div>
+
+      {/* Camera */}
+      {canShowCameraParams ? (
+        <div className="space-y-1.5">
+          <div className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.cameraParamsTitleLabel}</div>
+          {canShowPerspectiveCameraParams ? (
+            <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <LabeledNumberInput
+                  label={labels.cameraFovLabel}
+                  value={perspectiveCameraParamsState?.fov ?? 50}
+                  disabled={isDisabled}
+                  step={0.1}
+                  min={0.1}
+                  max={179.9}
+                  onPreviewChange={(v) => previewPerspectiveCameraNumber('fov', v)}
+                  onCommit={(v) => commitPerspectiveCameraNumber('fov', v)}
+                />
+                <LabeledNumberInput
+                  label={labels.cameraZoomLabel}
+                  value={perspectiveCameraParamsState?.zoom ?? 1}
+                  disabled={isDisabled}
+                  step={0.01}
+                  min={0.01}
+                  onPreviewChange={(v) => previewPerspectiveCameraNumber('zoom', v)}
+                  onCommit={(v) => commitPerspectiveCameraNumber('zoom', v)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <LabeledNumberInput
+                  label={labels.cameraNearLabel}
+                  value={perspectiveCameraParamsState?.near ?? 0.1}
+                  disabled={isDisabled}
+                  step={0.01}
+                  min={0.000001}
+                  onPreviewChange={(v) => previewPerspectiveCameraNumber('near', v)}
+                  onCommit={(v) => commitPerspectiveCameraNumber('near', v)}
+                />
+                <LabeledNumberInput
+                  label={labels.cameraFarLabel}
+                  value={perspectiveCameraParamsState?.far ?? 200}
+                  disabled={isDisabled}
+                  step={0.1}
+                  min={0.000001}
+                  onPreviewChange={(v) => previewPerspectiveCameraNumber('far', v)}
+                  onCommit={(v) => commitPerspectiveCameraNumber('far', v)}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {canShowOrthographicCameraParams ? (
+            <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-2 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <LabeledNumberInput
+                  label={labels.cameraZoomLabel}
+                  value={orthographicCameraParamsState?.zoom ?? 1}
+                  disabled={isDisabled}
+                  step={0.01}
+                  min={0.01}
+                  onPreviewChange={(v) => previewOrthographicCameraNumber('zoom', v)}
+                  onCommit={(v) => commitOrthographicCameraNumber('zoom', v)}
+                />
+                <div />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <LabeledNumberInput
+                  label={labels.cameraLeftLabel}
+                  value={orthographicCameraParamsState?.left ?? -1}
+                  disabled={isDisabled}
+                  step={0.1}
+                  onPreviewChange={(v) => previewOrthographicCameraNumber('left', v)}
+                  onCommit={(v) => commitOrthographicCameraNumber('left', v)}
+                />
+                <LabeledNumberInput
+                  label={labels.cameraRightLabel}
+                  value={orthographicCameraParamsState?.right ?? 1}
+                  disabled={isDisabled}
+                  step={0.1}
+                  onPreviewChange={(v) => previewOrthographicCameraNumber('right', v)}
+                  onCommit={(v) => commitOrthographicCameraNumber('right', v)}
+                />
+                <LabeledNumberInput
+                  label={labels.cameraTopLabel}
+                  value={orthographicCameraParamsState?.top ?? 1}
+                  disabled={isDisabled}
+                  step={0.1}
+                  onPreviewChange={(v) => previewOrthographicCameraNumber('top', v)}
+                  onCommit={(v) => commitOrthographicCameraNumber('top', v)}
+                />
+                <LabeledNumberInput
+                  label={labels.cameraBottomLabel}
+                  value={orthographicCameraParamsState?.bottom ?? -1}
+                  disabled={isDisabled}
+                  step={0.1}
+                  onPreviewChange={(v) => previewOrthographicCameraNumber('bottom', v)}
+                  onCommit={(v) => commitOrthographicCameraNumber('bottom', v)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <LabeledNumberInput
+                  label={labels.cameraNearLabel}
+                  value={orthographicCameraParamsState?.near ?? 0.1}
+                  disabled={isDisabled}
+                  step={0.01}
+                  min={0.000001}
+                  onPreviewChange={(v) => previewOrthographicCameraNumber('near', v)}
+                  onCommit={(v) => commitOrthographicCameraNumber('near', v)}
+                />
+                <LabeledNumberInput
+                  label={labels.cameraFarLabel}
+                  value={orthographicCameraParamsState?.far ?? 200}
+                  disabled={isDisabled}
+                  step={0.1}
+                  min={0.000001}
+                  onPreviewChange={(v) => previewOrthographicCameraNumber('far', v)}
+                  onCommit={(v) => commitOrthographicCameraNumber('far', v)}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {canShowLightColor ? (
         <div className="space-y-1">

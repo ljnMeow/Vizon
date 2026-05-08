@@ -59,7 +59,9 @@ export const VIZON_USER_DATA_KEYS = {
     LIGHT_HELPER: '__vizonLightHelper',
     SHADOW_HELPER_VISIBLE: '__vizonShadowHelperVisible',
     BORDER_LINE_HELPER: '__vizonBorderLineHelper',
-    LIGHT_TARGET_HANDLE: '__vizonLightTargetHandle',
+    // 注意：DEFAULTS.LIGHT_TARGET_HANDLE 用于在 handle 自身上打“这是 target handle”的标记（boolean）
+    // 这里用于在 light.userData 上存放“handle 引用”（Object3D）。必须使用不同 key，避免类型冲突。
+    LIGHT_TARGET_HANDLE: '__vizonLightTargetHandleRef',
   },
 
   /** 导线（conduit）编辑态数据 */

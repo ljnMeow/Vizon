@@ -186,6 +186,15 @@ export interface AppMessages {
       propertiesSettings: {
         baseSettingTitle: string;
         typeLabel: string;
+        cameraParamsTitleLabel: string;
+        cameraFovLabel: string;
+        cameraZoomLabel: string;
+        cameraNearLabel: string;
+        cameraFarLabel: string;
+        cameraLeftLabel: string;
+        cameraRightLabel: string;
+        cameraTopLabel: string;
+        cameraBottomLabel: string;
         materialTypeLabel: string;
         materialTypeOptions: {
           MeshBasicMaterial: string;
@@ -677,6 +686,15 @@ export const appMessages: Record<Locale, AppMessages> = {
         propertiesSettings: {
           baseSettingTitle: '通用属性',
           typeLabel: '类型',
+          cameraParamsTitleLabel: '相机参数',
+          cameraFovLabel: '视野角（FOV）',
+          cameraZoomLabel: '缩放（Zoom）',
+          cameraNearLabel: '近裁剪（Near）',
+          cameraFarLabel: '远裁剪（Far）',
+          cameraLeftLabel: '左（Left）',
+          cameraRightLabel: '右（Right）',
+          cameraTopLabel: '上（Top）',
+          cameraBottomLabel: '下（Bottom）',
           materialTypeLabel: '材质类型',
           materialTypeOptions: {
             MeshBasicMaterial: '基础材质',
@@ -1160,6 +1178,15 @@ export const appMessages: Record<Locale, AppMessages> = {
         propertiesSettings: {
           baseSettingTitle: 'Common Properties',
           typeLabel: 'Type',
+          cameraParamsTitleLabel: 'Camera Params',
+          cameraFovLabel: 'FOV',
+          cameraZoomLabel: 'Zoom',
+          cameraNearLabel: 'Near',
+          cameraFarLabel: 'Far',
+          cameraLeftLabel: 'Left',
+          cameraRightLabel: 'Right',
+          cameraTopLabel: 'Top',
+          cameraBottomLabel: 'Bottom',
           materialTypeLabel: 'Material Type',
           materialTypeOptions: {
             MeshBasicMaterial: 'MeshBasicMaterial',

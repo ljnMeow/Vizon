@@ -15,6 +15,13 @@ import { basicModels } from '../../../../utils/models';
 /** 内置基础模型 key 集合，用于判断当前对象是否支持参数化几何属性编辑 */
 const BASIC_MODEL_KEYS = new Set(basicModels.map((m) => m.key));
 
+// NOTE: web 侧依赖的 `vizon-3d-core` 版本可能暂未包含这些新 key 的类型声明；
+// 这里用 runtime fallback + string key，避免 TS 报错并保持兼容。
+const RECT_AREA_LIGHT_TARGET_KEY: string =
+  (VIZON_USER_DATA_KEYS as any)?.DEFAULTS?.RECT_AREA_LIGHT_TARGET ?? '__vizonRectAreaLightTarget';
+const LIGHT_TARGET_LIGHT_UUID_KEY: string =
+  (VIZON_USER_DATA_KEYS as any)?.DEFAULTS?.LIGHT_TARGET_LIGHT_UUID ?? '__vizonLightTargetLightUuid';
+
 /** 三维坐标轴 key */
 type AxisKey = 'x' | 'y' | 'z';
 
@@ -55,6 +62,25 @@ type OpacityState = {
 type RenderOrderState = {
   renderOrder: number;
   canRenderOrder: boolean;
+};
+
+type PerspectiveCameraParamsState = {
+  fov: number;
+  near: number;
+  far: number;
+  zoom: number;
+  canEdit: boolean;
+};
+
+type OrthographicCameraParamsState = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  near: number;
+  far: number;
+  zoom: number;
+  canEdit: boolean;
 };
 
 type LightColorState = {
@@ -335,6 +361,33 @@ function readSelectedRenderOrder(obj: any): RenderOrderState | null {
   return { renderOrder: v, canRenderOrder: true };
 }
 
+function readSelectedPerspectiveCameraParams(obj: any): PerspectiveCameraParamsState | null {
+  if (!obj) return null;
+  if (!(obj as any)?.isPerspectiveCamera) return null;
+  return {
+    fov: typeof (obj as any).fov === 'number' ? Number((obj as any).fov) : 50,
+    near: typeof (obj as any).near === 'number' ? Number((obj as any).near) : 0.1,
+    far: typeof (obj as any).far === 'number' ? Number((obj as any).far) : 200,
+    zoom: typeof (obj as any).zoom === 'number' ? Number((obj as any).zoom) : 1,
+    canEdit: true
+  };
+}
+
+function readSelectedOrthographicCameraParams(obj: any): OrthographicCameraParamsState | null {
+  if (!obj) return null;
+  if (!(obj as any)?.isOrthographicCamera) return null;
+  return {
+    left: typeof (obj as any).left === 'number' ? Number((obj as any).left) : -1,
+    right: typeof (obj as any).right === 'number' ? Number((obj as any).right) : 1,
+    top: typeof (obj as any).top === 'number' ? Number((obj as any).top) : 1,
+    bottom: typeof (obj as any).bottom === 'number' ? Number((obj as any).bottom) : -1,
+    near: typeof (obj as any).near === 'number' ? Number((obj as any).near) : 0.1,
+    far: typeof (obj as any).far === 'number' ? Number((obj as any).far) : 200,
+    zoom: typeof (obj as any).zoom === 'number' ? Number((obj as any).zoom) : 1,
+    canEdit: true
+  };
+}
+
 function readSelectedLightColor(obj: any): LightColorState | null {
   if (!obj) return null;
   const isLight = Boolean((obj as any)?.isLight);
@@ -400,7 +453,7 @@ function readSelectedRectAreaLightParams(obj: any): RectAreaLightParamsState | n
   const width = typeof (obj as any).width === 'number' ? Number((obj as any).width) : 1;
   const height = typeof (obj as any).height === 'number' ? Number((obj as any).height) : 1;
   const ud = (obj as any)?.userData ?? {};
-  const t = ud?.[VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET];
+  const t = ud?.[RECT_AREA_LIGHT_TARGET_KEY];
   const target = t && typeof t === 'object'
     ? { x: Number(t.x ?? 0), y: Number(t.y ?? 0), z: Number(t.z ?? 0) }
     : { x: 0, y: 0, z: 0 };
@@ -477,6 +530,8 @@ export function PropertiesSettings() {
   const [visibilityPickFreeze, setVisibilityPickFreeze] = useState<VisibilityPickFreezeState | null>(null);
   const [opacityState, setOpacityState] = useState<OpacityState | null>(null);
   const [renderOrderState, setRenderOrderState] = useState<RenderOrderState | null>(null);
+  const [perspectiveCameraParamsState, setPerspectiveCameraParamsState] = useState<PerspectiveCameraParamsState | null>(null);
+  const [orthographicCameraParamsState, setOrthographicCameraParamsState] = useState<OrthographicCameraParamsState | null>(null);
   const [lightColorState, setLightColorState] = useState<LightColorState | null>(null);
   const [lightIntensityState, setLightIntensityState] = useState<LightIntensityState | null>(null);
   const [directionalLightTargetState, setDirectionalLightTargetState] = useState<LightTargetState | null>(null);
@@ -499,6 +554,8 @@ export function PropertiesSettings() {
     setVisibilityPickFreeze(selected ? readSelectedVisibilityPickFreeze(selected) : null);
     setOpacityState(selected ? readSelectedOpacity(selected) : null);
     setRenderOrderState(selected ? readSelectedRenderOrder(selected) : null);
+    setPerspectiveCameraParamsState(selected ? readSelectedPerspectiveCameraParams(selected) : null);
+    setOrthographicCameraParamsState(selected ? readSelectedOrthographicCameraParams(selected) : null);
     const selectedLightColor = selected ? readSelectedLightColor(selected) : null;
     setLightColorState(selectedLightColor);
     setLightIntensityState(selected ? readSelectedLightIntensity(selected) : null);
@@ -520,6 +577,8 @@ export function PropertiesSettings() {
         setVisibilityPickFreeze(null);
         setOpacityState(null);
         setRenderOrderState(null);
+        setPerspectiveCameraParamsState(null);
+        setOrthographicCameraParamsState(null);
         setLightColorState(null);
         setLightIntensityState(null);
         setDirectionalLightTargetState(null);
@@ -543,6 +602,8 @@ export function PropertiesSettings() {
       setVisibilityPickFreeze(readSelectedVisibilityPickFreeze(object));
       setOpacityState(readSelectedOpacity(object));
       setRenderOrderState(readSelectedRenderOrder(object));
+      setPerspectiveCameraParamsState(readSelectedPerspectiveCameraParams(object));
+      setOrthographicCameraParamsState(readSelectedOrthographicCameraParams(object));
       const nextLightColor = readSelectedLightColor(object);
       setLightColorState(nextLightColor);
       setLightIntensityState(readSelectedLightIntensity(object));
@@ -586,7 +647,7 @@ export function PropertiesSettings() {
       // 如果 TransformControls 当前挂载的对象已换掉，则跳过，避免旧回调覆盖新选中。
       const attachedObj = (editor.transform as any)?.object as any;
       const attachedUuid = attachedObj?.uuid as string | undefined;
-      const attachedLightUuid = attachedObj?.userData?.[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET_LIGHT_UUID] as string | undefined;
+      const attachedLightUuid = attachedObj?.userData?.[LIGHT_TARGET_LIGHT_UUID_KEY] as string | undefined;
       const attachedToCurrentSelected =
         !attachedUuid || attachedUuid === selectedInfo.uuid || attachedLightUuid === selectedInfo.uuid;
       if (!attachedToCurrentSelected) return;
@@ -915,6 +976,60 @@ export function PropertiesSettings() {
     setRenderOrderState({ renderOrder: next, canRenderOrder: true });
   };
 
+  const previewPerspectiveCameraNumber = (path: 'fov' | 'near' | 'far' | 'zoom', nextValue: number) => {
+    setPerspectiveCameraParamsState((prev) => (prev ? { ...prev, [path]: nextValue } : prev));
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isPerspectiveCamera) return;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, Number(nextValue), { recordHistory: false });
+  };
+
+  const commitPerspectiveCameraNumber = (path: 'fov' | 'near' | 'far' | 'zoom', nextValue: number) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isPerspectiveCamera) return;
+    const normalizedValue = Number(nextValue);
+    if (!Number.isFinite(normalizedValue)) return;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, normalizedValue, {
+      recordHistory: true,
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${path} = ${normalizedValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${path} = ${normalizedValue}`
+      )
+    });
+    setPerspectiveCameraParamsState((prev) => (prev ? { ...prev, [path]: normalizedValue } : prev));
+  };
+
+  const previewOrthographicCameraNumber = (
+    path: 'left' | 'right' | 'top' | 'bottom' | 'near' | 'far' | 'zoom',
+    nextValue: number
+  ) => {
+    setOrthographicCameraParamsState((prev) => (prev ? { ...prev, [path]: nextValue } : prev));
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isOrthographicCamera) return;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, Number(nextValue), { recordHistory: false });
+  };
+
+  const commitOrthographicCameraNumber = (
+    path: 'left' | 'right' | 'top' | 'bottom' | 'near' | 'far' | 'zoom',
+    nextValue: number
+  ) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid) as any;
+    if (!obj?.isOrthographicCamera) return;
+    const normalizedValue = Number(nextValue);
+    if (!Number.isFinite(normalizedValue)) return;
+    void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, normalizedValue, {
+      recordHistory: true,
+      operationName: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${path} = ${normalizedValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${path} = ${normalizedValue}`
+      )
+    });
+    setOrthographicCameraParamsState((prev) => (prev ? { ...prev, [path]: normalizedValue } : prev));
+  };
+
   const setCastShadow = (nextCastShadow: boolean) => {
     if (!editor || !selectedInfo) return;
     const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
@@ -1192,7 +1307,7 @@ export function PropertiesSettings() {
     const prevTarget = rectAreaLightParamsState?.target ?? { x: 0, y: 0, z: 0 };
     const nextTarget = { ...prevTarget, [axis]: next };
     obj.userData = obj.userData ?? {};
-    obj.userData[VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET] = nextTarget;
+    obj.userData[RECT_AREA_LIGHT_TARGET_KEY] = nextTarget;
     obj.lookAt(nextTarget.x, nextTarget.y, nextTarget.z);
     setRectAreaLightParamsState((prev) => (prev ? { ...prev, target: nextTarget } : prev));
     editor.render();
@@ -1214,7 +1329,7 @@ export function PropertiesSettings() {
       ),
       do: () => {
         obj.userData = obj.userData ?? {};
-        obj.userData[VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET] = nextTarget;
+        obj.userData[RECT_AREA_LIGHT_TARGET_KEY] = nextTarget;
         obj.lookAt(nextTarget.x, nextTarget.y, nextTarget.z);
         setRectAreaLightParamsState((prev) => (prev ? { ...prev, target: nextTarget } : prev));
         editor.render();
@@ -1561,6 +1676,8 @@ export function PropertiesSettings() {
               visibilityPickFreeze={visibilityPickFreeze}
               opacityState={opacityState}
               renderOrderState={renderOrderState}
+              perspectiveCameraParamsState={perspectiveCameraParamsState}
+              orthographicCameraParamsState={orthographicCameraParamsState}
               lightColorState={lightColorState}
               lightIntensityState={lightIntensityState}
               directionalLightTargetState={directionalLightTargetState}
@@ -1587,6 +1704,10 @@ export function PropertiesSettings() {
               commitOpacity={commitOpacity}
               previewRenderOrder={previewRenderOrder}
               commitRenderOrder={commitRenderOrder}
+              previewPerspectiveCameraNumber={previewPerspectiveCameraNumber}
+              commitPerspectiveCameraNumber={commitPerspectiveCameraNumber}
+              previewOrthographicCameraNumber={previewOrthographicCameraNumber}
+              commitOrthographicCameraNumber={commitOrthographicCameraNumber}
               setCastShadow={setCastShadow}
               setReceiveShadow={setReceiveShadow}
               setFrustumCulled={setFrustumCulled}

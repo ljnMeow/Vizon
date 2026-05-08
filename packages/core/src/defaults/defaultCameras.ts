@@ -69,6 +69,8 @@ export function createDefaultCamera(key: DefaultCameraKey, opts?: CreateDefaultC
   if (key === 'perspective') {
     // 默认相机用于编辑器内放置与预览：far 太大时 CameraHelper 会显得“巨大”且干扰编辑。
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+    // 明确写入 zoom，避免上层序列化/面板读取时出现 undefined 分支。
+    camera.zoom = 1;
     // 默认略微抬高，避免创建后“看地面穿模”。
     camera.position.set(2.5, 2.0, 2.5);
     // 默认保持视线与地面平行（不下俯），便于拖拽创建后的初始编辑体验。
@@ -91,6 +93,8 @@ export function createDefaultCamera(key: DefaultCameraKey, opts?: CreateDefaultC
   // 具体显示效果由上层在切换到该相机时按 viewport aspect 再适配。
   const size = 1.5;
   const camera = new THREE.OrthographicCamera(-size, size, size, -size, 0.1, 200);
+  // 明确写入 zoom，避免上层序列化/面板读取时出现 undefined 分支。
+  camera.zoom = 1;
   camera.position.set(2.5, 2.0, 2.5);
   // 默认保持视线与地面平行（不下俯），便于拖拽创建后的初始编辑体验。
   camera.lookAt(0, 2.0, 0);

@@ -1578,7 +1578,7 @@ export class ThreeEditor {
   }
 
   private bindLightTargetHandle(light: THREE.Light) {
-    const handle = getVizonUserData(light)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_TARGET_HANDLE] as THREE.Object3D | undefined;
+    const handle = getVizonUserData(light)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_TARGET_HANDLE];
     if (!handle || this.lightTargetHandles.has(light.uuid)) return;
     this.lightTargetHandles.set(light.uuid, handle);
     if (!handle.parent) this.scene.add(handle);
@@ -2342,6 +2342,22 @@ export class ThreeEditor {
         this.syncLightTargetFromHandle(maybeObj3d);
       }
       if (maybeObj3d?.isLight) this.lightHelpersDirty = true;
+      if (maybeObj3d?.isCamera) {
+        const needsProjectionUpdate =
+          path === 'fov' ||
+          path === 'near' ||
+          path === 'far' ||
+          path === 'zoom' ||
+          path === 'aspect' ||
+          path === 'left' ||
+          path === 'right' ||
+          path === 'top' ||
+          path === 'bottom';
+        if (needsProjectionUpdate) {
+          maybeObj3d.updateProjectionMatrix?.();
+          this.cameraHelpersDirty = true;
+        }
+      }
       if (maybeObj3d?.isDirectionalLight || maybeObj3d?.isSpotLight) {
         if (path.startsWith('target.position.')) {
           const handle = this.lightTargetHandles.get(maybeObj3d.uuid);
