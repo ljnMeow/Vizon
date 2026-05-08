@@ -1356,7 +1356,9 @@ export class ThreeEditor {
       lightTarget.updateMatrixWorld(true);
       object.updateMatrixWorld?.(true);
     }
-    // helper 绑定逻辑仍保持在 ThreeEditor（T007 阶段先不搬迁）。
+    // helper 绑定属于 ThreeEditor 的“端到端交互链路副作用”：
+    // - SceneGraphService 只做结构变更与 sceneTree 同步；
+    // - ThreeEditor 维护 camera/light helper 的映射与 dirty 标记，并承担 helper 的可见性/阴影锥联动逻辑。
     this.bindHelpersForSubtree(object);
     if (this.freezeStaticObjects) {
       this.staticObjectFreezeController.freezeObjectTree(object);
@@ -1490,6 +1492,8 @@ export class ThreeEditor {
   }
 
   private bindHelpersForSubtree(root: THREE.Object3D) {
+    // traverse 的目的是覆盖 subtree 中“可能包含相机/灯光节点”的所有情况，
+    // 并把它们各自对应的 editor helper（camera helper / light helper）挂到当前 scene。
     root.traverse((node: any) => {
       if (node?.isCamera) {
         const helper = getVizonUserData(node)[VIZON_USER_DATA_KEYS.HELPERS.CAMERA_HELPER];
@@ -1536,6 +1540,9 @@ export class ThreeEditor {
   }
 
   private unbindHelpersForSubtree(root: THREE.Object3D) {
+    // 解绑 helper 的同时清理映射表（cameraHelpers/lightHelpers），避免：
+    // - helper 悬挂在 scene 中造成误渲染；
+    // - 映射表里残留旧 helper 导致后续更新写错对象。
     root.traverse((node: any) => {
       const cameraHelper = this.cameraHelpers.get(node.uuid);
       if (cameraHelper) {
