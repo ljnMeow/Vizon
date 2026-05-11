@@ -168,6 +168,14 @@ export class InteractionController {
     }
   }
 
+  /**
+   * 清除 Shift 增选修饰键状态（例如系统文件框打开/关闭时浏览器可能不派发 Shift 的 keyup）。
+   * 若不重置，视口拾取会一直带 toggle 模式，导致单选也无法挂载 TransformControls。
+   */
+  resetShiftMultiselectModifier() {
+    this.isShiftPressed = false;
+  }
+
   getOrbit() {
     return this.orbit;
   }

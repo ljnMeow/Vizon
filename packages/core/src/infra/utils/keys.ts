@@ -48,6 +48,14 @@ export const VIZON_USER_DATA_KEYS = {
      * 值：{ x:number; y:number; z:number }
      */
     RECT_AREA_LIGHT_TARGET: '__vizonRectAreaLightTarget',
+    /**
+     * DirectionalLight / SpotLight 的 target 位置持久化快照。
+     * three.js 的 light.target 是一个 Object3D，但它不一定会被挂载到 scene，
+     * 导致导出/导入后 target 位置难以稳定回显。这里用纯数据兜底。
+     *
+     * 值：{ x:number; y:number; z:number }
+     */
+    LIGHT_TARGET: '__vizonLightTarget',
     LIGHT_TARGET_HANDLE: '__vizonLightTargetHandle',
     LIGHT_TARGET_LIGHT_UUID: '__vizonLightTargetLightUuid',
     LIGHT_TARGET_LIGHT_TYPE: '__vizonLightTargetLightType',

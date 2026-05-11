@@ -107,6 +107,11 @@ export function ThreeViewport({
       inst.setTransformToolEnabled(true);
     });
 
+    const offShiftUiReset = inst.on("shiftMultiselectUiReset", () => {
+      shiftSelectingRef.current = false;
+      setHideViewportTool(false);
+    });
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Shift") return;
       if (shiftSelectingRef.current) return;
@@ -155,6 +160,7 @@ export function ThreeViewport({
 
     return () => {
       offSelect();
+      offShiftUiReset();
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onWindowBlur);
@@ -220,6 +226,7 @@ export function ThreeViewport({
           "en-US": `Add object - ${obj.uuid}`,
         }),
       });
+      inst.resetShiftMultiselectState();
       inst.select(obj);
       return;
     }
@@ -231,6 +238,7 @@ export function ThreeViewport({
       inst.add(cam, {
         operationName: getAddCameraHistoryName(typedKey, cam.uuid),
       });
+      inst.resetShiftMultiselectState();
       inst.select(cam);
       return;
     }
@@ -246,6 +254,7 @@ export function ThreeViewport({
       inst.add(light, {
         operationName: getAddLightHistoryName(typedKey, light.uuid),
       });
+      inst.resetShiftMultiselectState();
       inst.select(light);
     }
   };

@@ -391,6 +391,8 @@ export function Structure() {
   const selectNode = (uuid: string) => {
     if (!editor) return;
     const obj = uuid === editor.camera.uuid ? editor.camera : (editor.scene.getObjectByProperty('uuid', uuid) ?? null);
+    // 从树单选时强制退出 Shift 多选遗留态（文件框等场景可能收不到 keyup），否则视口与 React 仍认为在增选模式、Gizmo 被关。
+    editor.resetShiftMultiselectState();
     editor.select(obj);
   };
 

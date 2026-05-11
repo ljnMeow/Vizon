@@ -436,12 +436,14 @@ export function ObjectAttributes({
                     obj.userData = obj.userData ?? {};
                     obj.userData[VIZON_USER_DATA_KEYS.CONDUIT.EDIT_ENABLED] = next;
                     setRefreshKey((x) => x + 1);
+                    editor.resetShiftMultiselectState();
                     editor.select(obj);
                   },
                   undo: () => {
                     obj.userData = obj.userData ?? {};
                     obj.userData[VIZON_USER_DATA_KEYS.CONDUIT.EDIT_ENABLED] = prev;
                     setRefreshKey((x) => x + 1);
+                    editor.resetShiftMultiselectState();
                     editor.select(obj);
                   }
                 });

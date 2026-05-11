@@ -5,6 +5,7 @@ import { useLocale } from '../../../../hooks/useLocale';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { useTheme } from '../../../../hooks/useTheme';
 import { appMessages } from '../../../../i18n/messages';
+import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 
 /**
  * 判断快捷键事件是否来自可编辑输入控件。
@@ -136,6 +137,8 @@ export function ActionBar() {
   };
 
   const onImportDocumentClick = () => {
+    // 系统文件框可能导致 Shift 的 keyup 丢失；先重置修饰态，避免导入后视口拾取一直处于 toggle、Gizmo 不显示。
+    editor?.resetShiftMultiselectState();
     importInputRef.current?.click();
   };
 
@@ -146,7 +149,23 @@ export function ActionBar() {
     try {
       const text = await file.text();
       const parsed = JSON.parse(text) as unknown;
-      await importDocument(editor, parsed);
+      const before = editor.getVizonDocument({ generator: 'apps/web-actionbar' });
+      const after = JSON.parse(JSON.stringify(parsed)) as unknown;
+      await editor.executeHistoryOperation({
+        name: encodeHistoryI18nName({
+          'zh-CN': '导入 JSON 文档',
+          'en-US': 'Import JSON document'
+        }),
+        do: async () => {
+          await importDocument(editor, after);
+        },
+        undo: async () => {
+          await importDocument(editor, before);
+        },
+        redo: async () => {
+          await importDocument(editor, after);
+        }
+      });
     } catch (err) {
       // 测试入口保持轻量：导入失败时给出最小可见反馈，便于快速定位 JSON 问题。
       const msg = err instanceof Error ? err.message : 'Unknown import error';
@@ -154,6 +173,8 @@ export function ActionBar() {
     } finally {
       // 允许重复导入同一文件（浏览器对同名同文件不会重复触发 change）。
       inputEl.value = '';
+      // 解析失败等路径不会走 importDocument 内的重置；仍要恢复 Shift/Gizmo 相关状态。
+      editor?.resetShiftMultiselectState();
     }
   };
 

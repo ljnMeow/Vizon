@@ -1,6 +1,7 @@
-import type { SceneSettings } from '../settings/sceneSettings';
+import type { SceneSettings, SceneSettingsBasic, SceneSettingsEnvironment, SceneSettingsCamera, SceneSettingsGrid, RendererSettings } from '../settings/sceneSettings';
+import type { SceneTreeNode, SceneTreeNodeKind } from '../settings/sceneTree';
 
-export type VizonSchemaVersion = 1;
+export type VizonSchemaVersion = 1 | 2;
 
 export type VizonUpAxis = 'y' | 'z';
 export type VizonUnits = 'meter' | 'centimeter' | 'millimeter';
@@ -12,6 +13,18 @@ export type VizonDocumentMeta = {
   generator?: string; // e.g. "apps/web"
   units?: VizonUnits;
   upAxis?: VizonUpAxis;
+};
+
+export type VizonContentNode = {
+  uuid: string;
+  name: string;
+  type: string;
+  visible: boolean;
+  kind: SceneTreeNodeKind;
+  children: VizonContentNode[];
+  attribute: Record<string, unknown>;
+  material?: Record<string, unknown> | Array<Record<string, unknown>>;
+  effects?: Record<string, unknown>;
 };
 
 export type VizonNodeId = string; // use Object3D.uuid
@@ -96,14 +109,20 @@ export type VizonAssets = {
 
 export type VizonDocument = {
   meta: VizonDocumentMeta;
-  sceneSettings: SceneSettings;
-  /**
-   * Full Three.js scene serialization snapshot.
-   * Produced by `Scene.toJSON()` after editor-runtime helpers are stripped.
-   * This is the primary source for high-fidelity restore.
-   */
-  sceneSnapshot?: Record<string, unknown>;
-  nodes: VizonNode[];
+  basic: SceneSettingsBasic;
+  environment: SceneSettingsEnvironment;
+  camera: SceneSettingsCamera;
+  grid: SceneSettingsGrid;
+  helpers: SceneSettings['helpers'];
+  renderer: RendererSettings;
+  sceneTree: SceneTreeNode[];
+  content: VizonContentNode[];
   assets?: VizonAssets;
+  /**
+   * 向后兼容旧文档结构，仅用于读取历史数据，不再作为主写入字段。
+   */
+  sceneSettings?: SceneSettings;
+  sceneSnapshot?: Record<string, unknown>;
+  nodes?: VizonNode[];
 };
 

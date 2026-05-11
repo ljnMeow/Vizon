@@ -175,6 +175,7 @@ function AxisNumberInput({
   value,
   disabled,
   step,
+  finiteFallback = 0,
   onPreviewChange,
   onCommit
 }: {
@@ -182,19 +183,23 @@ function AxisNumberInput({
   value: number;
   disabled: boolean;
   step?: number;
+  /** position/rotation 用 0；scale 用 1，避免 Infinity/NaN 传入 type="number" 触发浏览器警告 */
+  finiteFallback?: number;
   onPreviewChange: (next: number) => void;
   onCommit: (next: number) => void;
 }) {
-  const [draft, setDraft] = useState(String(value));
+  const safe = Number.isFinite(value) ? value : finiteFallback;
+  const [draft, setDraft] = useState(String(safe));
 
   useEffect(() => {
-    setDraft(String(value));
-  }, [value]);
+    const nextSafe = Number.isFinite(value) ? value : finiteFallback;
+    setDraft(String(nextSafe));
+  }, [value, finiteFallback]);
 
   const commitDraft = () => {
     const next = Number(draft);
     if (!Number.isFinite(next)) {
-      setDraft(String(value));
+      setDraft(String(safe));
       return;
     }
     onCommit(next);
@@ -237,6 +242,7 @@ function LabeledNumberInput({
   step,
   min,
   max,
+  finiteFallback = 0,
   onPreviewChange,
   onCommit
 }: {
@@ -246,19 +252,22 @@ function LabeledNumberInput({
   step?: number;
   min?: number;
   max?: number;
+  finiteFallback?: number;
   onPreviewChange: (next: number) => void;
   onCommit: (next: number) => void;
 }) {
-  const [draft, setDraft] = useState(String(value));
+  const safe = Number.isFinite(value) ? value : finiteFallback;
+  const [draft, setDraft] = useState(String(safe));
 
   useEffect(() => {
-    setDraft(String(value));
-  }, [value]);
+    const nextSafe = Number.isFinite(value) ? value : finiteFallback;
+    setDraft(String(nextSafe));
+  }, [value, finiteFallback]);
 
   const commitDraft = () => {
     const next = Number(draft);
     if (!Number.isFinite(next)) {
-      setDraft(String(value));
+      setDraft(String(safe));
       return;
     }
     onCommit(next);
@@ -696,6 +705,7 @@ export function BaseSetting({
             value={transform?.scale.x ?? 1}
             disabled={isDisabled}
             step={0.01}
+            finiteFallback={1}
             onPreviewChange={(v) => previewScaleAxis('x', v)}
             onCommit={(v) => commitScaleAxis('x', v)}
           />
@@ -704,6 +714,7 @@ export function BaseSetting({
             value={transform?.scale.y ?? 1}
             disabled={isDisabled}
             step={0.01}
+            finiteFallback={1}
             onPreviewChange={(v) => previewScaleAxis('y', v)}
             onCommit={(v) => commitScaleAxis('y', v)}
           />
@@ -712,6 +723,7 @@ export function BaseSetting({
             value={transform?.scale.z ?? 1}
             disabled={isDisabled}
             step={0.01}
+            finiteFallback={1}
             onPreviewChange={(v) => previewScaleAxis('z', v)}
             onCommit={(v) => commitScaleAxis('z', v)}
           />

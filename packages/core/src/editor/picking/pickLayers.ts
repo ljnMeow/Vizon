@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VIZON_USER_DATA_KEYS } from '../../infra/utils';
 
 /**
  * three.js `Raycaster` 与 `Object3D.layers` 配合：通过层掩码在相交测试时快速「剪掉」整棵子树，
@@ -21,6 +22,12 @@ export const VIZON_EDITOR_OVERLAY_LAYER = 1;
 export function applyEditorOverlayLayer(root: THREE.Object3D) {
   root.traverse((obj) => {
     obj.layers.set(VIZON_EDITOR_OVERLAY_LAYER); // 每个 Object3D 独立 layers，需遍历
+    // overlay 子树属于编辑器内部对象：
+    // - 不应出现在结构树的“可编辑根节点”集合里（否则 import/clear 会把 gizmo 也清掉）
+    // - 不应参与选择/业务交互
+    const ud = ((obj.userData ??= {}) as Record<string, unknown>) as any;
+    ud[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE] = true;
+    ud[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR] = true;
   });
 }
 

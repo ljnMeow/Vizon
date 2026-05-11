@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { OrbitControls, TransformControls } from 'three-stdlib';
 import { Emitter } from '../infra/events';
 import { getVizonUserData, VIZON_HISTORY_KEYS, VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '../infra/utils';
-import { exportDocument } from '../document/document';
+import { buildVizonDocumentFromEditor } from './vizonPersist';
 import type { RendererSettings, SceneSettings } from '../settings/sceneSettings';
 import type { SceneTreeNode } from '../settings/sceneTree';
 import type { VizonDocument } from '../types/document';
@@ -58,6 +58,13 @@ export type ThreeEditorEvents = {
   select: { object: THREE.Object3D | null; objects: THREE.Object3D[] };
   sceneTreeChange: { tree: SceneTreeNode[] };
   historyChange: { records: EditorHistoryRecord[]; canUndo: boolean; canRedo: boolean };
+  /**
+   * 场景设置变更（来自 core 内部 apply，例如导入文档、撤销/重做、或外部直接调用 setSceneSettings）。
+   * Web 层可用它来刷新 Inspector 的基础/环境/渲染器/相机/辅助器等回显状态。
+   */
+  sceneSettingsChange: { settings: SceneSettings; renderer: RendererSettings };
+  /** 通知上层同步清理 Shift 多选相关的 React 状态（与 resetShiftMultiselectState 成对使用） */
+  shiftMultiselectUiReset: Record<string, never>;
 };
 
 /** 构造 `ThreeEditor` 时的选项：画布、初值、可选场景配置与实验开关 */
@@ -951,7 +958,18 @@ export class ThreeEditor {
    * 适合导出/导入链路与开发期控制台调试。
    */
   getVizonDocument(options?: { generator?: string }): VizonDocument {
-    return exportDocument(this, options);
+    return buildVizonDocumentFromEditor(this, options);
+  }
+
+  /**
+   * 重新绑定指定子树内的相机/灯光 helper。
+   * 用途：导入 JSON 后（尤其是跨版本/外部生成的 JSON），可能出现 helper 在 userData 中被延后补齐，
+   * 此时需要显式触发一次 bind 才能把 helper 挂回 scene 并进入同步链路。
+   */
+  rebindRuntimeHelpersForSubtree(root: THREE.Object3D) {
+    this.bindHelpersForSubtree(root);
+    this.syncHelperVisibilityForSubtree(root);
+    this.render();
   }
 
   /** 当前 WebGLRenderer 相关序列化配置的快照（抗锯齿、色调映射、阴影贴图类型等）。 */
@@ -997,6 +1015,7 @@ export class ThreeEditor {
     if (rendererChanged) this.markDirty({ renderer: true, shadow: true });
     this.sceneSettings = nextScene;
     this.applyRendererSettings(nextScene.renderer, prevRenderer);
+    this.emitSceneSettingsChange();
   }
 
   /**
@@ -1055,7 +1074,7 @@ export class ThreeEditor {
    */
   async setSceneSettings(
     next: SceneSettings,
-    options?: { recordHistory?: boolean; operationName?: string }
+    options?: { recordHistory?: boolean; operationName?: string; forceApply?: boolean }
   ): Promise<void> {
     if (options?.recordHistory === false && !this.pendingSceneHistoryBefore) {
       this.pendingSceneHistoryBefore = this.getSceneSettings();
@@ -1085,7 +1104,8 @@ export class ThreeEditor {
     });
     this.sceneSettings = normalized;
     const seq = ++this.sceneSettingsApplyingSeq;
-    await this.applySceneSettings(normalized, prev, seq);
+    await this.applySceneSettings(normalized, prev, seq, options?.forceApply === true);
+    this.emitSceneSettingsChange();
   }
 
   /**
@@ -1260,7 +1280,11 @@ export class ThreeEditor {
         if (!nextSet.has(item)) this.staticObjectFreezeController.freezeObjectTree(item);
       }
       for (const item of nextObjects) {
-        if (!prevSet.has(item)) this.staticObjectFreezeController.unfreezeObjectTree(item);
+        if (!prevSet.has(item)) {
+          this.staticObjectFreezeController.unfreezeObjectTree(item);
+          // 仅解冻选中子树不够：父级仍为冻结时世界矩阵链错误，Transform 会丢对象。
+          this.staticObjectFreezeController.unfreezeAncestors(item, this.scene);
+        }
       }
     }
 
@@ -1272,13 +1296,17 @@ export class ThreeEditor {
 
     const transformTarget =
       !options?.toggle && nextObjects.length === 1 && options?.targetHandle ? options.targetHandle : nextPrimary;
+    // 单选结果始终尝试挂载 Gizmo：toggle 仅影响集合增减，不应阻止「最终只剩一个对象」时的变换把手；
+    // 否则 Shift/keyup 丢失时 isShiftPressed 长期为 true，拾取一直以 toggle 写入，Gizmo 永远不出现。
     if (
       this.transformToolEnabled &&
       this.transformHandleVisible &&
-      !options?.toggle &&
       nextObjects.length === 1 &&
       this.canAttachTransformTarget(transformTarget)
     ) {
+      if (this.freezeStaticObjects && transformTarget) {
+        this.staticObjectFreezeController.unfreezeAncestors(transformTarget, this.scene);
+      }
       this.transform.attach(transformTarget);
       this.transform.visible = true;
     } else {
@@ -1320,6 +1348,9 @@ export class ThreeEditor {
 
     // 关闭时确保 gizmo 不再接管交互
     if (enabled && this.transformHandleVisible && this.selectedObjects.length === 1 && this.canAttachTransformTarget(this.selected)) {
+      if (this.freezeStaticObjects && this.selected) {
+        this.staticObjectFreezeController.unfreezeAncestors(this.selected, this.scene);
+      }
       this.transform.attach(this.selected);
       this.transform.visible = true;
     } else {
@@ -1337,6 +1368,9 @@ export class ThreeEditor {
   setTransformHandleVisible(visible: boolean) {
     this.transformHandleVisible = visible;
     if (this.transformToolEnabled && this.transformHandleVisible && this.selectedObjects.length === 1 && this.canAttachTransformTarget(this.selected)) {
+      if (this.freezeStaticObjects && this.selected) {
+        this.staticObjectFreezeController.unfreezeAncestors(this.selected, this.scene);
+      }
       this.transform.attach(this.selected);
       this.transform.visible = true;
       return;
@@ -1346,14 +1380,28 @@ export class ThreeEditor {
   }
 
   /**
+   * 重置 Shift 多选遗留状态并恢复变换把手可见性。
+   * 典型场景：导入 JSON 时系统文件框可能导致 Shift keyup 丢失，拾取始终以 toggle 写入，Gizmo 因 select 内 `!options.toggle` 而不显示。
+   */
+  resetShiftMultiselectState() {
+    this.interactionController.resetShiftMultiselectModifier();
+    this.setTransformHandleVisible(true);
+    this.events.emit('shiftMultiselectUiReset', {});
+  }
+
+  /**
    * 向场景根添加对象；默认包一层可撤销历史。会处理平行光/聚光灯的 `target`、相机与灯光 helper 的挂接，以及静态冻结子树。
    */
-  add(object: THREE.Object3D, options?: { recordHistory?: boolean; operationName?: string }) {
+  add(
+    object: THREE.Object3D,
+    options?: { recordHistory?: boolean; operationName?: string; freezeSubtreeAfterAdd?: boolean }
+  ) {
     if (options?.recordHistory ?? true) {
       const parent = object.parent;
+      const { recordHistory: _recordHistoryIgnored, ...addRest } = options ?? {};
       void this.executeHistoryOperation({
         name: options?.operationName ?? `添加物体 - ${object.uuid}`,
-        do: () => this.add(object, { recordHistory: false }),
+        do: () => this.add(object, { ...addRest, recordHistory: false }),
         undo: () => {
           if (!object.parent) return;
           object.parent.remove(object);
@@ -1361,7 +1409,7 @@ export class ThreeEditor {
           this.syncSceneTreeState();
           this.render();
         },
-        redo: () => this.add(object, { recordHistory: false })
+        redo: () => this.add(object, { ...addRest, recordHistory: false })
       });
       // 若对象之前挂在其他父节点，执行 add 时会自动 re-parent；这里保持现有行为
       if (parent && parent !== this.scene) {
@@ -1384,7 +1432,9 @@ export class ThreeEditor {
     // - SceneGraphService 只做结构变更与 sceneTree 同步；
     // - ThreeEditor 维护 camera/light helper 的映射与 dirty 标记，并承担 helper 的可见性/阴影锥联动逻辑。
     this.bindHelpersForSubtree(object);
-    if (this.freezeStaticObjects) {
+    // 文档导入等批量挂载场景：默认冻结父链会导致子节点选中后 Transform 矩阵不同步；导入路径传 freezeSubtreeAfterAdd:false
+    const shouldFreezeSubtree = this.freezeStaticObjects && (options?.freezeSubtreeAfterAdd ?? true);
+    if (shouldFreezeSubtree) {
       this.staticObjectFreezeController.freezeObjectTree(object);
     }
     // 新增/重挂对象后，阴影投射关系可能变化，触发下一帧阴影重建。
@@ -1538,6 +1588,15 @@ export class ThreeEditor {
           (helper as any).update?.();
           this.lightHelpersDirty = true;
         }
+        // Directional/Spot 的 target 必须挂到 scene 才能稳定生效与序列化/回显。
+        // 这里兜底把 target 加入 scene，并标记为编辑器隐藏/不可选。
+        const anyLight: any = node as any;
+        if ((anyLight?.isDirectionalLight || anyLight?.isSpotLight) && anyLight.target) {
+          const t = anyLight.target as THREE.Object3D;
+          t.userData[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE] = true;
+          t.userData[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR] = true;
+          if (!t.parent) this.scene.add(t);
+        }
         this.bindLightTargetHandle(node as THREE.Light);
       }
       this.syncObjectHelperVisibility(node as THREE.Object3D);
@@ -1622,6 +1681,7 @@ export class ThreeEditor {
     if (anyLight?.isDirectionalLight || anyLight?.isSpotLight) {
       anyLight.target?.position?.set?.(p.x, p.y, p.z);
       anyLight.target?.updateMatrixWorld?.(true);
+      (light.userData as any)[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET] = { x: p.x, y: p.y, z: p.z };
     } else if (anyLight?.isRectAreaLight) {
       light.userData[VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET] = { x: p.x, y: p.y, z: p.z };
       anyLight.lookAt?.(p.x, p.y, p.z);
@@ -1637,6 +1697,11 @@ export class ThreeEditor {
     if (anyLight?.isDirectionalLight || anyLight?.isSpotLight) {
       const t = anyLight?.target?.position;
       if (t) handle.position.set(t.x, t.y, t.z);
+      (light.userData as any)[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET] = {
+        x: Number(t?.x ?? 0),
+        y: Number(t?.y ?? 0),
+        z: Number(t?.z ?? 0),
+      };
       return;
     }
     if (anyLight?.isRectAreaLight) {
@@ -2309,6 +2374,13 @@ export class ThreeEditor {
       records: this.history.getRecords(),
       canUndo: this.history.canUndo(),
       canRedo: this.history.canRedo()
+    });
+  }
+
+  private emitSceneSettingsChange() {
+    this.events.emit('sceneSettingsChange', {
+      settings: this.getSceneSettings(),
+      renderer: this.getRendererSettings()
     });
   }
 

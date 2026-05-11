@@ -22,6 +22,20 @@ export class StaticObjectFreezeController {
     });
   }
 
+  /**
+   * 选中子节点时祖先链若仍为 matrixAutoUpdate=false，会阻断世界矩阵传播，导致 gizmo 拖拽后对象消失。
+   * 从当前节点的父级解冻直到 stopExclusive（通常为 Scene），不含 stopExclusive 本身。
+   */
+  unfreezeAncestors(obj: THREE.Object3D, stopExclusive: THREE.Object3D) {
+    let cur: THREE.Object3D | null = obj.parent;
+    while (cur && cur !== stopExclusive) {
+      cur.matrixAutoUpdate = true;
+      cur.updateMatrix();
+      cur.updateMatrixWorld(true);
+      cur = cur.parent;
+    }
+  }
+
   private canFreezeObject(obj: THREE.Object3D) {
     if ((obj as any).isCamera) return false;
     if ((obj as any).isLight) return false;

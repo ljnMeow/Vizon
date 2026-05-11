@@ -192,17 +192,40 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
       const fromCore = editor.getSceneSettings();
       setSceneSettings(fromCore);
       setCameraSettings(fromCore.camera);
+      sceneSettingsRef.current = fromCore;
     } finally {
       syncFromCoreRef.current = false;
     }
 
-    setRendererSettings(editor.getRendererSettings());
+    const renderer = editor.getRendererSettings();
+    setRendererSettings(renderer);
+    rendererSettingsRef.current = renderer;
   }, [editor]);
 
   useEffect(() => {
     if (!editor) return;
     const off = editor.on('sceneTreeChange', ({ tree }) => {
       setSceneSettings((prev) => ({ ...prev, sceneTree: tree }));
+    });
+    return off;
+  }, [editor]);
+
+  // 导入/撤销/重做等由 core 驱动的 scene settings 变更，需要显式推送到 React state 才能回显。
+  useEffect(() => {
+    if (!editor) return;
+    const off = editor.on('sceneSettingsChange', ({ settings, renderer }) => {
+      syncFromCoreRef.current = true;
+      try {
+        setSceneSettings(settings);
+        setRendererSettings(renderer);
+        setCameraSettings(settings.camera);
+        // 立刻推进 ref，避免导入/撤销后 Orbit change 仍用旧 settings 回写 core，
+        // 把刚恢复的 helpers / renderer / environment 等字段覆盖掉。
+        sceneSettingsRef.current = settings;
+        rendererSettingsRef.current = renderer;
+      } finally {
+        syncFromCoreRef.current = false;
+      }
     });
     return off;
   }, [editor]);
@@ -627,4 +650,3 @@ export function useSceneSettings() {
   if (!ctx) throw new Error('useSceneSettings must be used within SceneSettingsProvider');
   return ctx;
 }
-
