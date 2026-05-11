@@ -32,7 +32,8 @@ export type VizonUserData = {
 
 export type VizonObject3D = THREE.Object3D & { userData: VizonUserData };
 
-export function getVizonUserData(obj: THREE.Object3D): VizonUserData {
+export function getVizonUserData(obj?: THREE.Object3D | null): VizonUserData {
+  if (!obj) return {} as VizonUserData;
   return (obj.userData ?? {}) as VizonUserData;
 }
 

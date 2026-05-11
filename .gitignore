@@ -1,6 +1,7 @@
 .cursor
 .vscode
 .tocodex
+.playwright-mcp
 node_modules
 
 # ignore all build outputs

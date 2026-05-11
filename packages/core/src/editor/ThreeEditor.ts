@@ -2,8 +2,10 @@ import * as THREE from 'three';
 import type { OrbitControls, TransformControls } from 'three-stdlib';
 import { Emitter } from '../infra/events';
 import { getVizonUserData, VIZON_HISTORY_KEYS, VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '../infra/utils';
+import { exportDocument } from '../document/document';
 import type { RendererSettings, SceneSettings } from '../settings/sceneSettings';
 import type { SceneTreeNode } from '../settings/sceneTree';
+import type { VizonDocument } from '../types/document';
 import { createDefaultSceneSettings, normalizeSceneSettings } from '../settings/sceneSettings';
 import { calcSceneSettingsDiff, mapSceneDiffToDirtyFlags } from '../settings/sceneSettingsDiff';
 import { AssetLoader } from './controllers/AssetLoader';
@@ -942,6 +944,14 @@ export class ThreeEditor {
       renderer: { ...s.renderer },
       sceneTree: this.getSceneTree()
     };
+  }
+
+  /**
+   * 获取当前可持久化文档快照（VizonDocument）。
+   * 适合导出/导入链路与开发期控制台调试。
+   */
+  getVizonDocument(options?: { generator?: string }): VizonDocument {
+    return exportDocument(this, options);
   }
 
   /** 当前 WebGLRenderer 相关序列化配置的快照（抗锯齿、色调映射、阴影贴图类型等）。 */

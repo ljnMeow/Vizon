@@ -13,6 +13,9 @@
  */
 export { ThreeEditor } from './editor/ThreeEditor';
 export { VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS, VIZON_HISTORY_KEYS } from './infra/utils';
+export { getVizonUserData } from './infra/utils';
+export type { VizonDocument, VizonNode } from './types/document';
+export { exportDocument, importDocument, parseVizonDocument, migrateVizonDocument } from './document/document';
 export type {
   ThreeEditorEvents,
   ThreeEditorOptions,

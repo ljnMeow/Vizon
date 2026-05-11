@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEventHandler } from 'react';
+import { importDocument } from 'vizon-3d-core';
 import { GlobalMenu } from '../../../../components/GlobalMenu';
 import { useLocale } from '../../../../hooks/useLocale';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
@@ -34,6 +35,7 @@ export function ActionBar() {
   const [canGroup, setCanGroup] = useState(false);
   const [canUngroup, setCanUngroup] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const labels = useMemo(() => appMessages[locale].designPage.actionBar, [locale]);
   const loginT = appMessages[locale].auth.login;
@@ -118,6 +120,43 @@ export function ActionBar() {
     setLocale(locale === 'zh-CN' ? 'en-US' : 'zh-CN');
   };
 
+  const onExportDocument = () => {
+    if (!editor) return;
+    const doc = editor.getVizonDocument({ generator: 'apps/web-actionbar' });
+    const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    a.href = url;
+    a.download = `vizon-document-${ts}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const onImportDocumentClick = () => {
+    importInputRef.current?.click();
+  };
+
+  const onImportDocumentChange: ChangeEventHandler<HTMLInputElement> = async (e) => {
+    const inputEl = e.currentTarget;
+    const file = e.target.files?.[0];
+    if (!file || !editor) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as unknown;
+      await importDocument(editor, parsed);
+    } catch (err) {
+      // 测试入口保持轻量：导入失败时给出最小可见反馈，便于快速定位 JSON 问题。
+      const msg = err instanceof Error ? err.message : 'Unknown import error';
+      window.alert(`导入失败: ${msg}`);
+    } finally {
+      // 允许重复导入同一文件（浏览器对同名同文件不会重复触发 change）。
+      inputEl.value = '';
+    }
+  };
+
   return (
     <div ref={ref} className="relative flex items-center gap-2">
       <button
@@ -149,6 +188,29 @@ export function ActionBar() {
           }
         ]}
         align="left"
+      />
+      <button
+        type="button"
+        onClick={onExportDocument}
+        disabled={!editor}
+        className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-xs text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        导出JSON
+      </button>
+      <button
+        type="button"
+        onClick={onImportDocumentClick}
+        disabled={!editor}
+        className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-xs text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        导入JSON
+      </button>
+      <input
+        ref={importInputRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={onImportDocumentChange}
       />
       <button
         type="button"
