@@ -58,15 +58,6 @@ function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
 
-/** 将属性值格式化为适合 UI 展示的文本 */
-function formatNumber(n: unknown) {
-  if (typeof n === 'number') {
-    if (!Number.isFinite(n)) return String(n);
-    return (Math.round(n * 100) / 100).toString();
-  }
-  return String(n);
-}
-
 /**
  * 对象几何属性面板。
  * 仅对内置基础模型开放参数化编辑，例如 Box/Sphere/Cone/Torus 等。
@@ -221,7 +212,7 @@ export function ObjectAttributes({
     }
 
     return { modelKey: key, modelTitle: base.title, geometryType: geometry?.type ?? '', attributes: base.items };
-  }, [editor, selectedInfo?.uuid, locale, objAttrT]);
+  }, [editor, selectedInfo?.uuid, objAttrT]);
 
   const applyParam = useCallback(
     (paramKey: string, nextValue: unknown) => {

@@ -207,25 +207,6 @@ function readSelectedTransform(obj: any): TransformState {
   };
 }
 
-/**
- * 根据 three 对象类型推导历史记录分类前缀，
- * 让属性修改在撤销/重做面板中更易识别。
- */
-function getHistoryCategoryByObjectType(type?: string): string {
-  if (!type) return '修改物体属性';
-  if (type === 'OrthographicCamera') return '修改正交相机属性';
-  if (type === 'PerspectiveCamera') return '修改透视相机属性';
-  if (type.endsWith('Camera')) return '修改相机属性';
-  if (type === 'DirectionalLight') return '修改平行光属性';
-  if (type === 'PointLight') return '修改点光源属性';
-  if (type === 'SpotLight') return '修改聚光灯属性';
-  if (type === 'AmbientLight') return '修改环境光属性';
-  if (type === 'HemisphereLight') return '修改半球光属性';
-  if (type === 'RectAreaLight') return '修改矩形光属性';
-  if (type.endsWith('Light')) return '修改灯光属性';
-  return '修改物体属性';
-}
-
 function getHistoryCategoryI18n(type?: string): { zh: string; en: string } {
   if (!type) return { zh: '修改物体属性', en: 'Modify object property' };
   if (type === 'OrthographicCamera') return { zh: '修改正交相机属性', en: 'Modify orthographic camera property' };
@@ -263,16 +244,6 @@ function readSelectedShadow(obj: any): ShadowState | null {
     canReceiveShadow,
     canFrustumCulled
   };
-}
-
-/** 判断对象及其祖先中是否存在“不可选择”标记 */
-function computeIsNonSelectableInHierarchy(obj: any): boolean {
-  let cur: any = obj;
-  while (cur) {
-    if (Boolean(cur?.userData?.[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE])) return true;
-    cur = cur.parent;
-  }
-  return false;
 }
 
 /** 判断对象及其祖先中是否存在“不可拾取”标记 */
@@ -939,21 +910,6 @@ export function PropertiesSettings() {
         editor.render();
       }
     });
-  };
-
-  const setRenderOrder = (nextRenderOrder: number) => {
-    if (!editor || !selectedInfo) return;
-    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
-    if (!obj) return;
-
-    const next = Math.max(0, Math.min(999, Math.round(nextRenderOrder)));
-    void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'renderOrder', next, {
-      operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.renderOrderLabel} = ${next}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.renderOrderLabel} = ${next}`
-      )
-    });
-    setRenderOrderState({ renderOrder: next, canRenderOrder: true });
   };
 
   const previewRenderOrder = (nextRenderOrder: number) => {

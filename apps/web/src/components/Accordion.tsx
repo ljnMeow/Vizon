@@ -70,9 +70,6 @@ export function Accordion<T extends string = string>({
   // 这样可以避免 max-height 只在首次打开时测量导致的“裁切/遮挡”问题
   const contentMeasureRefs = useRef<Array<HTMLDivElement | null>>([]);
 
-  const itemKeysSignature = useMemo(() => items.map((i) => String(i.key)).join('|'), [items]);
-  const openKeysSignature = useMemo(() => Array.from(openSet).sort().join('|'), [openSet]);
-
   // 通过 MutationObserver 监听面板内容变化，动态修正 max-height。
   // 避免首次展开后内容变高时被截断。
   useLayoutEffect(() => {
@@ -156,7 +153,7 @@ export function Accordion<T extends string = string>({
       cancelAnimationFrame(raf);
       observer.disconnect();
     };
-  }, [itemKeysSignature, openKeysSignature]);
+  }, [items, openSet]);
 
   useLayoutEffect(() => {
     // 兜底：Accordion 面板打开时，确保该面板高度是准确的

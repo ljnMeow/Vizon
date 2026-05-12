@@ -56,11 +56,11 @@ export function UpdateUserForm({
         }
       }
     });
-  }, [nickname, disabled, onRegister, onDisabledChange, onSaved]);
+  }, [nickname, disabled, onRegister, onDisabledChange, onSaved, t]);
 
   useEffect(() => {
     onDisabledChange(disabled);
-  }, [disabled]);
+  }, [disabled, onDisabledChange]);
 
   return (
     <div className="space-y-3">

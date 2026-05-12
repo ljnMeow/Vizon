@@ -296,6 +296,7 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
       orbit.removeEventListener('change', onOrbitChange);
       if (raf) cancelAnimationFrame(raf);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- update 定义在本 hook 后部，无法列入 deps
   }, [editor, editor?.orbit]);
 
   // 始终保留最新 sceneSettings，供 setter 在同一轮事件里“立即同步 core”
@@ -572,7 +573,6 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
           grid: { ...prev.grid, opacity }
         }), { operationName: `修改场景属性-网格-透明度 = ${Number(opacity.toFixed(4))}` }),
       // grid.lineColor removed; keep legacy setter as noop (prevents accidental usage/loops).
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       setGridLineColor: (_lineColor: string) => {},
       setAxesEnabled: (enabled) =>
         update((prev) => ({

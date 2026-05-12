@@ -172,6 +172,8 @@ function DialogShell({
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
+    // requestClose 随渲染更新；此处仅需在 closeOnEsc 变化时重绑监听
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omit requestClose to avoid churn
   }, [req.closeOnEsc]);
 
   /**
@@ -188,6 +190,8 @@ function DialogShell({
       setConfirmDisabled,
       setConfirmLoadingText
     }),
+    // close 每次渲染更新；ctx 故意保持稳定引用，避免 custom body 不必要重挂载
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 

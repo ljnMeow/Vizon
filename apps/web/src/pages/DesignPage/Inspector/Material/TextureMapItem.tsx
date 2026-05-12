@@ -161,7 +161,6 @@ export function TextureMapItem({
       <div className="flex items-center gap-3">
         {previewUrl ? (
           <div className="h-10 w-10 overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={previewUrl} alt={title} className="h-full w-full object-cover" />
           </div>
         ) : (

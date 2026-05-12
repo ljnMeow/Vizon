@@ -315,7 +315,7 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
 
     try {
       await ensureRefreshed(baseUrl);
-    } catch (e) {
+    } catch (_e) {
       // refresh 失败：提示后跳转登录（等待提示消失）
       await logoutToLoginAfterNotice();
       // 上面会 replace 跳转；这里返回一个永不 resolve 的 Promise，避免调用方继续弹错误 toast

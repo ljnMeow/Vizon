@@ -2,6 +2,7 @@
 .vscode
 .tocodex
 .playwright-mcp
+.turbo
 node_modules
 
 # ignore all build outputs

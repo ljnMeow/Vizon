@@ -23,6 +23,7 @@ export {
   migrateVizonDocument,
   VIZON_IMPORT_ERROR_NO_OBJECT_SNAPSHOT
 } from './editor/vizonPersist';
+export type { VizonDocumentBuildEditorLike } from './editor/vizonPersist';
 export type {
   ThreeEditorEvents,
   ThreeEditorOptions,

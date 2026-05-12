@@ -31,7 +31,7 @@ export function DesignHeader() {
   const [storedUser, setStoredUser] = useState<StoredUser | null>(() => getUserInfo<StoredUser>());
   const displayName = useMemo(
     () => (storedUser?.nickname || storedUser?.username || '').trim() || t.profile.nicknameFallback,
-    [storedUser]
+    [storedUser, t.profile.nicknameFallback]
   );
   const initial = displayName.charAt(0);
 

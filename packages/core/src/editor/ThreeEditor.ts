@@ -9,7 +9,7 @@ import {
   VIZON_STORAGE_KEYS,
   VIZON_USER_DATA_KEYS
 } from '../infra/utils';
-import { buildVizonDocumentFromEditor } from './vizonPersist';
+import { buildVizonDocumentFromEditor } from './vizonPersistBuild';
 import type { RendererSettings, SceneSettings } from '../settings/sceneSettings';
 import type { SceneTreeNode } from '../settings/sceneTree';
 import type { VizonDocument } from '../types/document';

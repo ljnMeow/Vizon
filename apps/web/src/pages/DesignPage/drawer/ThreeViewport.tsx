@@ -172,6 +172,8 @@ export function ThreeViewport({
           (window as any).vizonEditor = null;
       }
     };
+    // view 仅在初始化时写入；后续由 setPreset 单独同步，避免依赖 view 整实例重建
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, onEditorReady]);
 
   const setPreset = (preset: ViewPreset) => {

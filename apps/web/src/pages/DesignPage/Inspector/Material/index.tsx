@@ -10,7 +10,6 @@ import { WEB_USER_DATA_KEYS } from '../../../../utils/keys';
 import { MaterialMainControlsSection } from './MaterialMainControlsSection';
 import { MaterialTextureMapsSection } from './MaterialTextureMapsSection';
 import {
-  allTextureFieldKeys,
   blendingKeyToValue,
   materialBlendingOrder,
   materialSideKeyToValue,
@@ -74,8 +73,11 @@ export function MaterialSettings() {
   const blendingOptions = p.materialBlendingOptions;
   // 混合模式说明文案（下拉框下方解释）
   const blendingDescriptions = p.materialBlendingDescriptions;
-  const historyName = (zhName: string, enName: string) =>
-    encodeHistoryI18nName({ 'zh-CN': zhName, 'en-US': enName });
+  const historyName = useCallback(
+    (zhName: string, enName: string) =>
+      encodeHistoryI18nName({ 'zh-CN': zhName, 'en-US': enName }),
+    []
+  );
   const boolText = (v: boolean) => (v ? { zh: '是', en: 'true' } : { zh: '否', en: 'false' });
 
   // 面板状态与 three 材质数据保持“受控同步”
@@ -329,6 +331,8 @@ export function MaterialSettings() {
   const [materialUiEpoch, setMaterialUiEpoch] = useState(0);
   const firstMeshMaterial = useMemo(
     () => (editor ? getFirstMeshMaterial(editor.getSelected()) : null),
+    // materialUiEpoch：three 原地改材质；selectedMaterialType：切换类型后强制重读实例
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 依赖项用于失效刷新，useMemo 函数体内未直接读取
     [editor, materialUiEpoch, selectedMaterialType]
   );
 
@@ -337,79 +341,82 @@ export function MaterialSettings() {
    * @param key 材质字段名，如 `map` / `opacity` / `normalScale`
    * @param value 目标值，按 key 的字段类型传入
    */
-  const onPropertyChange = (key: string, value: any) => {
-    if (!editor) return;
-    const root = editor.getSelected();
-    if (!root) return;
-    const mats = getAllMeshMaterials(root);
-    if (mats.length === 0) return;
-    if (key.endsWith('__dragStart')) {
-      const actualKey = key.replace('__dragStart', '');
-      materialSliderBeforeRef.current[actualKey] = mats.map((m) => ({
-        material: m,
-        value: (m as any)[actualKey]
-      }));
-      return;
-    }
-    if (key.endsWith('__preview')) {
-      const actualKey = key.replace('__preview', '');
-      for (const m of mats) {
-        (m as any)[actualKey] = value;
-        (m as any).needsUpdate = true;
+  const onPropertyChange = useCallback(
+    (key: string, value: any) => {
+      if (!editor) return;
+      const root = editor.getSelected();
+      if (!root) return;
+      const mats = getAllMeshMaterials(root);
+      if (mats.length === 0) return;
+      if (key.endsWith('__dragStart')) {
+        const actualKey = key.replace('__dragStart', '');
+        materialSliderBeforeRef.current[actualKey] = mats.map((m) => ({
+          material: m,
+          value: (m as any)[actualKey]
+        }));
+        return;
       }
-      setMaterialUiEpoch((e) => e + 1);
-      editor.render();
-      return;
-    }
-    const before = mats.map((m) => ({
-      material: m,
-      value: (m as any)[key]
-    }));
-    const beforeFromDrag = materialSliderBeforeRef.current[key];
-    const effectiveBefore = beforeFromDrag && beforeFromDrag.length > 0 ? beforeFromDrag : before;
-    if (beforeFromDrag) delete materialSliderBeforeRef.current[key];
-    const firstBeforeValue = effectiveBefore[0]?.value;
-    try {
-      if (JSON.stringify(firstBeforeValue) === JSON.stringify(value)) return;
-    } catch {
-      // ignore
-    }
-    const applyValue = (nextValue: any) => {
-      for (const m of mats) {
-        (m as any)[key] = nextValue;
-        (m as any).needsUpdate = true;
-      }
-      setMaterialUiEpoch((e) => e + 1);
-      editor.render();
-    };
-    const valueText =
-      typeof value === 'number'
-        ? String(Number.isFinite(value) ? Number(value.toFixed(4)) : value)
-        : typeof value === 'boolean'
-          ? value
-            ? 'true'
-            : 'false'
-          : typeof value === 'string'
-            ? value
-            : '';
-    void editor.executeHistoryOperation({
-      name: historyName(
-        `修改物体属性 - ${root.uuid} - 材质-${key}${valueText ? ` = ${valueText}` : ''}`,
-        `Modify object property - ${root.uuid} - Material-${key}${valueText ? ` = ${valueText}` : ''}`
-      ),
-      mergeKey: `material-prop:${root.uuid}:${key}`,
-      mergeWindowMs: 280,
-      do: () => applyValue(value),
-      undo: () => {
-        for (const item of effectiveBefore) {
-          (item.material as any)[key] = item.value;
-          (item.material as any).needsUpdate = true;
+      if (key.endsWith('__preview')) {
+        const actualKey = key.replace('__preview', '');
+        for (const m of mats) {
+          (m as any)[actualKey] = value;
+          (m as any).needsUpdate = true;
         }
         setMaterialUiEpoch((e) => e + 1);
         editor.render();
+        return;
       }
-    });
-  };
+      const before = mats.map((m) => ({
+        material: m,
+        value: (m as any)[key]
+      }));
+      const beforeFromDrag = materialSliderBeforeRef.current[key];
+      const effectiveBefore = beforeFromDrag && beforeFromDrag.length > 0 ? beforeFromDrag : before;
+      if (beforeFromDrag) delete materialSliderBeforeRef.current[key];
+      const firstBeforeValue = effectiveBefore[0]?.value;
+      try {
+        if (JSON.stringify(firstBeforeValue) === JSON.stringify(value)) return;
+      } catch {
+        // ignore
+      }
+      const applyValue = (nextValue: any) => {
+        for (const m of mats) {
+          (m as any)[key] = nextValue;
+          (m as any).needsUpdate = true;
+        }
+        setMaterialUiEpoch((e) => e + 1);
+        editor.render();
+      };
+      const valueText =
+        typeof value === 'number'
+          ? String(Number.isFinite(value) ? Number(value.toFixed(4)) : value)
+          : typeof value === 'boolean'
+            ? value
+              ? 'true'
+              : 'false'
+            : typeof value === 'string'
+              ? value
+              : '';
+      void editor.executeHistoryOperation({
+        name: historyName(
+          `修改物体属性 - ${root.uuid} - 材质-${key}${valueText ? ` = ${valueText}` : ''}`,
+          `Modify object property - ${root.uuid} - Material-${key}${valueText ? ` = ${valueText}` : ''}`
+        ),
+        mergeKey: `material-prop:${root.uuid}:${key}`,
+        mergeWindowMs: 280,
+        do: () => applyValue(value),
+        undo: () => {
+          for (const item of effectiveBefore) {
+            (item.material as any)[key] = item.value;
+            (item.material as any).needsUpdate = true;
+          }
+          setMaterialUiEpoch((e) => e + 1);
+          editor.render();
+        }
+      });
+    },
+    [editor, historyName]
+  );
 
   /**
    * 单个贴图槽“效果开关”（不是上传/清除）。
@@ -461,7 +468,7 @@ export function MaterialSettings() {
     }
 
     setMaterialUiEpoch((e) => e + 1);
-  }, [editor, selectedMaterialType]);
+  }, [TEXTURE_EFFECT_DISABLED_KEY, editor, selectedMaterialType]);
 
   const isTextureFieldEffectDisabled = useCallback(
     (fieldKey: TextureFieldKey) => {
@@ -475,7 +482,7 @@ export function MaterialSettings() {
       // “禁用效果”定义为：材质字段已置空，但缓存里仍有原贴图（可恢复）
       return !hasActiveTexture && hasCachedTexture;
     },
-    [firstMeshMaterial]
+    [TEXTURE_EFFECT_DISABLED_KEY, firstMeshMaterial]
   );
 
   /**
@@ -567,7 +574,7 @@ export function MaterialSettings() {
         },
       };
     },
-    [firstMeshMaterial, materialTextureDebugDisableOneLabel, setTextureFieldEffectEnabled]
+    [TEXTURE_EFFECT_DISABLED_KEY, firstMeshMaterial, materialTextureDebugDisableOneLabel, setTextureFieldEffectEnabled]
   );
 
   /**
@@ -613,8 +620,6 @@ export function MaterialSettings() {
     if (!root) return;
     const mats = getAllMeshMaterials(root);
     if (mats.length === 0) return;
-    const nextTextureSupport = textureSupportByMaterialType[nextType];
-    const supportedTextureKeys = Object.keys(nextTextureSupport) as TextureFieldKey[];
     const prevType = selectedMaterialType;
     const applyType = (type: MaterialTypeKey | null) => {
       if (!type) return;
@@ -633,7 +638,7 @@ export function MaterialSettings() {
       do: () => applyType(nextType),
       undo: () => applyType(prevType)
     });
-  }, [editor, syncFromObject]);
+  }, [editor, historyName, pEn.materialTypeOptions, pZh.materialTypeOptions, selectedMaterialType, syncFromObject]);
 
   /**
    * side 变更处理。
@@ -668,7 +673,7 @@ export function MaterialSettings() {
         editor.render();
       }
     });
-  }, [editor]);
+  }, [editor, historyName, pEn.materialSideOptions, pZh.materialSideOptions]);
 
   /**
    * blending 变更处理。
@@ -705,7 +710,7 @@ export function MaterialSettings() {
         editor.render();
       }
     });
-  }, [editor]);
+  }, [editor, historyName, pEn.materialBlendingOptions, pZh.materialBlendingOptions]);
 
   /**
    * 材质颜色变更处理。
@@ -739,7 +744,7 @@ export function MaterialSettings() {
       do: () => applyColor(nextColor),
       undo: () => applyColor(before[0]?.hex ?? '#ffffff')
     });
-  }, [editor]);
+  }, [editor, historyName]);
 
   /**
    * transparent 开关处理。
@@ -774,7 +779,7 @@ export function MaterialSettings() {
         editor.render();
       }
     });
-  }, [editor]);
+  }, [editor, historyName]);
 
   /**
    * opacity 滑杆变更处理。
@@ -835,7 +840,7 @@ export function MaterialSettings() {
       }
     });
     opacityDragStartValueRef.current = null;
-  }, [editor, selectedMaterialOpacity, selectedMaterialTransparentEnabled]);
+  }, [editor, historyName, selectedMaterialOpacity, selectedMaterialTransparentEnabled]);
 
   /**
    * wireframe 开关处理。
@@ -871,7 +876,7 @@ export function MaterialSettings() {
         editor.render();
       }
     });
-  }, [editor]);
+  }, [editor, historyName]);
 
   /**
    * alphaToCoverage 开关处理。
@@ -906,7 +911,7 @@ export function MaterialSettings() {
         editor.render();
       }
     });
-  }, [editor]);
+  }, [editor, historyName]);
 
   /**
    * alphaTest 阈值变更处理。
@@ -964,7 +969,7 @@ export function MaterialSettings() {
       }
     });
     alphaTestDragStartValueRef.current = null;
-  }, [editor, selectedMaterialAlphaTestThreshold]);
+  }, [editor, historyName, selectedMaterialAlphaTestThreshold]);
 
   /**
    * depthTest 开关处理。
@@ -1000,7 +1005,7 @@ export function MaterialSettings() {
         editor.render();
       }
     });
-  }, [editor]);
+  }, [editor, historyName]);
 
   /**
    * depthWrite 开关处理。
@@ -1036,7 +1041,7 @@ export function MaterialSettings() {
         editor.render();
       }
     });
-  }, [editor]);
+  }, [editor, historyName]);
 
   /**
    * 顶点色总开关处理。
@@ -1072,7 +1077,7 @@ export function MaterialSettings() {
         editor.render();
       }
     });
-  }, [applyVertexColorToMeshes, editor, selectedVertexColor]);
+  }, [applyVertexColorToMeshes, editor, historyName, selectedVertexColor]);
 
   /**
    * 顶点色颜色变更处理。
@@ -1109,7 +1114,7 @@ export function MaterialSettings() {
         editor.render();
       }
     });
-  }, [applyVertexColorToMeshes, editor]);
+  }, [applyVertexColorToMeshes, editor, historyName]);
 
   return (
     <div className="space-y-3 select-none">
