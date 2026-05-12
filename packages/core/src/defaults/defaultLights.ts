@@ -9,8 +9,7 @@
 import * as THREE from 'three';
 import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
-import { VIZON_USER_DATA_KEYS } from '../infra/utils';
-import { getVizonUserData } from '../infra/utils';
+import { forEachMaterial, type Vec3Like, getVizonUserData, VIZON_USER_DATA_KEYS } from '../infra/utils';
 import { DEFAULT_LIGHT_HELPER_COLOR, DEFAULT_LIGHTS } from './registry';
 
 /** 可创建的灯光种类枚举（与 UI 列表 key 对齐） */
@@ -22,8 +21,7 @@ export type DefaultLightKey =
   | 'hemisphereLight'
   | 'rectAreaLight';
 
-/** 与 SceneSettings 中向量字段风格一致的 Plain 对象，避免 editor 侧强依赖 Vector3 */
-export type Vec3Like = { x: number; y: number; z: number };
+export type { Vec3Like };
 
 /** 工厂可选参数：覆盖名称、位置、目标点、是否生成 helper */
 export type CreateDefaultLightOptions = {
@@ -83,8 +81,7 @@ function configureLightHelper(helper: THREE.Object3D, light: THREE.Light) {
   helper.userData[VIZON_USER_DATA_KEYS.COMMON.PICK_TARGET] = light; // 射线命中 helper 时选中灯
 
   const mat = (helper as any).material as THREE.Material | THREE.Material[] | undefined;
-  const materials = mat ? (Array.isArray(mat) ? mat : [mat]) : [];
-  for (const m of materials) {
+  forEachMaterial(mat, (m) => {
     if ('color' in m && (m as any).color?.set) {
       (m as any).color.setHex(DEFAULT_LIGHT_HELPER_COLOR); // 线框颜色
     }
@@ -94,7 +91,7 @@ function configureLightHelper(helper: THREE.Object3D, light: THREE.Light) {
     m.transparent = true;
     m.opacity = 0.9;
     m.needsUpdate = true;
-  }
+  });
   helper.renderOrder = 8_000; // 较晚绘制，减少被透明物体误挡
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEventHandler } from 'react';
-import { importDocument } from 'vizon-3d-core';
+import { importDocument, VIZON_IMPORT_ERROR_NO_OBJECT_SNAPSHOT } from 'vizon-3d-core';
 import { GlobalMenu } from '../../../../components/GlobalMenu';
 import { useLocale } from '../../../../hooks/useLocale';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
@@ -168,8 +168,10 @@ export function ActionBar() {
       });
     } catch (err) {
       // 测试入口保持轻量：导入失败时给出最小可见反馈，便于快速定位 JSON 问题。
-      const msg = err instanceof Error ? err.message : 'Unknown import error';
-      window.alert(`导入失败: ${msg}`);
+      const raw = err instanceof Error ? err.message : String(err);
+      const msg =
+        raw === VIZON_IMPORT_ERROR_NO_OBJECT_SNAPSHOT ? labels.importNoObjectSnapshot : raw || labels.importUnknownError;
+      window.alert(`${labels.importFailedPrefix}${msg}`);
     } finally {
       // 允许重复导入同一文件（浏览器对同名同文件不会重复触发 change）。
       inputEl.value = '';
@@ -209,6 +211,7 @@ export function ActionBar() {
           }
         ]}
         align="left"
+        ariaLabel={labels.menuAriaLabel}
       />
       <button
         type="button"
@@ -216,7 +219,7 @@ export function ActionBar() {
         disabled={!editor}
         className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-xs text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        导出JSON
+        {labels.exportJson}
       </button>
       <button
         type="button"
@@ -224,7 +227,7 @@ export function ActionBar() {
         disabled={!editor}
         className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-xs text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        导入JSON
+        {labels.importJson}
       </button>
       <input
         ref={importInputRef}

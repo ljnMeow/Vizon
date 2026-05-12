@@ -11,6 +11,15 @@ export interface AppMessages {
     cancel: string;
     processing: string;
     loading: string;
+    routeLoading: string;
+    requireAuthChecking: string;
+    errorBoundaryTitle: string;
+    errorBoundaryDescription: string;
+    errorBoundaryReload: string;
+    errorBoundaryBackToLogin: string;
+    globalMenuAriaLabel: string;
+    imagePreviewUnsupported: string;
+    imagePreviewLoadFailed: string;
   };
   auth: {
     sessionInvalidToast: string;
@@ -132,6 +141,7 @@ export interface AppMessages {
     };
     actionBar: {
       title: string;
+      menuAriaLabel: string;
       undoWithShortcut: string;
       redoWithShortcut: string;
       copyWithShortcut: string;
@@ -141,6 +151,11 @@ export interface AppMessages {
       ungroupWithShortcut: string;
       clear: string;
       reset: string;
+      exportJson: string;
+      importJson: string;
+      importFailedPrefix: string;
+      importUnknownError: string;
+      importNoObjectSnapshot: string;
     };
     inspector: {
       tabs: {
@@ -513,7 +528,16 @@ export const appMessages: Record<Locale, AppMessages> = {
       confirm: '确定',
       cancel: '取消',
       processing: '处理中...',
-      loading: '加载中...'
+      loading: '加载中...',
+      routeLoading: '加载中…',
+      requireAuthChecking: '正在验证登录状态…',
+      errorBoundaryTitle: '页面渲染出错',
+      errorBoundaryDescription: '你可以尝试刷新页面；如果问题持续出现，请联系管理员。',
+      errorBoundaryReload: '刷新页面',
+      errorBoundaryBackToLogin: '返回登录',
+      globalMenuAriaLabel: '菜单',
+      imagePreviewUnsupported: '暂不支持预览此文件类型。',
+      imagePreviewLoadFailed: '图片加载失败。'
     },
     auth: {
       sessionInvalidToast: '登录状态失效，请重新登录',
@@ -632,6 +656,7 @@ export const appMessages: Record<Locale, AppMessages> = {
       },
       actionBar: {
         title: '操作',
+        menuAriaLabel: '操作菜单',
         undoWithShortcut: '撤销（Ctrl+Z / Command+Z）',
         redoWithShortcut: '恢复（Ctrl+Shift+Z / Command+Shift+Z）',
         copyWithShortcut: '复制（Ctrl+C / Command+C）',
@@ -640,7 +665,13 @@ export const appMessages: Record<Locale, AppMessages> = {
         groupWithShortcut: '组合（Ctrl+D / Command+D）',
         ungroupWithShortcut: '取消组合（Ctrl+F / Command+F）',
         clear: '清空',
-        reset: '重置'
+        reset: '重置',
+        exportJson: '导出 JSON',
+        importJson: '导入 JSON',
+        importFailedPrefix: '导入失败：',
+        importUnknownError: '未知错误',
+        importNoObjectSnapshot:
+          '未在文档中找到有效的场景快照。请使用本编辑器导出的 JSON，并确保 content 节点包含 Three.js 序列化数据。'
       },
       inspector: {
         tabs: {
@@ -1005,7 +1036,16 @@ export const appMessages: Record<Locale, AppMessages> = {
       confirm: 'Confirm',
       cancel: 'Cancel',
       processing: 'Processing...',
-      loading: 'Loading...'
+      loading: 'Loading...',
+      routeLoading: 'Loading…',
+      requireAuthChecking: 'Checking session…',
+      errorBoundaryTitle: 'Something went wrong',
+      errorBoundaryDescription: 'Try refreshing the page. If this keeps happening, contact your administrator.',
+      errorBoundaryReload: 'Reload',
+      errorBoundaryBackToLogin: 'Back to sign in',
+      globalMenuAriaLabel: 'Menu',
+      imagePreviewUnsupported: 'This file type cannot be previewed.',
+      imagePreviewLoadFailed: 'Failed to load image.'
     },
     auth: {
       sessionInvalidToast: 'Your session has expired. Please sign in again.',
@@ -1124,6 +1164,7 @@ export const appMessages: Record<Locale, AppMessages> = {
       },
       actionBar: {
         title: 'Actions',
+        menuAriaLabel: 'Actions menu',
         undoWithShortcut: 'Undo (Ctrl+Z / Command+Z)',
         redoWithShortcut: 'Redo (Ctrl+Shift+Z / Command+Shift+Z)',
         copyWithShortcut: 'Copy (Ctrl+C / Command+C)',
@@ -1132,7 +1173,13 @@ export const appMessages: Record<Locale, AppMessages> = {
         groupWithShortcut: 'Group (Ctrl+D / Command+D)',
         ungroupWithShortcut: 'Ungroup (Ctrl+F / Command+F)',
         clear: 'Clear',
-        reset: 'Reset'
+        reset: 'Reset',
+        exportJson: 'Export JSON',
+        importJson: 'Import JSON',
+        importFailedPrefix: 'Import failed: ',
+        importUnknownError: 'Unknown error',
+        importNoObjectSnapshot:
+          'No valid scene snapshot was found in the document. Export JSON from this editor and ensure content nodes include Three.js serialization data.'
       },
       inspector: {
         tabs: {

@@ -1,18 +1,21 @@
 import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './hooks/useTheme';
-import { LocaleProvider } from './hooks/useLocale';
+import { LocaleProvider, useLocale } from './hooks/useLocale';
 import { GlobalDialogProvider } from './components/GlobalDialog';
 import { GlobalMessageProvider } from './components/GlobalMessage';
 import { RequireAuth } from '@/auth/RequireAuth';
+import { appMessages } from './i18n/messages';
 
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const DesignPage = lazy(() => import('./pages/DesignPage'));
 
 function RouteFallback() {
+  const { locale } = useLocale();
+  const text = appMessages[locale].common.routeLoading;
   return (
     <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] flex items-center justify-center">
-      <div className="text-sm text-[var(--text-muted)]">Loading…</div>
+      <div className="text-sm text-[var(--text-muted)]">{text}</div>
     </div>
   );
 }

@@ -58,6 +58,9 @@ export function parseHexColor(input: string, fallbackHex: string): THREE.Color {
 /** 最小的三维坐标结构（与 {x,y,z} 结构等价）。 */
 export type XYZ = { x: number; y: number; z: number };
 
+/** 与 `XYZ` 等价；defaults 工厂参数命名沿用 Vec3Like。 */
+export type Vec3Like = XYZ;
+
 /**
  * 把 {x,y,z} 转成 THREE.Vector3（只接收一个参数）。
  * @param p 输入点
@@ -82,6 +85,28 @@ export function toVec3Into(p: XYZ, out: THREE.Vector3): THREE.Vector3 {
  */
 export function fromVec3(v: THREE.Vector3): XYZ {
   return { x: v.x, y: v.y, z: v.z };
+}
+
+/**
+ * 遍历单个材质或材质数组（跳过 undefined 槽位）。
+ */
+export function forEachMaterial(
+  material: THREE.Material | THREE.Material[] | undefined | null,
+  callback: (m: THREE.Material) => void
+): void {
+  if (material == null) return;
+  if (Array.isArray(material)) {
+    for (const m of material) {
+      if (m) callback(m);
+    }
+    return;
+  }
+  callback(material);
+}
+
+/** 释放单个材质或材质数组（常用于 helper / 临时 mesh 清理）。 */
+export function disposeMaterial(material: THREE.Material | THREE.Material[]): void {
+  forEachMaterial(material, (m) => m.dispose());
 }
 
 /**
@@ -112,6 +137,7 @@ export function computeAverageCenterVec3(points: XYZ[], out?: THREE.Vector3): TH
   return v;
 }
 
+export { encodeHistoryI18nName, type HistoryI18nName } from './historyEncoding';
 export { VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS, VIZON_HISTORY_KEYS } from './keys';
 export type { VizonUserData, VizonObject3D } from '../userData';
 export { getVizonUserData } from '../userData';

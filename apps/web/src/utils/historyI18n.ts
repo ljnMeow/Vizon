@@ -101,6 +101,8 @@ function translateHistoryNameToEn(zhName: string): string {
     [/辅助器/g, 'Helpers'],
     [/坐标轴开关/g, 'Axes enabled'],
     [/坐标轴尺寸/g, 'Axes size'],
+    [/修改渲染器设置/g, 'Modify renderer settings'],
+    [/修改场景设置/g, 'Modify scene settings'],
     [/渲染器/g, 'Renderer'],
     [/抗锯齿/g, 'Antialias'],
     [/输出色彩空间/g, 'Output color space'],
@@ -137,7 +139,14 @@ function translateHistoryNameToEn(zhName: string): string {
     [/亮度/g, 'Brightness'],
     [/深度测试/g, 'Depth test'],
     [/深度写入/g, 'Depth write'],
-    [/深度/g, 'Depth']
+    [/粘贴节点 - /g, 'Paste node - '],
+    [/删除节点（(\d+)个）/g, 'Delete nodes ($1)'],
+    [/删除节点 - /g, 'Delete node - '],
+    [/清空场景节点/g, 'Clear scene nodes'],
+    [/重置画布/g, 'Reset workspace'],
+    [/添加物体 - /g, 'Add object - '],
+    [/显示物体-/g, 'Show object - '],
+    [/隐藏物体-/g, 'Hide object - ']
   ];
   let result = zhName;
   for (const [regex, replacement] of map) {

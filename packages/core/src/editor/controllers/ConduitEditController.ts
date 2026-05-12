@@ -1,7 +1,15 @@
 import * as THREE from 'three';
 import { isNonSelectableInHierarchy } from '../picking/objectGuards';
 import { configureRaycasterForScenePicking } from '../picking/pickLayers';
-import { clamp, computeAverageCenterVec3, fromVec3, toVec3, VIZON_USER_DATA_KEYS, type XYZ } from '../../infra/utils';
+import {
+  clamp,
+  computeAverageCenterVec3,
+  disposeMaterial,
+  fromVec3,
+  toVec3,
+  VIZON_USER_DATA_KEYS,
+  type XYZ
+} from '../../infra/utils';
 
 type ConduitPoint = XYZ;
 
@@ -191,9 +199,7 @@ export class ConduitEditController {
       // 释放控制点节点的几何与材质，避免多次挂载造成 WebGL 内存泄漏。
       for (const n of this.nodes) {
         (n.geometry as any)?.dispose?.();
-        const m = n.material as any;
-        if (Array.isArray(m)) m.forEach((x) => x?.dispose?.());
-        else m?.dispose?.();
+        disposeMaterial(n.material as THREE.Material | THREE.Material[]);
       }
       this.nodes = [];
       this.helperGroup = null;

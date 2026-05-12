@@ -4,6 +4,7 @@
  * 使用 emissive 略提亮，在场景尚未布置灯光时仍可辨认形状；非 PBR 工作流最终应由用户替换材质。
  */
 import * as THREE from 'three';
+import type { Vec3Like } from '../infra/utils';
 import { VIZON_USER_DATA_KEYS } from '../infra/utils';
 import { DEFAULT_MESH_COLOR, DEFAULT_MODELS } from './registry';
 
@@ -18,7 +19,7 @@ export type DefaultModelKey =
   | 'theConduit'
   | 'group';
 
-export type Vec3Like = { x: number; y: number; z: number };
+export type { Vec3Like };
 
 export type CreateDefaultModelOptions = {
   position?: Vec3Like;

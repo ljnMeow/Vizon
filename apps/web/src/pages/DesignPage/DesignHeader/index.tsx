@@ -118,6 +118,7 @@ export function DesignHeader() {
           open={menuOpen}
           containerRef={menuContainerRef}
           onRequestClose={() => setMenuOpen(false)}
+          ariaLabel={t.common.globalMenuAriaLabel}
           groups={[
             {
               key: 'workspace',

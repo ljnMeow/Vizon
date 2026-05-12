@@ -1,7 +1,14 @@
 import * as THREE from 'three';
 import type { OrbitControls, TransformControls } from 'three-stdlib';
 import { Emitter } from '../infra/events';
-import { getVizonUserData, VIZON_HISTORY_KEYS, VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '../infra/utils';
+import {
+  encodeHistoryI18nName,
+  forEachMaterial,
+  getVizonUserData,
+  VIZON_HISTORY_KEYS,
+  VIZON_STORAGE_KEYS,
+  VIZON_USER_DATA_KEYS
+} from '../infra/utils';
 import { buildVizonDocumentFromEditor } from './vizonPersist';
 import type { RendererSettings, SceneSettings } from '../settings/sceneSettings';
 import type { SceneTreeNode } from '../settings/sceneTree';
@@ -102,7 +109,6 @@ export type ThreeEditorOptions = {
  */
 export class ThreeEditor {
   private static readonly HISTORY_OP_PREFIX = VIZON_HISTORY_KEYS.OP_PREFIX;
-  private static readonly HISTORY_I18N_PREFIX = VIZON_HISTORY_KEYS.I18N_PREFIX;
   /** 与 WebGLRenderer 绑定的同一个 canvas 引用 */
   readonly canvas: HTMLCanvasElement;
   /** 所有可编辑内容的根；主相机不在其子树中（见 `canAttachTransformTarget`） */
@@ -573,7 +579,10 @@ export class ThreeEditor {
     if (!this.clipboardObject) return false;
     const pasted = this.clipboardObject.clone(true);
     await this.executeHistoryOperation({
-      name: `粘贴节点 - ${pasted.uuid}`,
+      name: encodeHistoryI18nName({
+        'zh-CN': `粘贴节点 - ${pasted.uuid}`,
+        'en-US': `Paste node - ${pasted.uuid}`
+      }),
       do: () => {
         this.add(pasted, { recordHistory: false });
         this.select(pasted);
@@ -602,7 +611,17 @@ export class ThreeEditor {
     if (snapshot.length === 0) return false;
 
     await this.executeHistoryOperation({
-      name: snapshot.length === 1 ? `删除节点 - ${snapshot[0].node.uuid}` : `删除节点（${snapshot.length}个）`,
+      name: encodeHistoryI18nName(
+        snapshot.length === 1
+          ? {
+              'zh-CN': `删除节点 - ${snapshot[0].node.uuid}`,
+              'en-US': `Delete node - ${snapshot[0].node.uuid}`
+            }
+          : {
+              'zh-CN': `删除节点（${snapshot.length}个）`,
+              'en-US': `Delete nodes (${snapshot.length})`
+            }
+      ),
       do: () => {
         for (const item of snapshot) this.detachObjectFromParent(item.node);
         this.select(null);
@@ -818,7 +837,10 @@ export class ThreeEditor {
     if (roots.length === 0) return false;
     const snapshot = roots.map((node) => ({ node, parent: node.parent, index: node.parent ? node.parent.children.indexOf(node) : -1 }));
     await this.executeHistoryOperation({
-      name: '清空场景节点',
+      name: encodeHistoryI18nName({
+        'zh-CN': '清空场景节点',
+        'en-US': 'Clear scene nodes'
+      }),
       do: () => {
         for (const item of snapshot) this.detachObjectFromParent(item.node);
         this.select(null);
@@ -848,7 +870,10 @@ export class ThreeEditor {
     const nextSettings = createDefaultSceneSettings();
 
     await this.executeHistoryOperation({
-      name: '重置画布',
+      name: encodeHistoryI18nName({
+        'zh-CN': '重置画布',
+        'en-US': 'Reset workspace'
+      }),
       do: async () => {
         for (const item of snapshot) this.detachObjectFromParent(item.node);
         this.select(null);
@@ -997,7 +1022,12 @@ export class ThreeEditor {
       this.pendingRendererHistoryBefore = null;
       if (this.isRendererSettingsEqual(prevRenderer, next)) return;
       void this.executeHistoryOperation({
-        name: options?.operationName ?? '修改渲染器设置',
+        name:
+          options?.operationName ??
+          encodeHistoryI18nName({
+            'zh-CN': '修改渲染器设置',
+            'en-US': 'Modify renderer settings'
+          }),
         mergeKey: 'renderer-settings',
         mergeWindowMs: 280,
         do: () => this.setRendererSettings(next, { recordHistory: false }),
@@ -1085,7 +1115,12 @@ export class ThreeEditor {
       const normalizedNext = normalizeSceneSettings(next);
       if (this.isSceneSettingsEqualForHistory(prev, normalizedNext)) return;
       await this.executeHistoryOperation({
-        name: options?.operationName ?? '修改场景设置',
+        name:
+          options?.operationName ??
+          encodeHistoryI18nName({
+            'zh-CN': '修改场景设置',
+            'en-US': 'Modify scene settings'
+          }),
         mergeKey: 'scene-settings',
         mergeWindowMs: 280,
         do: () => this.setSceneSettings(normalizedNext, { recordHistory: false }),
@@ -1400,7 +1435,12 @@ export class ThreeEditor {
       const parent = object.parent;
       const { recordHistory: _recordHistoryIgnored, ...addRest } = options ?? {};
       void this.executeHistoryOperation({
-        name: options?.operationName ?? `添加物体 - ${object.uuid}`,
+        name:
+          options?.operationName ??
+          encodeHistoryI18nName({
+            'zh-CN': `添加物体 - ${object.uuid}`,
+            'en-US': `Add object - ${object.uuid}`
+          }),
         do: () => this.add(object, { ...addRest, recordHistory: false }),
         undo: () => {
           if (!object.parent) return;
@@ -1457,7 +1497,12 @@ export class ThreeEditor {
       if (prevVisible === visible) return true;
       const objectName = this.getObjectDisplayName(currentObj);
       void this.executeHistoryOperation({
-        name: options?.operationName ?? `${visible ? '显示物体' : '隐藏物体'}-${objectName}`,
+        name:
+          options?.operationName ??
+          encodeHistoryI18nName({
+            'zh-CN': `${visible ? '显示物体' : '隐藏物体'}-${objectName}`,
+            'en-US': `${visible ? 'Show object' : 'Hide object'} - ${objectName}`
+          }),
         mergeKey: `object-visible:${uuid}`,
         mergeWindowMs: 280,
         do: () => {
@@ -1948,15 +1993,9 @@ export class ThreeEditor {
 
   private invalidateSceneMaterials() {
     this.scene.traverse((obj: any) => {
-      const material = obj?.material as THREE.Material | THREE.Material[] | undefined;
-      if (!material) return;
-      if (Array.isArray(material)) {
-        for (const mat of material) {
-          if (mat) mat.needsUpdate = true;
-        }
-        return;
-      }
-      material.needsUpdate = true;
+      forEachMaterial(obj?.material as THREE.Material | THREE.Material[] | undefined, (mat) => {
+        mat.needsUpdate = true;
+      });
     });
   }
 
@@ -2000,7 +2039,7 @@ export class ThreeEditor {
               const propLabels = this.getLightTargetPropLabels();
               const targetText = this.formatVec3ForHistory(afterTarget.target);
               void this.executeHistoryOperation({
-                name: this.encodeHistoryI18nName({
+                name: encodeHistoryI18nName({
                   'zh-CN': `${lightLabels['zh-CN']} - ${light.uuid} - ${propLabels['zh-CN']} = ${targetText}`,
                   'en-US': `${lightLabels['en-US']} - ${light.uuid} - ${propLabels['en-US']} = ${targetText}`
                 }),
@@ -2159,11 +2198,10 @@ export class ThreeEditor {
       const material = (mesh as any).material as THREE.Material | THREE.Material[] | undefined;
       if (!material) return;
 
-      const materials = Array.isArray(material) ? material : [material];
-      for (const m of materials) {
+      forEachMaterial(material, (m) => {
         this.disposeMaterialTextures(m);
         m.dispose();
-      }
+      });
     });
   }
 
@@ -2349,10 +2387,6 @@ export class ThreeEditor {
   private formatVec3ForHistory(v: { x: number; y: number; z: number }) {
     const n = (value: number) => Number(Number(value).toFixed(4));
     return `(${n(v.x)}, ${n(v.y)}, ${n(v.z)})`;
-  }
-
-  private encodeHistoryI18nName(name: { 'zh-CN': string; 'en-US': string }) {
-    return `${ThreeEditor.HISTORY_I18N_PREFIX}${JSON.stringify(name)}`;
   }
 
   private isHistoryValueEqual(a: unknown, b: unknown) {

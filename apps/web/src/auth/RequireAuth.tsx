@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { isLogin } from '@/api/auth';
 import { getAccessToken } from '@/utils/authStorage';
+import { useLocale } from '@/hooks/useLocale';
+import { appMessages } from '@/i18n/messages';
 
 type Props = { children: JSX.Element };
 
@@ -16,6 +18,8 @@ type Props = { children: JSX.Element };
  */
 export function RequireAuth({ children }: Props) {
   const location = useLocation();
+  const { locale } = useLocale();
+  const checkingText = appMessages[locale].common.requireAuthChecking;
   const hasToken = useMemo(() => Boolean(getAccessToken()), []);
   const [verified, setVerified] = useState<boolean | null>(hasToken ? null : false);
 
@@ -42,7 +46,7 @@ export function RequireAuth({ children }: Props) {
   if (verified === null) {
     return (
       <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] flex items-center justify-center">
-        <div className="text-sm text-[var(--text-muted)]">Checking session…</div>
+        <div className="text-sm text-[var(--text-muted)]">{checkingText}</div>
       </div>
     );
   }

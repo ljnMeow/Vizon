@@ -1,4 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { readStoredLocale } from '../hooks/useLocale';
+import { appMessages } from '../i18n/messages';
 
 type Props = {
   children: ReactNode;
@@ -26,28 +28,29 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
+      const locale = readStoredLocale();
+      const t = appMessages[locale].common;
       return (
-        this.props.fallback ?? (
-          <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] flex items-center justify-center p-6">
-            <div className="max-w-md w-full rounded-xl border border-white/10 bg-[var(--bg-elevated)]/80 p-6 shadow-lg">
-              <div className="text-lg font-semibold">页面渲染出错</div>
-              <div className="mt-2 text-sm text-[var(--text-muted)]">
-                你可以尝试刷新页面；如果问题持续出现，请联系管理员。
-              </div>
-              <div className="mt-4 flex gap-3">
-                <button
-                  className="rounded-lg bg-white/10 px-4 py-2 text-sm hover:bg-white/15 transition-colors"
-                  onClick={() => window.location.reload()}
-                >
-                  刷新页面
-                </button>
-                <a className="rounded-lg px-4 py-2 text-sm hover:bg-white/10 transition-colors" href="/login">
-                  返回登录
-                </a>
-              </div>
+        <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] flex items-center justify-center p-6">
+          <div className="max-w-md w-full rounded-xl border border-white/10 bg-[var(--bg-elevated)]/80 p-6 shadow-lg">
+            <div className="text-lg font-semibold">{t.errorBoundaryTitle}</div>
+            <div className="mt-2 text-sm text-[var(--text-muted)]">{t.errorBoundaryDescription}</div>
+            <div className="mt-4 flex gap-3">
+              <button
+                className="rounded-lg bg-white/10 px-4 py-2 text-sm hover:bg-white/15 transition-colors"
+                onClick={() => window.location.reload()}
+              >
+                {t.errorBoundaryReload}
+              </button>
+              <a className="rounded-lg px-4 py-2 text-sm hover:bg-white/10 transition-colors" href="/login">
+                {t.errorBoundaryBackToLogin}
+              </a>
             </div>
           </div>
-        )
+        </div>
       );
     }
 

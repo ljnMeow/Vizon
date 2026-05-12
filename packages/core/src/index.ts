@@ -14,8 +14,15 @@
 export { ThreeEditor } from './editor/ThreeEditor';
 export { VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS, VIZON_HISTORY_KEYS } from './infra/utils';
 export { getVizonUserData } from './infra/utils';
+export type { Vec3Like, XYZ } from './infra/utils';
 export type { VizonDocument, VizonNode } from './types/document';
-export { buildVizonDocumentFromEditor, importDocument, parseVizonDocument, migrateVizonDocument } from './editor/vizonPersist';
+export {
+  buildVizonDocumentFromEditor,
+  importDocument,
+  parseVizonDocument,
+  migrateVizonDocument,
+  VIZON_IMPORT_ERROR_NO_OBJECT_SNAPSHOT
+} from './editor/vizonPersist';
 export type {
   ThreeEditorEvents,
   ThreeEditorOptions,

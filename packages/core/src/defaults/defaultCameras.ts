@@ -5,12 +5,12 @@
  * `ThreeEditor.add` 会读取 `userData.__vizonCameraHelper` 并维护更新。
  */
 import * as THREE from 'three';
-import { VIZON_USER_DATA_KEYS } from '../infra/utils';
+import { forEachMaterial, type Vec3Like, VIZON_USER_DATA_KEYS } from '../infra/utils';
 import { DEFAULT_CAMERAS } from './registry';
 
 export type DefaultCameraKey = 'orthographic' | 'perspective';
 
-export type Vec3Like = { x: number; y: number; z: number };
+export type { Vec3Like };
 
 export type CreateDefaultCameraOptions = {
   position?: Vec3Like;
@@ -51,15 +51,14 @@ function configureCameraHelper(helper: THREE.CameraHelper) {
   helper.userData[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR] = true;
 
   const material = (helper as any).material as THREE.Material | THREE.Material[] | undefined;
-  const materials = material ? (Array.isArray(material) ? material : [material]) : [];
-  for (const m of materials) {
+  forEachMaterial(material, (m) => {
     m.depthTest = false;
     m.depthWrite = false;
     (m as any).toneMapped = false;
     m.transparent = true;
     m.opacity = 0.9;
     m.needsUpdate = true;
-  }
+  });
   helper.renderOrder = 9_000;
 }
 

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { SceneSettingsGrid, SceneSettingsHelpers } from '../../settings/sceneSettings';
-import { VIZON_USER_DATA_KEYS } from '../../infra/utils';
+import { disposeMaterial, forEachMaterial, VIZON_USER_DATA_KEYS } from '../../infra/utils';
 import { applyEditorOverlayLayer } from '../picking/pickLayers';
 
 /**
@@ -66,7 +66,7 @@ export class HelperController {
     this.scene.remove(this.grid);
     this.scene.remove(this.axes);
     this.grid.geometry.dispose();
-    this.disposeMaterial(this.grid.material);
+    disposeMaterial(this.grid.material);
     this.scene = null;
   }
 
@@ -85,7 +85,7 @@ export class HelperController {
     // 尽量复用当前透明度配置（applyGrid 会紧接着再设置一次 opacity）
     const oldMaterial = this.grid.material;
     const nextMaterial = next.material;
-    this.forEachMaterial(nextMaterial, (material) => {
+    forEachMaterial(nextMaterial, (material) => {
       const old = Array.isArray(oldMaterial) ? oldMaterial[0] : oldMaterial;
       material.transparent = old.transparent;
       material.opacity = old.opacity;
@@ -97,14 +97,14 @@ export class HelperController {
     }
 
     this.grid.geometry.dispose();
-    this.disposeMaterial(oldMaterial);
+    disposeMaterial(oldMaterial);
 
     this.grid = next;
     this.lastGridColor = gridColorHex;
   }
 
   private configureAxesMaterial() {
-    this.forEachMaterial(this.axes.material, (material) => {
+    forEachMaterial(this.axes.material, (material) => {
       // 辅助线应尽量不被模型遮挡，保证编辑态可见性。
       material.depthTest = false;
       material.depthWrite = false;
@@ -116,16 +116,5 @@ export class HelperController {
     this.axes.renderOrder = 10_000;
   }
 
-  private forEachMaterial(material: THREE.Material | THREE.Material[], cb: (m: THREE.Material) => void) {
-    if (Array.isArray(material)) {
-      material.forEach((m) => cb(m));
-      return;
-    }
-    cb(material);
-  }
-
-  private disposeMaterial(material: THREE.Material | THREE.Material[]) {
-    this.forEachMaterial(material, (m) => m.dispose());
-  }
 }
 

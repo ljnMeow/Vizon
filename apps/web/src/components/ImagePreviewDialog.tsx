@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { readStoredLocale } from '../hooks/useLocale';
+import { appMessages } from '../i18n/messages';
 
 /** 图片预览弹窗属性。 */
 export type ImagePreviewDialogProps = {
@@ -37,6 +39,10 @@ export function ImagePreviewDialog({
 }: ImagePreviewDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const locale = readStoredLocale();
+  const common = appMessages[locale].common;
+  const resolvedUnsupported = unsupportedText ?? common.imagePreviewUnsupported;
+  const resolvedErrorFallback = errorText ?? common.imagePreviewLoadFailed;
 
   // fileUrl 有效时才展示图片
   const isValid = useMemo(() => Boolean(open && fileUrl), [open, fileUrl]);
@@ -80,7 +86,7 @@ export function ImagePreviewDialog({
           ) : error ? (
             <div className="text-xs text-[var(--text-muted)]">{error}</div>
           ) : !isValid ? (
-            <div className="text-xs text-[var(--text-muted)]">{unsupportedText ?? errorText ?? 'Unsupported'}</div>
+            <div className="text-xs text-[var(--text-muted)]">{resolvedUnsupported}</div>
           ) : (
             <div className="h-[360px] w-full overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/30">
               <img
@@ -89,7 +95,7 @@ export function ImagePreviewDialog({
                 className="h-full w-full object-contain"
                 onLoad={() => setLoading(false)}
                 onError={() => {
-                  setError(errorText ?? 'Failed to load image.');
+                  setError(resolvedErrorFallback);
                   setLoading(false);
                 }}
               />

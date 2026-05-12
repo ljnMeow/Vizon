@@ -4,76 +4,18 @@ import { createDefaultCamera } from '../defaults/defaultCameras';
 import { createDefaultLight } from '../defaults/defaultLights';
 import { createDefaultModel } from '../defaults/defaultModels';
 import { normalizeSceneSettings } from '../settings/sceneSettings';
-import { VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '../infra/utils';
+import { forEachMaterial, VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '../infra/utils';
 import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js';
 import type { SceneSettings } from '../settings/sceneSettings';
-import type {
-  VizonContentNode,
-  VizonDocument,
-  VizonNode,
-  VizonQuat,
-  VizonVec3,
-} from '../types/document';
+import type { VizonContentNode, VizonDocument, VizonNode } from '../types/document';
 import type { SceneTreeNodeKind } from '../settings/sceneTree';
 import { VIZON_EDITOR_OVERLAY_LAYER } from './picking/pickLayers';
+import { LATEST_SCHEMA_VERSION, RUNTIME_HELPER_TYPES, VIZON_IMPORT_ERROR_NO_OBJECT_SNAPSHOT } from './vizonPersistConstants';
+import { isRecord, nowIso, toBool, toFiniteNumber, toString } from './vizonPersistShared';
+import { parseVizonDocument } from './vizonPersistParse';
 
-/** 与持久化 meta 对齐的版本号 */
-const LATEST_SCHEMA_VERSION = 2 as const;
-
-const RUNTIME_HELPER_TYPES = new Set([
-  'TransformControlsGizmo',
-  'TransformControlsPlane',
-  'GridHelper',
-  'AxesHelper',
-  'CameraHelper',
-  'DirectionalLightHelper',
-  'PointLightHelper',
-  'SpotLightHelper',
-  'HemisphereLightHelper',
-  'RectAreaLightHelper',
-  'BoxHelper',
-  'LineSegments2',
-]);
-
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null;
-}
-
-function toFiniteNumber(value: unknown, fallback: number) {
-  const n = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function toString(value: unknown, fallback: string) {
-  return typeof value === 'string' ? value : fallback;
-}
-
-function toBool(value: unknown, fallback: boolean) {
-  return typeof value === 'boolean' ? value : fallback;
-}
-
-function toVec3(input: unknown, fallback: VizonVec3): VizonVec3 {
-  if (!isRecord(input)) return fallback;
-  return {
-    x: toFiniteNumber(input.x, fallback.x),
-    y: toFiniteNumber(input.y, fallback.y),
-    z: toFiniteNumber(input.z, fallback.z),
-  };
-}
-
-function toQuat(input: unknown, fallback: VizonQuat): VizonQuat {
-  if (!isRecord(input)) return fallback;
-  return {
-    x: toFiniteNumber(input.x, fallback.x),
-    y: toFiniteNumber(input.y, fallback.y),
-    z: toFiniteNumber(input.z, fallback.z),
-    w: toFiniteNumber(input.w, fallback.w),
-  };
-}
+export { migrateVizonDocument, parseVizonDocument } from './vizonPersistParse';
+export { VIZON_IMPORT_ERROR_NO_OBJECT_SNAPSHOT } from './vizonPersistConstants';
 
 function toLayers(obj: THREE.Object3D): number[] {
   const out: number[] = [];
@@ -190,23 +132,18 @@ function serializeMaterial(
   material: THREE.Material | THREE.Material[] | null | undefined
 ): Record<string, unknown> | Array<Record<string, unknown>> | undefined {
   if (!material) return undefined;
+  const list: Record<string, unknown>[] = [];
+  forEachMaterial(material, (m) => {
+    try {
+      list.push(m.toJSON() as unknown as Record<string, unknown>);
+    } catch {
+      /* skip */
+    }
+  });
   if (Array.isArray(material)) {
-    const list = material
-      .map((m) => {
-        try {
-          return m.toJSON() as unknown as Record<string, unknown>;
-        } catch {
-          return undefined;
-        }
-      })
-      .filter((x): x is Record<string, unknown> => Boolean(x));
     return list.length ? list : undefined;
   }
-  try {
-    return material.toJSON() as unknown as Record<string, unknown>;
-  } catch {
-    return undefined;
-  }
+  return list[0];
 }
 
 function toSerializableUserData(input: unknown): Record<string, unknown> {
@@ -289,17 +226,14 @@ function configureRuntimeHelperObject(helper: THREE.Object3D, pickTarget: THREE.
   ud[VIZON_USER_DATA_KEYS.COMMON.PICK_TARGET] = pickTarget;
 
   helper.traverse((node: any) => {
-    const mat = node?.material as THREE.Material | THREE.Material[] | undefined;
-    if (!mat) return;
-    const materials = Array.isArray(mat) ? mat : [mat];
-    for (const m of materials) {
+    forEachMaterial(node?.material as THREE.Material | THREE.Material[] | undefined, (m) => {
       (m as any).depthTest = false;
       (m as any).depthWrite = false;
       (m as any).toneMapped = false;
       (m as any).transparent = true;
       (m as any).opacity = typeof (m as any).opacity === 'number' ? (m as any).opacity : 0.9;
       (m as any).needsUpdate = true;
-    }
+    });
   });
   helper.renderOrder = Math.max(helper.renderOrder ?? 0, 8_000);
 }
@@ -623,147 +557,6 @@ export function buildVizonDocumentFromEditor(editor: ThreeEditor, options?: { ge
   };
 }
 
-export function parseVizonDocument(input: unknown): VizonDocument {
-  const migrated = migrateVizonDocument(input);
-  return normalizeVizonDocument(migrated);
-}
-
-/**
- * 迁移入口：后续版本只在此追加分支，调用方仍用 parseVizonDocument。
- */
-export function migrateVizonDocument(input: unknown): VizonDocument {
-  if (!isRecord(input)) throw new Error('Invalid VizonDocument: not an object');
-  const meta = isRecord(input.meta) ? input.meta : null;
-  const schemaVersion = meta ? toFiniteNumber(meta.schemaVersion, NaN) : NaN;
-
-  if (schemaVersion === 2) {
-    return {
-      meta: {
-        schemaVersion: 2,
-        createdAt: toString(meta?.createdAt, nowIso()),
-        updatedAt: toString(meta?.updatedAt, nowIso()),
-        generator: typeof meta?.generator === 'string' ? meta.generator : undefined,
-        units: meta?.units === 'centimeter' || meta?.units === 'millimeter' || meta?.units === 'meter' ? meta.units : undefined,
-        upAxis: meta?.upAxis === 'z' || meta?.upAxis === 'y' ? meta.upAxis : undefined,
-      },
-      basic: (input.basic as any) ?? {},
-      environment: (input.environment as any) ?? {},
-      camera: (input.camera as any) ?? {},
-      grid: (input.grid as any) ?? {},
-      helpers: (input.helpers as any) ?? {},
-      renderer: (input.renderer as any) ?? {},
-      sceneTree: Array.isArray(input.sceneTree) ? (input.sceneTree as any) : [],
-      content: Array.isArray(input.content) ? (input.content as any) : [],
-      sceneSettings: isRecord(input.sceneSettings) ? (input.sceneSettings as any) : undefined,
-      sceneSnapshot: isRecord(input.sceneSnapshot) ? (input.sceneSnapshot as any) : undefined,
-      nodes: Array.isArray(input.nodes) ? (input.nodes as any) : undefined,
-      assets: isRecord(input.assets) ? (input.assets as any) : undefined,
-    };
-  }
-
-  if (schemaVersion === 1) {
-    const sceneSettings = normalizeSceneSettings((input.sceneSettings as any) as SceneSettings);
-    return {
-      meta: {
-        schemaVersion: 2,
-        createdAt: toString(meta?.createdAt, nowIso()),
-        updatedAt: toString(meta?.updatedAt, nowIso()),
-        generator: typeof meta?.generator === 'string' ? meta.generator : undefined,
-        units: meta?.units === 'centimeter' || meta?.units === 'millimeter' || meta?.units === 'meter' ? meta.units : undefined,
-        upAxis: meta?.upAxis === 'z' || meta?.upAxis === 'y' ? meta.upAxis : undefined,
-      },
-      basic: { ...sceneSettings.basic },
-      environment: { ...sceneSettings.environment, fog: { ...sceneSettings.environment.fog }, hdri: { ...sceneSettings.environment.hdri } },
-      camera: { ...sceneSettings.camera, position: { ...sceneSettings.camera.position }, target: { ...sceneSettings.camera.target } },
-      grid: { ...sceneSettings.grid },
-      helpers: { axes: { ...sceneSettings.helpers.axes } },
-      renderer: { ...sceneSettings.renderer },
-      sceneTree: sceneSettings.sceneTree ?? [],
-      content: [],
-      sceneSettings,
-      sceneSnapshot: isRecord(input.sceneSnapshot) ? (input.sceneSnapshot as any) : undefined,
-      nodes: Array.isArray(input.nodes) ? (input.nodes as any) : [],
-      assets: isRecord(input.assets) ? (input.assets as any) : undefined,
-    };
-  }
-
-  throw new Error(`Unsupported VizonDocument schemaVersion: ${String(schemaVersion)}`);
-}
-
-function normalizeVizonDocument(doc: VizonDocument): VizonDocument {
-  const sceneSettings = normalizeSceneSettings({
-    basic: doc.basic,
-    environment: doc.environment,
-    camera: doc.camera,
-    grid: doc.grid,
-    helpers: doc.helpers,
-    renderer: doc.renderer,
-    sceneTree: Array.isArray(doc.sceneTree) ? doc.sceneTree : [],
-  } as SceneSettings);
-
-  const normalizedContent = Array.isArray(doc.content) ? doc.content : [];
-  const nodesRaw = doc.nodes;
-  const nodes = Array.isArray(nodesRaw) ? nodesRaw.map((n) => normalizeNode(n)) : undefined;
-
-  return {
-    ...doc,
-    basic: { ...sceneSettings.basic },
-    environment: { ...sceneSettings.environment, fog: { ...sceneSettings.environment.fog }, hdri: { ...sceneSettings.environment.hdri } },
-    camera: { ...sceneSettings.camera, position: { ...sceneSettings.camera.position }, target: { ...sceneSettings.camera.target } },
-    grid: { ...sceneSettings.grid },
-    helpers: { axes: { ...sceneSettings.helpers.axes } },
-    renderer: { ...sceneSettings.renderer },
-    sceneTree: sceneSettings.sceneTree,
-    content: normalizedContent as VizonContentNode[],
-    sceneSettings,
-    nodes,
-    sceneSnapshot: isRecord(doc.sceneSnapshot) ? doc.sceneSnapshot : undefined,
-  };
-}
-
-function normalizeNode(input: unknown): VizonNode {
-  if (!isRecord(input)) throw new Error('Invalid node: not an object');
-  const id = toString(input.id, '');
-  if (!id) throw new Error('Invalid node.id');
-
-  const fallbackVec3: VizonVec3 = { x: 0, y: 0, z: 0 };
-  const fallbackScale: VizonVec3 = { x: 1, y: 1, z: 1 };
-  const fallbackQuat: VizonQuat = { x: 0, y: 0, z: 0, w: 1 };
-
-  const children = Array.isArray(input.children) ? input.children.map((c) => toString(c, '')).filter(Boolean) : [];
-  const layers = Array.isArray(input.layers)
-    ? input.layers.map((l) => toFiniteNumber(l, -1)).filter((n) => Number.isInteger(n) && n >= 0 && n < 32)
-    : [0];
-
-  const node: VizonNode = {
-    id,
-    name: toString(input.name, ''),
-    type: toString(input.type, 'Object3D'),
-    parentId: input.parentId == null ? null : toString(input.parentId, null as any),
-    children,
-    visible: toBool(input.visible, true),
-    layers,
-    position: toVec3(input.position, fallbackVec3),
-    quaternion: toQuat(input.quaternion, fallbackQuat),
-    scale: toVec3(input.scale, fallbackScale),
-  };
-
-  if (isRecord(input.flags)) {
-    node.flags = {
-      hideInEditor: input.flags.hideInEditor == null ? undefined : toBool(input.flags.hideInEditor, false),
-      nonSelectable: input.flags.nonSelectable == null ? undefined : toBool(input.flags.nonSelectable, false),
-      nonPickable: input.flags.nonPickable == null ? undefined : toBool(input.flags.nonPickable, false),
-      dynamic: input.flags.dynamic == null ? undefined : toBool(input.flags.dynamic, false),
-    };
-  }
-
-  if (isRecord(input.components)) {
-    node.components = input.components as any;
-  }
-
-  return node;
-}
-
 /** 从节点 attribute 取出 Three.toJSON 产生的 object 块（仅认 objectSnapshot） */
 function extractObjectSnapshot(node: VizonContentNode): Record<string, unknown> | undefined {
   const attr = node.attribute;
@@ -1052,9 +845,7 @@ export async function importDocument(
   if (Array.isArray(doc.content) && doc.content.length > 0) {
     const added = importSceneFromContentNodes(editor, doc.content);
     if (added === 0) {
-      throw new Error(
-        'VizonDocument.content 中未找到有效的 attribute.objectSnapshot，无法恢复场景。请使用由本编辑器导出的 JSON 或检查 content 节点是否包含 Three.js 序列化块。'
-      );
+      throw new Error(VIZON_IMPORT_ERROR_NO_OBJECT_SNAPSHOT);
     }
     await applyImportedDocumentSettings(editor, doc, options);
     // 显式按 content helper 标记补齐并重绑定（不依赖 add() 时机与隐式链路）

@@ -14,6 +14,24 @@ const LocaleContext = createContext<LocaleContextValue | undefined>(undefined);
 const LOCALE_STORAGE_KEY = STORAGE_KEYS.LOCALE;
 
 /**
+ * 读取当前应使用的语言（与 LocaleProvider 首次 state 逻辑一致）。
+ * 供 ErrorBoundary 等位于 LocaleProvider 之外的组件使用。
+ */
+export function readStoredLocale(): Locale {
+  const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY) as Locale | null;
+  if (stored === 'zh-CN' || stored === 'en-US') {
+    return stored;
+  }
+  const navLang =
+    (typeof navigator !== 'undefined' && (navigator.language || navigator.languages?.[0])) || '';
+  const lower = navLang.toLowerCase();
+  if (lower.startsWith('zh')) {
+    return 'zh-CN';
+  }
+  return 'en-US';
+}
+
+/**
  * 提供全局语言环境（Locale）：
  * - 优先从 localStorage 读取
  * - 其次根据浏览器语言推断
@@ -22,25 +40,7 @@ const LOCALE_STORAGE_KEY = STORAGE_KEYS.LOCALE;
 export const LocaleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // 懒加载初始化：避免每次渲染都重复访问 localStorage / navigator。
   // 优先读取用户显式选择，其次根据系统语言推断默认值。
-  const [locale, setLocale] = useState<Locale>(() => {
-    const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY) as Locale | null;
-    if (stored === 'zh-CN' || stored === 'en-US') {
-      return stored;
-    }
-
-    // 从浏览器环境推断系统语言
-    const navLang =
-      (typeof navigator !== 'undefined' &&
-        (navigator.language || navigator.languages?.[0])) ||
-      '';
-    const lower = navLang.toLowerCase();
-
-    if (lower.startsWith('zh')) {
-      return 'zh-CN';
-    }
-
-    return 'en-US';
-  });
+  const [locale, setLocale] = useState<Locale>(() => readStoredLocale());
 
   useEffect(() => {
     // 每次语言变更时写入 localStorage，保证下次打开页面时仍然生效
