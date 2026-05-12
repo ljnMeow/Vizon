@@ -1,6 +1,12 @@
-import { normalizeSceneSettings } from '../settings/sceneSettings';
-import type { SceneSettings } from '../settings/sceneSettings';
-import type { VizonContentNode, VizonDocument, VizonNode, VizonQuat, VizonVec3 } from '../types/document';
+/**
+ * **VizonDocument 解析与迁移**：将任意 `unknown` 输入规范为内部使用的 `VizonDocument`。
+ * - `parseVizonDocument`：迁移 + `normalizeSceneSettings` 等后处理。
+ * - `migrateVizonDocument`：按 `meta.schemaVersion` 分支升级旧快照（新版本只在此追加逻辑）。
+ * - 节点级 `normalizeNode` 等供测试与导入链复用。
+ */
+import { normalizeSceneSettings } from '../../settings/sceneSettings';
+import type { SceneSettings } from '../../settings/sceneSettings';
+import type { VizonContentNode, VizonDocument, VizonNode, VizonQuat, VizonVec3 } from '../../types/document';
 import { isRecord, nowIso, toBool, toFiniteNumber, toQuat, toString, toVec3 } from './vizonPersistShared';
 
 export function parseVizonDocument(input: unknown): VizonDocument {

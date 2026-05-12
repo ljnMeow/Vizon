@@ -1,3 +1,7 @@
+/**
+ * **贴图加载辅助**：URL / `File` → `THREE.Texture`，默认色彩空间与 `EnvironmentController` 中 LDR 路径一致。
+ * 供 core 内环境与材质路径使用，避免应用层直接拼 Loader 细节。
+ */
 import * as THREE from 'three';
 
 /**

@@ -1,3 +1,7 @@
+/**
+ * **three.js 类型补丁**：为当前 `@types/three` 中可能缺失、但运行时已存在的字段补充声明，避免 TS 报错。
+ * 仅影响类型检查，不改变运行时。
+ */
 import 'three';
 
 declare module 'three' {

@@ -1,3 +1,8 @@
+/**
+ * 持久化层 **常量**：schema 版本、导入错误标识、以及序列化时跳过的运行时 helper 类型名集合。
+ * 与 `vizonPersistScene` 中「不参与 objectSnapshot 的对象」逻辑保持一致。
+ */
+
 /** 与持久化 meta 对齐的版本号 */
 export const LATEST_SCHEMA_VERSION = 2 as const;
 

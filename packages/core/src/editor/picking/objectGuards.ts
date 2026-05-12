@@ -1,3 +1,7 @@
+/**
+ * **拾取/结构树守卫**：沿父链判断 `nonSelectable` / `nonPickable` / 可见性，避免选中 Grid、Gizmo 或隐藏分支。
+ * `ThreeEditor`、`InteractionController`、持久化导入等共用，保证语义一致。
+ */
 import * as THREE from 'three';
 import { VIZON_USER_DATA_KEYS } from '../../infra/utils';
 

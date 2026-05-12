@@ -1,3 +1,17 @@
+/**
+ * **ThreeEditor** — vizon-3d-core 的 **运行时门面**（非 React）。
+ *
+ * **主要职责**：编排 `controllers` 与 `services`；维护 `SceneSettings` 与 THREE 场景同步；暴露
+ * `start` / `render` / `resize` / `dispose`；处理选中、变换 Gizmo、历史撤销、剪贴板与场景节点编辑；
+ * 通过 `events` 向 UI 推送 `select` / `sceneTreeChange` / `historyChange` / `sceneSettingsChange` 等。
+ *
+ * **不宜继续塞入的逻辑**：纯数据解析（见 `vizonPersist/`）、可单测的选中集合推导（`selection/nextSelection`）、
+ * 历史 pending 纯函数（`history/`）。本文件仍保留 WebGL/DOM 强相关的 `writeNestedValue`、渲染管线钩子等与 three 紧耦合部分。
+ *
+ * @see `editor/vizonPersist/` 文档导入导出
+ * @see `editor/history/` 撤销与属性预览提交辅助
+ * @see `editor/selection/` 多选状态机与副作用编排
+ */
 import * as THREE from 'three';
 import type { OrbitControls, TransformControls } from 'three-stdlib';
 import { Emitter } from '../infra/events';
@@ -9,7 +23,7 @@ import {
   VIZON_STORAGE_KEYS,
   VIZON_USER_DATA_KEYS
 } from '../infra/utils';
-import { buildVizonDocumentFromEditor } from './vizonPersistBuild';
+import { buildVizonDocumentFromEditor } from './vizonPersist';
 import type { RendererSettings, SceneSettings } from '../settings/sceneSettings';
 import type { SceneTreeNode } from '../settings/sceneTree';
 import type { VizonDocument } from '../types/document';
@@ -27,7 +41,25 @@ import { SceneTreeController } from './controllers/SceneTreeController';
 import { StaticObjectFreezeController } from './controllers/StaticObjectFreezeController';
 import { ConduitEditController } from './controllers/ConduitEditController';
 import { isNonSelectableInHierarchy, isVisibleInHierarchy } from './picking/objectGuards';
-import { HistoryManager, type EditorHistoryOperation, type EditorHistoryRecord } from './HistoryManager';
+import {
+  cloneForHistory,
+  createSingleSlotPending,
+  encodeHistoryPayload,
+  executeWithHistoryNotify,
+  formatHistoryValue,
+  getObjectHistoryTargetKind,
+  HistoryManager,
+  isHistoryValueEqual,
+  readNestedValueCloned,
+  runObjectPropertyHistoryStep,
+  runRendererSettingsHistoryCommit,
+  runSceneSettingsHistoryCommit,
+  seedSingleSlotBaselineIfEmpty,
+  type EditorHistoryOperation,
+  type EditorHistoryRecord
+} from './history';
+import { computeNextPrimary, computeNextSelectedObjects, computeTransformAttachTarget } from './selection/nextSelection';
+import { SelectionOrchestrator } from './selection/SelectionOrchestrator';
 import {
   applyEditorOverlayLayer,
   configureRaycasterForScenePicking,
@@ -108,7 +140,6 @@ export type ThreeEditorOptions = {
  * - 不依赖 React；上层通过 `events` 与 getter 拉取状态。
  */
 export class ThreeEditor {
-  private static readonly HISTORY_OP_PREFIX = VIZON_HISTORY_KEYS.OP_PREFIX;
   /** 与 WebGLRenderer 绑定的同一个 canvas 引用 */
   readonly canvas: HTMLCanvasElement;
   /** 所有可编辑内容的根；主相机不在其子树中（见 `canAttachTransformTarget`） */
@@ -200,6 +231,7 @@ export class ThreeEditor {
   private viewPresetController: ViewPresetController;
   private sceneTreeController: SceneTreeController;
   private staticObjectFreezeController: StaticObjectFreezeController;
+  private selectionOrchestrator: SelectionOrchestrator;
   private assetLoader: AssetLoader;
 
   // —— 场景内额外相机/灯光的辅助器（独立于光/相机节点，避免矩阵双计）——
@@ -220,10 +252,10 @@ export class ThreeEditor {
   private history: HistoryManager;
   /** 预览阶段暂存的对象属性“历史前值” */
   private pendingObjectPropHistoryBefore = new Map<string, unknown>();
-  /** 预览阶段暂存的场景配置“历史前值” */
-  private pendingSceneHistoryBefore: SceneSettings | null = null;
-  /** 预览阶段暂存的渲染器配置“历史前值” */
-  private pendingRendererHistoryBefore: RendererSettings | null = null;
+  /** 预览阶段暂存的场景配置“历史前值”（单槽） */
+  private pendingSceneHistoryBefore = createSingleSlotPending<SceneSettings>();
+  /** 预览阶段暂存的渲染器配置“历史前值”（单槽） */
+  private pendingRendererHistoryBefore = createSingleSlotPending<RendererSettings>();
   /** 渲染配置变更标记：当前仅用于观测，不影响现有渲染行为。 */
   private rendererDirty = false;
   /** 阴影相关变更标记：用于后续替换每帧阴影兜底。 */
@@ -404,6 +436,14 @@ export class ThreeEditor {
     this.conduitEditController.setDomElement(this.renderer.domElement);
     // 仅在 freezeStaticObjects 时注册 dragging 监听，避免无意义闭包
     this.bindTransformDragHooks();
+    this.selectionOrchestrator = new SelectionOrchestrator({
+      scene: this.scene,
+      freezeController: this.staticObjectFreezeController,
+      effectsController: this.effectsController,
+      transform: this.transform,
+      getConduitEditController: () => this.conduitEditController,
+      requestShadowMapUpdate: () => this.requestShadowMapUpdate()
+    });
     this.viewPresetController = new ViewPresetController(this.camera, this.orbit);
 
     // SceneGraphService 必须在 bootstrapScene() 前初始化：
@@ -519,8 +559,7 @@ export class ThreeEditor {
    * 供内部与扩展能力复用；一般 UI 应优先走 `undo`/`redo`/`setSceneSettings` 等封装方法。
    */
   async executeHistoryOperation(operation: EditorHistoryOperation) {
-    await this.history.execute(operation);
-    this.emitHistoryChange();
+    await executeWithHistoryNotify(this.history, operation, () => this.emitHistoryChange());
   }
 
   /** 撤销一步：同步场景树并请求一帧渲染。 */
@@ -709,7 +748,7 @@ export class ThreeEditor {
     group.updateMatrixWorld(true);
 
     await this.executeHistoryOperation({
-      name: this.encodeHistoryOp({
+      name: encodeHistoryPayload(VIZON_HISTORY_KEYS.OP_PREFIX, {
         op: 'group',
         count: snapshot.length,
         uuids: snapshot.map((x) => x.node.uuid)
@@ -793,7 +832,7 @@ export class ThreeEditor {
     ];
 
     await this.executeHistoryOperation({
-      name: this.encodeHistoryOp({
+      name: encodeHistoryPayload(VIZON_HISTORY_KEYS.OP_PREFIX, {
         op: 'ungroup',
         count: snapshot[0].children.length,
         groupUuid: group.uuid,
@@ -908,46 +947,28 @@ export class ThreeEditor {
     const obj = this.scene.getObjectByProperty('uuid', uuid);
     if (!obj) return false;
     const before = this.readNestedValue(obj, path);
-    const after = this.cloneForHistory(nextValue);
-    const pendingKey = `${uuid}::${path}`;
+    const after = cloneForHistory(nextValue);
 
-    if (options?.recordHistory === false) {
-      if (!this.pendingObjectPropHistoryBefore.has(pendingKey)) {
-        this.pendingObjectPropHistoryBefore.set(pendingKey, this.cloneForHistory(before));
-      }
-      this.writeNestedValue(obj, path, this.cloneForHistory(after));
-      return true;
-    }
-
-    const historyBefore = this.pendingObjectPropHistoryBefore.has(pendingKey)
-      ? this.pendingObjectPropHistoryBefore.get(pendingKey)
-      : before;
-    this.pendingObjectPropHistoryBefore.delete(pendingKey);
-    if (this.isHistoryValueEqual(historyBefore, after)) return true;
-
-    const prop = path.split('.').filter(Boolean).slice(-1)[0] ?? path;
-    const valueText = this.formatHistoryValue(after);
-    const targetKind = this.getHistoryTargetKind(obj);
-    await this.executeHistoryOperation({
-      name:
-        options?.operationName ??
-        this.encodeHistoryOp({
+    return runObjectPropertyHistoryStep({
+      pending: this.pendingObjectPropHistoryBefore,
+      uuid,
+      path,
+      options,
+      before,
+      after,
+      cloneForHistory,
+      isHistoryValueEqual,
+      buildDefaultOperationName: () =>
+        encodeHistoryPayload(VIZON_HISTORY_KEYS.OP_PREFIX, {
           op: 'update_property',
-          targetKind,
+          targetKind: getObjectHistoryTargetKind(obj),
           uuid,
-          prop,
-          valueText: valueText || undefined
+          prop: path.split('.').filter(Boolean).slice(-1)[0] ?? path,
+          valueText: formatHistoryValue(after) || undefined
         }),
-      mergeKey: `object-prop:${uuid}:${path}`,
-      mergeWindowMs: 280,
-      do: () => {
-        this.writeNestedValue(obj, path, this.cloneForHistory(after));
-      },
-      undo: () => {
-        this.writeNestedValue(obj, path, this.cloneForHistory(historyBefore));
-      }
+      writeValue: (value) => this.writeNestedValue(obj, path, value),
+      executeHistoryOperation: (op) => this.executeHistoryOperation(op)
     });
-    return true;
   }
 
   /**
@@ -1014,25 +1035,25 @@ export class ThreeEditor {
    * 如 antialias 变化会触发 renderer 重建）。
    */
   setRendererSettings(next: RendererSettings, options?: { recordHistory?: boolean; operationName?: string }) {
-    if (options?.recordHistory === false && !this.pendingRendererHistoryBefore) {
-      this.pendingRendererHistoryBefore = { ...this.sceneSettings.renderer };
+    if (options?.recordHistory === false) {
+      seedSingleSlotBaselineIfEmpty(this.pendingRendererHistoryBefore, { ...this.sceneSettings.renderer });
     }
-    if (options?.recordHistory ?? true) {
-      const prevRenderer = this.pendingRendererHistoryBefore ? { ...this.pendingRendererHistoryBefore } : { ...this.sceneSettings.renderer };
-      this.pendingRendererHistoryBefore = null;
-      if (this.isRendererSettingsEqual(prevRenderer, next)) return;
-      void this.executeHistoryOperation({
-        name:
-          options?.operationName ??
+    if (
+      runRendererSettingsHistoryCommit({
+        pending: this.pendingRendererHistoryBefore,
+        next,
+        options,
+        getLiveRendererSettings: () => ({ ...this.sceneSettings.renderer }),
+        isEqual: (a, b) => this.isRendererSettingsEqual(a, b),
+        buildDefaultOperationName: () =>
           encodeHistoryI18nName({
             'zh-CN': '修改渲染器设置',
             'en-US': 'Modify renderer settings'
           }),
-        mergeKey: 'renderer-settings',
-        mergeWindowMs: 280,
-        do: () => this.setRendererSettings(next, { recordHistory: false }),
-        undo: () => this.setRendererSettings(prevRenderer, { recordHistory: false })
-      });
+        applyWithoutHistory: (settings) => this.setRendererSettings(settings, { recordHistory: false }),
+        executeHistoryOperation: (op) => this.executeHistoryOperation(op)
+      })
+    ) {
       return;
     }
     const prevRenderer = this.sceneSettings.renderer;
@@ -1106,26 +1127,26 @@ export class ThreeEditor {
     next: SceneSettings,
     options?: { recordHistory?: boolean; operationName?: string; forceApply?: boolean }
   ): Promise<void> {
-    if (options?.recordHistory === false && !this.pendingSceneHistoryBefore) {
-      this.pendingSceneHistoryBefore = this.getSceneSettings();
+    if (options?.recordHistory === false) {
+      seedSingleSlotBaselineIfEmpty(this.pendingSceneHistoryBefore, this.getSceneSettings());
     }
-    if (options?.recordHistory ?? true) {
-      const prev = this.pendingSceneHistoryBefore ? this.pendingSceneHistoryBefore : this.getSceneSettings();
-      this.pendingSceneHistoryBefore = null;
-      const normalizedNext = normalizeSceneSettings(next);
-      if (this.isSceneSettingsEqualForHistory(prev, normalizedNext)) return;
-      await this.executeHistoryOperation({
-        name:
-          options?.operationName ??
+    if (
+      await runSceneSettingsHistoryCommit({
+        pending: this.pendingSceneHistoryBefore,
+        next,
+        options,
+        normalizeSceneSettings: normalizeSceneSettings,
+        getLiveSceneSettings: () => this.getSceneSettings(),
+        isEqualForHistory: (a, b) => this.isSceneSettingsEqualForHistory(a, b),
+        buildDefaultOperationName: () =>
           encodeHistoryI18nName({
             'zh-CN': '修改场景设置',
             'en-US': 'Modify scene settings'
           }),
-        mergeKey: 'scene-settings',
-        mergeWindowMs: 280,
-        do: () => this.setSceneSettings(normalizedNext, { recordHistory: false }),
-        undo: () => this.setSceneSettings(prev, { recordHistory: false })
-      });
+        applyWithoutHistory: (settings) => this.setSceneSettings(settings, { recordHistory: false }),
+        executeHistoryOperation: (op) => this.executeHistoryOperation(op)
+      })
+    ) {
       return;
     }
     const normalized = normalizeSceneSettings(next);
@@ -1287,7 +1308,6 @@ export class ThreeEditor {
     const safe = object && !isNonSelectableInHierarchy(object) ? object : null;
     const prev = this.selected;
     const prevObjects = this.selectedObjects;
-    let nextObjects: THREE.Object3D[];
     // 非 Shift 单选模式下的点击：应清掉“临时高亮”（包括点空白清空）。
     if (!options?.toggle) {
       this.effectsController.setSelectionHighlightEnabled(false);
@@ -1295,73 +1315,30 @@ export class ThreeEditor {
       // Shift(toggle) 选中行为：确保临时 bloom 高亮开启（不依赖 keydown 是否先触发）。
       this.effectsController.setSelectionHighlightEnabled(true);
     }
-    if (options?.toggle) {
-      if (!safe) {
-        // 多选模式点击空白处：保持当前集合，等待用户继续增减选择。
-        nextObjects = [...prevObjects];
-      } else {
-        const exists = prevObjects.includes(safe);
-        nextObjects = exists ? prevObjects.filter((item) => item !== safe) : [...prevObjects, safe];
-      }
-    } else {
-      nextObjects = safe ? [safe] : [];
-    }
-    const nextPrimary = nextObjects.length > 0 ? nextObjects[nextObjects.length - 1] : null;
+    const nextObjects = computeNextSelectedObjects(prevObjects, safe, { toggle: options?.toggle });
+    const nextPrimary = computeNextPrimary(nextObjects);
+    const transformTarget = computeTransformAttachTarget(nextPrimary, nextObjects, options);
 
-    if (this.freezeStaticObjects) {
-      const prevSet = new Set(prevObjects);
-      const nextSet = new Set(nextObjects);
-      for (const item of prevObjects) {
-        if (!nextSet.has(item)) this.staticObjectFreezeController.freezeObjectTree(item);
+    const dirty = this.selectionOrchestrator.apply({
+      freezeStaticObjects: this.freezeStaticObjects,
+      prevObjects,
+      nextObjects,
+      prevPrimary: prev,
+      nextPrimary,
+      transformTarget,
+      transformToolEnabled: this.transformToolEnabled,
+      transformHandleVisible: this.transformHandleVisible,
+      canAttachTransformTarget: (o) => this.canAttachTransformTarget(o),
+      assignSelectionState: () => {
+        this.selectedObjects = [...nextObjects];
+        this.selected = nextPrimary;
+      },
+      onEmitSelect: (payload) => {
+        this.events.emit('select', payload);
       }
-      for (const item of nextObjects) {
-        if (!prevSet.has(item)) {
-          this.staticObjectFreezeController.unfreezeObjectTree(item);
-          // 仅解冻选中子树不够：父级仍为冻结时世界矩阵链错误，Transform 会丢对象。
-          this.staticObjectFreezeController.unfreezeAncestors(item, this.scene);
-        }
-      }
-    }
-
-    this.selectedObjects = nextObjects;
-    this.selected = nextPrimary;
-    this.effectsController.setSelectedObjects(nextObjects);
-    if ((prev as any)?.isCamera || (nextPrimary as any)?.isCamera) this.cameraHelpersDirty = true;
-    if ((prev as any)?.isLight || (nextPrimary as any)?.isLight) this.lightHelpersDirty = true;
-
-    const transformTarget =
-      !options?.toggle && nextObjects.length === 1 && options?.targetHandle ? options.targetHandle : nextPrimary;
-    // 单选结果始终尝试挂载 Gizmo：toggle 仅影响集合增减，不应阻止「最终只剩一个对象」时的变换把手；
-    // 否则 Shift/keyup 丢失时 isShiftPressed 长期为 true，拾取一直以 toggle 写入，Gizmo 永远不出现。
-    if (
-      this.transformToolEnabled &&
-      this.transformHandleVisible &&
-      nextObjects.length === 1 &&
-      this.canAttachTransformTarget(transformTarget)
-    ) {
-      if (this.freezeStaticObjects && transformTarget) {
-        this.staticObjectFreezeController.unfreezeAncestors(transformTarget, this.scene);
-      }
-      this.transform.attach(transformTarget);
-      this.transform.visible = true;
-    } else {
-      this.transform.detach();
-      this.transform.visible = false;
-    }
-    this.conduitEditController?.syncFromSelection(nextPrimary);
-    this.events.emit('select', { object: nextPrimary, objects: [...nextObjects] });
-    if ((nextPrimary as any)?.isDirectionalLight || (nextPrimary as any)?.isSpotLight || (nextPrimary as any)?.isPointLight) {
-      const light = nextPrimary as any;
-      light.updateMatrixWorld?.(true);
-      light.target?.updateMatrixWorld?.(true);
-      light.shadow?.camera?.updateProjectionMatrix?.();
-      light.shadow?.camera?.updateMatrixWorld?.(true);
-      light.shadow?.updateMatrices?.(light);
-      this.lightHelpersDirty = true;
-    }
-    // autoUpdate=false 时，点击空白/切换选中也可能触发渲染管线状态变化（后处理 pass、helper 更新等）。
-    // 这里主动请求一次 shadow map 重建，避免出现“切换后阴影贴图丢失但未自动回填”的现象。
-    this.requestShadowMapUpdate();
+    });
+    if (dirty.cameraHelpersDirty) this.cameraHelpersDirty = true;
+    if (dirty.lightHelpersDirty) this.lightHelpersDirty = true;
   }
 
   /**
@@ -2068,7 +2045,7 @@ export class ThreeEditor {
           });
           if (changed) {
             void this.executeHistoryOperation({
-              name: this.encodeHistoryOp({
+              name: encodeHistoryPayload(VIZON_HISTORY_KEYS.OP_PREFIX, {
                 op: 'transform',
                 action: this.getTransformActionLabel(this.transformMode),
                 targetKind: 'object',
@@ -2082,9 +2059,9 @@ export class ThreeEditor {
           }
         } else if (!this.isSameTransformSnapshot(before, after)) {
           const actionLabel = this.getTransformActionLabel(this.transformMode);
-          const targetKind = this.getHistoryTargetKind(target);
+          const targetKind = getObjectHistoryTargetKind(target);
           void this.executeHistoryOperation({
-            name: this.encodeHistoryOp({
+            name: encodeHistoryPayload(VIZON_HISTORY_KEYS.OP_PREFIX, {
               op: 'transform',
               action: actionLabel,
               targetKind,
@@ -2335,43 +2312,6 @@ export class ThreeEditor {
     return 'move';
   }
 
-  private encodeHistoryOp(payload: Record<string, unknown>) {
-    return `${ThreeEditor.HISTORY_OP_PREFIX}${JSON.stringify(payload)}`;
-  }
-
-  private getHistoryTargetKind(obj: THREE.Object3D | null | undefined) {
-    if (!obj) return 'object';
-    const anyObj = obj as any;
-    if (anyObj?.isOrthographicCamera) return 'orthographic_camera';
-    if (anyObj?.isPerspectiveCamera) return 'perspective_camera';
-    if (anyObj?.isCamera) return 'camera';
-    if (anyObj?.isDirectionalLight) return 'directional_light';
-    if (anyObj?.isPointLight) return 'point_light';
-    if (anyObj?.isSpotLight) return 'spot_light';
-    if (anyObj?.isAmbientLight) return 'ambient_light';
-    if (anyObj?.isHemisphereLight) return 'hemisphere_light';
-    if (anyObj?.isRectAreaLight) return 'rect_area_light';
-    if (anyObj?.isLight) return 'light';
-    return 'object';
-  }
-
-  private formatHistoryValue(value: unknown) {
-    if (value == null) return '';
-    if (typeof value === 'string') {
-      const v = value.trim();
-      if (!v) return '""';
-      return v.length > 32 ? `${v.slice(0, 32)}…` : v;
-    }
-    if (typeof value === 'number') {
-      if (!Number.isFinite(value)) return '';
-      // 尽量短：整数原样，小数最多 4 位
-      return Math.abs(value - Math.round(value)) < 1e-9 ? String(Math.round(value)) : String(Number(value.toFixed(4)));
-    }
-    if (typeof value === 'boolean') return value ? 'true' : 'false';
-    // 对象/数组不直接塞进标题，避免过长
-    return '';
-  }
-
   private getLightTypeHistoryLabels(light: THREE.Light) {
     const anyLight = light as any;
     if (anyLight?.isDirectionalLight) return { 'zh-CN': '修改平行光属性', 'en-US': 'Modify directional light property' } as const;
@@ -2389,20 +2329,6 @@ export class ThreeEditor {
     return `(${n(v.x)}, ${n(v.y)}, ${n(v.z)})`;
   }
 
-  private isHistoryValueEqual(a: unknown, b: unknown) {
-    if (Object.is(a, b)) return true;
-    if (typeof a !== typeof b) return false;
-    if (a == null || b == null) return false;
-    if (typeof a === 'object') {
-      try {
-        return JSON.stringify(a) === JSON.stringify(b);
-      } catch {
-        return false;
-      }
-    }
-    return false;
-  }
-
   private emitHistoryChange() {
     this.events.emit('historyChange', {
       records: this.history.getRecords(),
@@ -2418,25 +2344,9 @@ export class ThreeEditor {
     });
   }
 
-  private cloneForHistory<T>(value: T): T {
-    if (value == null) return value;
-    if (typeof value !== 'object') return value;
-    try {
-      return JSON.parse(JSON.stringify(value)) as T;
-    } catch {
-      return value;
-    }
-  }
-
   private readNestedValue(source: any, path: string) {
     if (!path) return source;
-    const keys = path.split('.');
-    let cur = source;
-    for (const key of keys) {
-      if (cur == null) return undefined;
-      cur = cur[key];
-    }
-    return this.cloneForHistory(cur);
+    return readNestedValueCloned(source, path, cloneForHistory);
   }
 
   private writeNestedValue(target: any, path: string, value: unknown) {

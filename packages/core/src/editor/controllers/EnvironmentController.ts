@@ -1,3 +1,7 @@
+/**
+ * **环境与背景**：HDRI（RGBE/EXR）异步加载、场景 `environment`/`background`、雾、以及加载序号防竞态。
+ * 由 `ThreeEditor.applySceneSettings` 在 diff 命中环境相关字段时调用。
+ */
 import * as THREE from 'three';
 import { EXRLoader, RGBELoader } from 'three-stdlib';
 import type { SceneSettings } from '../../settings/sceneSettings';

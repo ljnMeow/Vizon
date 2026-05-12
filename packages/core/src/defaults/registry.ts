@@ -1,3 +1,7 @@
+/**
+ * **默认资源注册表**：内置模型/相机/灯光的 key 列表、默认 mesh 颜色、灯光 helper 颜色等常量。
+ * 与 `defaultModels` / `defaultCameras` / `defaultLights` 工厂配合，供编辑器「添加默认对象」与 UI 列表使用。
+ */
 export const DEFAULT_MESH_COLOR = 0x60a5fa;
 export const DEFAULT_LIGHT_HELPER_COLOR = 0xffb703;
 

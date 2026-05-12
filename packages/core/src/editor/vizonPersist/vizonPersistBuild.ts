@@ -1,6 +1,11 @@
+/**
+ * **从编辑器快照构建 VizonDocument**（导出侧）。
+ * 通过 `VizonDocumentBuildEditorLike` 只依赖 `scene` + `getSceneSettings()`，避免 `ThreeEditor` ↔ 本模块循环 import。
+ * 场景节点内容由 `serializeVizonSceneContent` 生成，与设置字段共用单一数据源。
+ */
 import * as THREE from 'three';
-import type { SceneSettings } from '../settings/sceneSettings';
-import type { VizonDocument } from '../types/document';
+import type { SceneSettings } from '../../settings/sceneSettings';
+import type { VizonDocument } from '../../types/document';
 import { LATEST_SCHEMA_VERSION } from './vizonPersistConstants';
 import { nowIso } from './vizonPersistShared';
 import { serializeVizonSceneContent } from './vizonPersistScene';

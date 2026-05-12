@@ -1,3 +1,6 @@
+/**
+ * **网格与坐标轴**：按 `SceneSettings` 创建/更新 `GridHelper`、坐标轴 helper，并打上 overlay layer。
+ */
 import * as THREE from 'three';
 import type { SceneSettingsGrid, SceneSettingsHelpers } from '../../settings/sceneSettings';
 import { disposeMaterial, forEachMaterial, VIZON_USER_DATA_KEYS } from '../../infra/utils';

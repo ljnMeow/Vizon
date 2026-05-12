@@ -1,3 +1,4 @@
+/** `encodeHistoryI18nName` 与前缀约定。 */
 import { describe, expect, it } from 'vitest';
 import { VIZON_HISTORY_KEYS } from '../keys';
 import { encodeHistoryI18nName } from '../historyEncoding';

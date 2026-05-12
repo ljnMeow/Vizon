@@ -1,3 +1,4 @@
+/** `normalizeSceneSettings` 钳制与默认值。 */
 import { describe, expect, it } from 'vitest';
 import { createDefaultSceneSettings, normalizeSceneSettings } from '../sceneSettings';
 import type { SceneSettings } from '../sceneSettings';

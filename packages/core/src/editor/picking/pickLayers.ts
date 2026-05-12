@@ -1,3 +1,7 @@
+/**
+ * **编辑器 layer 约定**：内容层 vs overlay 层掩码、`Raycaster` 配置、以及把对象打上 overlay 标记的辅助函数。
+ * 与 `InteractionController` 的拾取、`EffectsController` 的选中盒等同用一套 layer 策略。
+ */
 import * as THREE from 'three';
 import { VIZON_USER_DATA_KEYS } from '../../infra/utils';
 

@@ -1,3 +1,7 @@
+/**
+ * **运行时材质类型切换**：在保持 mesh 引用不变的前提下，把材质替换为另一 three.js 材质类，
+ * 并按 `supportedTextureKeys` 等选项迁移兼容贴图槽。供编辑器与工具链复用，无 UI。
+ */
 import * as THREE from 'three';
 
 export type SwitchMaterialTypeOptions = {

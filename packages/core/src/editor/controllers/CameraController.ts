@@ -1,3 +1,7 @@
+/**
+ * **视口相机同步**：把 `SceneSettings.camera` 中的 FOV、近远裁剪、位置与 target 应用到
+ * `PerspectiveCamera` + `OrbitControls`，与 `ThreeEditor` 的 `applyCameraSettings` 路径配合。
+ */
 import * as THREE from 'three';
 import type { SceneSettings } from '../../settings/sceneSettings';
 import type { OrbitControls } from 'three-stdlib';

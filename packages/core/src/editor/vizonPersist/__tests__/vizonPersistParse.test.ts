@@ -1,5 +1,7 @@
+/** `vizonPersistParse`：文档迁移、normalize、节点形状。 */
 import { describe, expect, it } from 'vitest';
-import { createDefaultSceneSettings } from '../../settings/sceneSettings';
+
+import { createDefaultSceneSettings } from '../../../settings/sceneSettings';
 import { migrateVizonDocument, normalizeNode, parseVizonDocument } from '../vizonPersistParse';
 
 function minimalV2Doc(overrides: Record<string, unknown> = {}) {
@@ -121,3 +123,4 @@ describe('normalizeNode', () => {
     expect(n.layers).toEqual([0, 31]);
   });
 });
+

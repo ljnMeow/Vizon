@@ -1,3 +1,4 @@
+/** `sceneSettingsDiff` / dirty 映射。 */
 import { describe, expect, it } from 'vitest';
 import { createDefaultSceneSettings } from '../sceneSettings';
 import type { SceneSettings } from '../sceneSettings';

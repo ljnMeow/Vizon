@@ -1,3 +1,7 @@
+/**
+ * **WebGLRenderer 生命周期**：创建 renderer、应用 `RendererSettings`、在 `antialias` 变化时整实例重建并
+ * 委托 `InteractionController` 重建 orbit/transform。与 `ThreeEditor` 的 `resize`、特效绑定衔接。
+ */
 import * as THREE from 'three';
 import type { RendererSettings } from '../../settings/sceneSettings';
 import type { TransformMode } from '../ThreeEditor';

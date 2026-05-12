@@ -1,4 +1,6 @@
+/** `vizonPersistShared`：解析用小工具函数。 */
 import { describe, expect, it } from 'vitest';
+
 import { isRecord, nowIso, toBool, toFiniteNumber, toQuat, toString, toVec3 } from '../vizonPersistShared';
 
 describe('vizonPersistShared', () => {

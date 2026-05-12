@@ -1,3 +1,8 @@
+/**
+ * **场景图服务**：在 `THREE.Scene` 与 **可序列化的 sceneTree** 之间同步结构；
+ * 封装 `add`/`remove` 后的树重建、helper 绑定、静态冻结、选中清理与 `sceneTreeChange` 派发。
+ * `ThreeEditor` 构造时注入 `SceneGraphHost` 回调以避免与门面循环依赖。
+ */
 import * as THREE from 'three';
 import type { SceneTreeNode } from '../../settings/sceneTree';
 

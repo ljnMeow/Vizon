@@ -1,3 +1,7 @@
+/**
+ * **`userData` 类型收窄**：把 `THREE.Object3D['userData']` 与 Vizon 约定的 key（`VIZON_USER_DATA_KEYS`）映射为
+ * 只读结构化类型，供 TS 在读取 `nonSelectable`、默认模型 key 等字段时获得补全。
+ */
 import * as THREE from 'three';
 import { VIZON_USER_DATA_KEYS } from './utils/keys';
 import type { DefaultLightKey } from '../defaults/defaultLights';

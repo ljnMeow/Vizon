@@ -1,3 +1,7 @@
+/**
+ * **指针与变换控件**：创建/销毁 `OrbitControls` 与 `TransformControls`；pointer 拾取；Shift 多选键盘钩子；
+ * `Transform` 拖拽时禁用 orbit。通过构造参数中的 `select` 回调与 `ThreeEditor` 解耦。
+ */
 import * as THREE from 'three';
 import { OrbitControls, TransformControls } from 'three-stdlib';
 import type { TransformMode } from '../ThreeEditor';

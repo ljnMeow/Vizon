@@ -1,3 +1,7 @@
+/**
+ * **SceneSettings 差分**：比较两份规范化后的设置，输出布尔标志供 `ThreeEditor.applySceneSettings` 决定
+ * 是否触达环境/渲染器/相机等子系统，并映射为 dirty 标记（renderer/shadow/scene）。
+ */
 import type { SceneSettings, RendererSettings } from './sceneSettings';
 
 /**

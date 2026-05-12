@@ -1,3 +1,7 @@
+/**
+ * **渲染管线**：RAF 循环、每帧 `renderer.render`、阴影灯同步、后处理/特效 pass、conduit 与选中盒更新等。
+ * 通过 `RenderPipelineHost` 从 `ThreeEditor` 拉取 canvas、renderer、orbit 与各类 per-frame 钩子，保持单类职责清晰。
+ */
 import * as THREE from 'three';
 import type { OrbitControls } from 'three-stdlib';
 import type { SceneSettings } from '../../settings/sceneSettings';

@@ -1,3 +1,7 @@
+/**
+ * **场景树 JSON 构建**：从 `THREE.Scene` 与「相机根」walk 出生成的 `SceneTreeNode[]`，过滤 helper/gizmo 等类型；
+ * 供 UI 结构面板与持久化 `sceneTree` 字段使用。
+ */
 import * as THREE from 'three';
 import { VIZON_USER_DATA_KEYS } from '../../infra/utils';
 import type { SceneTreeNode, SceneTreeNodeKind } from '../../settings/sceneTree';

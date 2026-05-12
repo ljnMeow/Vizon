@@ -1,9 +1,14 @@
+/**
+ * **场景侧持久化**：把 `THREE.Scene` 用户子树打成 `VizonDocument['content']` 树（`serializeVizonSceneContent`），
+ * 并在导入时提供 **helper / layer / 材质 / 灯光 target** 等与运行时编辑器一致的行为。
+ * 体量较大：序列化与反序列化共用 `RUNTIME_HELPER_TYPES` 等约定，见 `vizonPersistConstants`。
+ */
 import * as THREE from 'three';
-import { forEachMaterial, VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '../infra/utils';
+import { forEachMaterial, VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '../../infra/utils';
 import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js';
-import type { VizonContentNode, VizonNode } from '../types/document';
-import type { SceneTreeNodeKind } from '../settings/sceneTree';
-import { VIZON_EDITOR_OVERLAY_LAYER } from './picking/pickLayers';
+import type { VizonContentNode, VizonNode } from '../../types/document';
+import type { SceneTreeNodeKind } from '../../settings/sceneTree';
+import { VIZON_EDITOR_OVERLAY_LAYER } from '../picking/pickLayers';
 import { RUNTIME_HELPER_TYPES } from './vizonPersistConstants';
 import { isRecord, toBool, toFiniteNumber, toString } from './vizonPersistShared';
 

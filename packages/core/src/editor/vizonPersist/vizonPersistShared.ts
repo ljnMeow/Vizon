@@ -1,5 +1,9 @@
-import type { VizonQuat, VizonVec3 } from '../types/document';
-import { toFiniteNumber } from '../infra/utils';
+/**
+ * 持久化解析/序列化共用的 **小型工具**：`isRecord`、各类 `to*` 强制转换、`nowIso`。
+ * 无 THREE 依赖，便于在 Node 测试中与 `vizonPersistParse` 一同使用。
+ */
+import type { VizonQuat, VizonVec3 } from '../../types/document';
+import { toFiniteNumber } from '../../infra/utils';
 
 export { toFiniteNumber };
 

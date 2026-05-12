@@ -1,3 +1,8 @@
+/**
+ * **后处理与编辑器叠加特效**：`EffectComposer`、Bloom、多选高亮描边、输出色彩空间 pass；
+ * 与 `RenderPipelineService` 协作在每帧末执行 `composer.render()`。
+ * 同时承担选中对象列表驱动的高亮 mesh 更新（与 `SelectionOrchestrator` 调用顺序相关）。
+ */
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';

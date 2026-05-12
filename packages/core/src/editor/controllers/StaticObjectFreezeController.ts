@@ -1,3 +1,7 @@
+/**
+ * **静态矩阵冻结**：对可选中子树设置 `matrixAutoUpdate=false` 以省矩阵更新；选中时按需解冻子树与祖先链，
+ * 避免 Gizmo 与世界矩阵不同步。由 `SelectionOrchestrator` 与场景图添加路径调用。
+ */
 import * as THREE from 'three';
 import { VIZON_USER_DATA_KEYS } from '../../infra/utils';
 

@@ -1,4 +1,11 @@
 /**
+ * **撤销 / 重做栈**（`HistoryManager`）
+ *
+ * 维护 undo/redo 双栈、最大条数裁剪、以及基于 `mergeKey` + `mergeWindowMs` 的连续操作合并（减少滑条等高频噪音）。
+ * `ThreeEditor` 通过 `executeHistoryOperation` → `executeWithHistoryNotify` 调用；**不**依赖 React。
+ */
+
+/**
  * 单条历史操作的定义。
  * - do: 执行操作
  * - undo: 撤销操作

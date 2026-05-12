@@ -1,12 +1,17 @@
+/**
+ * **导入执行层**：在 `ThreeEditor` 已清空用户节点的前提下，把 **已解析** 的 `VizonDocument` 写回场景。
+ * 负责按 content 树实例化对象、恢复 `objectSnapshot`（Three.js JSON）、默认资源占位、灯光 target helper、
+ * 以及应用 `SceneSettings`；错误路径通过 `VIZON_IMPORT_ERROR_NO_OBJECT_SNAPSHOT` 等常量标识。
+ */
 import * as THREE from 'three';
-import type { ThreeEditor } from './ThreeEditor';
-import { createDefaultCamera } from '../defaults/defaultCameras';
-import { createDefaultLight } from '../defaults/defaultLights';
-import { createDefaultModel } from '../defaults/defaultModels';
-import { VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '../infra/utils';
-import { normalizeSceneSettings } from '../settings/sceneSettings';
-import type { SceneSettings } from '../settings/sceneSettings';
-import type { VizonContentNode, VizonDocument, VizonNode } from '../types/document';
+import type { ThreeEditor } from '../ThreeEditor';
+import { createDefaultCamera } from '../../defaults/defaultCameras';
+import { createDefaultLight } from '../../defaults/defaultLights';
+import { createDefaultModel } from '../../defaults/defaultModels';
+import { VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS } from '../../infra/utils';
+import { normalizeSceneSettings } from '../../settings/sceneSettings';
+import type { SceneSettings } from '../../settings/sceneSettings';
+import type { VizonContentNode, VizonDocument, VizonNode } from '../../types/document';
 import { VIZON_IMPORT_ERROR_NO_OBJECT_SNAPSHOT } from './vizonPersistConstants';
 import {
   applyImportedLightTargetFromUserData,

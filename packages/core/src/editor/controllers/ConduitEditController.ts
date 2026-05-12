@@ -1,3 +1,7 @@
+/**
+ * **导管（Tube/曲线）编辑**：拾取端点、拖拽更新 `userData` 与 geometry path、与 `OrbitControls` 互斥；
+ * `ThreeEditor` 在选中变化时调用 `syncFromSelection`。
+ */
 import * as THREE from 'three';
 import { isNonSelectableInHierarchy } from '../picking/objectGuards';
 import { configureRaycasterForScenePicking } from '../picking/pickLayers';

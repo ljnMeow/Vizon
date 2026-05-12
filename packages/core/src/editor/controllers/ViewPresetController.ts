@@ -1,3 +1,6 @@
+/**
+ * **工程视图预设**：正视/顶视等预设下相机位置与 `OrbitControls.target` 的插值动画（或立即切换）。
+ */
 import * as THREE from 'three';
 import type { OrbitControls } from 'three-stdlib';
 import type { SceneSettingsCamera } from '../../settings/sceneSettings';

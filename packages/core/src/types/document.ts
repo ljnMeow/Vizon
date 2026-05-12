@@ -1,3 +1,10 @@
+/**
+ * **VizonDocument** 及相关 **持久化节点类型**（与 `SceneSettings` 并列构成保存文件的主要 JSON 形状）。
+ *
+ * - `VizonDocument`：meta + basic/environment/camera/… 与 `SceneSettings` 对齐的字段 + `content` 场景树 + `assets`。
+ * - `VizonNode` / `VizonContentNode`：树节点与 `attribute` 中挂载的 `objectSnapshot`（Three.js `toJSON` 子集）。
+ * 解析与迁移实现见 `editor/vizonPersist/vizonPersistParse.ts`；类型集中在此文件以便 settings 与 editor 共用且避免循环引用。
+ */
 import type { SceneSettings, SceneSettingsBasic, SceneSettingsEnvironment, SceneSettingsCamera, SceneSettingsGrid, RendererSettings } from '../settings/sceneSettings';
 import type { SceneTreeNode, SceneTreeNodeKind } from '../settings/sceneTree';
 
