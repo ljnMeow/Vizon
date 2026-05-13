@@ -248,7 +248,7 @@ export class ConduitEditController {
 
       const createNode = (index: number, total: number) => {
         const g = new THREE.SphereGeometry(0.06, 16, 12);
-        const color = index === 0 ? 0x22c55e : index === total - 1 ? 0xef4444 : 0x60a5fa;
+        const color = index === 0 ? 0x22c55e : index === total - 1 ? 0xef4444 : 0xFFFF00;
         const m = new THREE.MeshBasicMaterial({
           color,
           depthTest: false,

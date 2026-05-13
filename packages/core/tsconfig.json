@@ -6,7 +6,8 @@
     "outDir": "dist",
     "moduleResolution": "Bundler",
     "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true
+    "declarationMap": false,
+    "sourceMap": false,
+    "removeComments": true
   }
 }

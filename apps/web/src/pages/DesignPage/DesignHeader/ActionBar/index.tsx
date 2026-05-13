@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEventHandler } from 'react';
 import { importDocument, VIZON_IMPORT_ERROR_NO_OBJECT_SNAPSHOT } from 'vizon-3d-core';
+import dayjs from 'dayjs';
 import { GlobalMenu } from '../../../../components/GlobalMenu';
 import { useLocale } from '../../../../hooks/useLocale';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { useTheme } from '../../../../hooks/useTheme';
 import { appMessages } from '../../../../i18n/messages';
+import { buildProjectBundle, importProjectBundle } from '../../../../utils/documentBundle';
 import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 
 /**
@@ -20,12 +22,19 @@ function isEditableTarget(target: EventTarget | null) {
   return false;
 }
 
+/** 将场景名整理为可安全用于下载文件名的片段（去除非法字符、控制长度）。 */
+function sanitizeExportFileBaseName(raw: string) {
+  const trimmed = raw.trim().replace(/[/\\:*?"<>|]/g, '_').replace(/\s+/g, ' ');
+  const collapsed = trimmed.replace(/\s{2,}/g, ' ').trim();
+  return collapsed.slice(0, 120);
+}
+
 /**
  * 设计器顶部操作栏。
  * 聚合撤销/重做、复制粘贴、删除、清空、重置以及语言/主题切换入口。
  */
 export function ActionBar() {
-  const { editor } = useSceneSettings();
+  const { editor, sceneSettings } = useSceneSettings();
   const { locale, setLocale } = useLocale();
   const { theme, toggleTheme } = useTheme();
   const [open, setOpen] = useState(false);
@@ -37,6 +46,7 @@ export function ActionBar() {
   const [canUngroup, setCanUngroup] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const importBundleInputRef = useRef<HTMLInputElement | null>(null);
 
   const labels = useMemo(() => appMessages[locale].designPage.actionBar, [locale]);
   const loginT = appMessages[locale].auth.login;
@@ -127,19 +137,49 @@ export function ActionBar() {
     const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const ts = dayjs().format('YYYY-MM-DD_HH-mm-ss');
+    const configured = sceneSettings.basic.sceneName.trim();
+    const rawBase = configured || labels.exportFileDefaultSceneName;
+    const safeBase = sanitizeExportFileBaseName(rawBase) || labels.exportFileDefaultSceneName;
     a.href = url;
-    a.download = `vizon-document-${ts}.json`;
+    a.download = `${safeBase}-${ts}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
   };
 
+  const onExportBundle = async () => {
+    if (!editor) return;
+    try {
+      const { blob } = await buildProjectBundle(editor, { generator: 'apps/web-project-bundle' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const ts = dayjs().format('YYYY-MM-DD_HH-mm-ss');
+      const configured = sceneSettings.basic.sceneName.trim();
+      const rawBase = configured || labels.exportFileDefaultSceneName;
+      const safeBase = sanitizeExportFileBaseName(rawBase) || labels.exportFileDefaultSceneName;
+      a.href = url;
+      a.download = `${safeBase}-${ts}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      window.alert(`${labels.exportFailedPrefix}${raw || labels.exportUnknownError}`);
+    }
+  };
+
   const onImportDocumentClick = () => {
     // 系统文件框可能导致 Shift 的 keyup 丢失；先重置修饰态，避免导入后视口拾取一直处于 toggle、Gizmo 不显示。
     editor?.resetShiftMultiselectState();
     importInputRef.current?.click();
+  };
+
+  const onImportBundleClick = () => {
+    editor?.resetShiftMultiselectState();
+    importBundleInputRef.current?.click();
   };
 
   const onImportDocumentChange: ChangeEventHandler<HTMLInputElement> = async (e) => {
@@ -180,6 +220,36 @@ export function ActionBar() {
     }
   };
 
+  const onImportBundleChange: ChangeEventHandler<HTMLInputElement> = async (e) => {
+    const inputEl = e.currentTarget;
+    const file = e.target.files?.[0];
+    if (!file || !editor) return;
+    try {
+      const before = editor.getVizonDocument({ generator: 'apps/web-actionbar' });
+      await editor.executeHistoryOperation({
+        name: encodeHistoryI18nName({
+          'zh-CN': '导入项目包',
+          'en-US': 'Import project bundle'
+        }),
+        do: async () => {
+          await importProjectBundle(editor, file);
+        },
+        undo: async () => {
+          await importDocument(editor, before);
+        },
+        redo: async () => {
+          await importProjectBundle(editor, file);
+        }
+      });
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      window.alert(`${labels.importFailedPrefix}${raw || labels.importUnknownError}`);
+    } finally {
+      inputEl.value = '';
+      editor?.resetShiftMultiselectState();
+    }
+  };
+
   return (
     <div ref={ref} className="relative flex items-center gap-2">
       <button
@@ -212,6 +282,31 @@ export function ActionBar() {
         ]}
         align="left"
         ariaLabel={labels.menuAriaLabel}
+      />
+      <button
+        type="button"
+        onClick={() => {
+          void onExportBundle();
+        }}
+        disabled={!editor}
+        className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-xs text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {labels.exportPackage}
+      </button>
+      <button
+        type="button"
+        onClick={onImportBundleClick}
+        disabled={!editor}
+        className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-xs text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {labels.importPackage}
+      </button>
+      <input
+        ref={importBundleInputRef}
+        type="file"
+        accept="application/zip,.zip"
+        className="hidden"
+        onChange={onImportBundleChange}
       />
       <button
         type="button"

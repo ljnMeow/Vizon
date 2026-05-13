@@ -9,7 +9,8 @@
 import * as THREE from 'three';
 import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHelper.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
-import { forEachMaterial, type Vec3Like, getVizonUserData, VIZON_USER_DATA_KEYS } from '../infra/utils';
+import { type Vec3Like, getVizonUserData, VIZON_USER_DATA_KEYS } from '../infra/utils';
+import { configureEditorHelperObject, createLightTargetHandle } from '../editor/helpers/lightHelperUtils';
 import { DEFAULT_LIGHT_HELPER_COLOR, DEFAULT_LIGHTS } from './registry';
 
 /** 可创建的灯光种类枚举（与 UI 列表 key 对齐） */
@@ -70,57 +71,6 @@ function getTarget(opts?: CreateDefaultLightOptions): THREE.Vector3 {
   return new THREE.Vector3(target.x, target.y, target.z);
 }
 
-/**
- * 统一配置灯光 helper 的材质与用户数据：
- * - 不参与结构树、不可直接选中线框（由 pickTarget 映射到灯）；
- * - depthTest 关闭减少 Z-fighting，略透明避免完全遮挡模型。
- */
-function configureLightHelper(helper: THREE.Object3D, light: THREE.Light) {
-  helper.userData[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE] = true; // helper 本身非业务节点
-  helper.userData[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR] = true; // 结构面板隐藏
-  helper.userData[VIZON_USER_DATA_KEYS.COMMON.PICK_TARGET] = light; // 射线命中 helper 时选中灯
-
-  const mat = (helper as any).material as THREE.Material | THREE.Material[] | undefined;
-  forEachMaterial(mat, (m) => {
-    if ('color' in m && (m as any).color?.set) {
-      (m as any).color.setHex(DEFAULT_LIGHT_HELPER_COLOR); // 线框颜色
-    }
-    m.depthTest = false; // 始终画在模型之上（editor 可读性优先）
-    m.depthWrite = false;
-    (m as any).toneMapped = false; // 不受曝光影响，亮度稳定
-    m.transparent = true;
-    m.opacity = 0.9;
-    m.needsUpdate = true;
-  });
-  helper.renderOrder = 8_000; // 较晚绘制，减少被透明物体误挡
-}
-
-function createLightTargetHandle(light: THREE.Light, target: THREE.Vector3, lightType: 'DirectionalLight' | 'SpotLight' | 'RectAreaLight') {
-  const handle = new THREE.Mesh(
-    new THREE.SphereGeometry(0.14, 12, 12),
-    new THREE.MeshBasicMaterial({
-      color: DEFAULT_LIGHT_HELPER_COLOR,
-      depthTest: false,
-      depthWrite: false,
-      transparent: true,
-      opacity: 0.92,
-      toneMapped: false
-    })
-  );
-  handle.name = `${light.type}TargetHandle`;
-  handle.position.copy(target);
-  handle.renderOrder = 8_100;
-  // 点击控制点时，业务选中语义仍归属灯光本体；编辑器会用额外参数把 gizmo 挂到 handle。
-  handle.userData[VIZON_USER_DATA_KEYS.COMMON.PICK_TARGET] = light;
-  // 不在结构树展示，避免污染用户的业务节点层级；但保持可拾取可拖拽。
-  handle.userData[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR] = true;
-  handle.userData[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET_HANDLE] = true;
-  handle.userData[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET_LIGHT_UUID] = light.uuid;
-  handle.userData[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET_LIGHT_TYPE] = lightType;
-  (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_TARGET_HANDLE] = handle;
-  return handle;
-}
-
 function isShadowHelperVisible(light: THREE.Light) {
   const ud = getVizonUserData(light);
   return Boolean(light.castShadow && ud[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] !== false);
@@ -151,12 +101,7 @@ function createShadowLightHelperGroup(args: {
     shadowHelper.update();
   };
 
-  configureLightHelper(helperGroup, light);
-  helperGroup.traverse((child) => {
-    if (child === helperGroup) return;
-    configureLightHelper(child, light);
-  });
-  return helperGroup;
+  return configureEditorHelperObject(helperGroup, light, { color: DEFAULT_LIGHT_HELPER_COLOR });
 }
 
 /**
@@ -176,10 +121,11 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
     light.position.set(4, 8, 4); // 稍抬高主光高度，减少近距离硬阴影
     applyCommon(light, key, opts);
     light.target.position.copy(getTarget(opts)); // Directional 需 target 才有朝向语义
-    (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_TARGET_HANDLE] = createLightTargetHandle(
+    createLightTargetHandle(
       light,
       light.target.position.clone(),
-      'DirectionalLight'
+      'DirectionalLight',
+      { color: DEFAULT_LIGHT_HELPER_COLOR }
     );
     // 默认不显示阴影视锥（视锥线框较干扰；需要时可在属性面板手动开启）
     (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] = false;
@@ -253,10 +199,11 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
     light.position.set(2, 4, 2);
     applyCommon(light, key, opts);
     light.target.position.copy(getTarget(opts));
-    (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_TARGET_HANDLE] = createLightTargetHandle(
+    createLightTargetHandle(
       light,
       light.target.position.clone(),
-      'SpotLight'
+      'SpotLight',
+      { color: DEFAULT_LIGHT_HELPER_COLOR }
     );
     // 默认不显示阴影视锥（需要时在属性面板手动开启）
     (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE] = false;
@@ -293,7 +240,7 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
     applyCommon(light, key, opts);
     if (helperEnabled) {
       const helper = new THREE.HemisphereLightHelper(light, 0.9);
-      configureLightHelper(helper, light);
+      configureEditorHelperObject(helper, light, { color: DEFAULT_LIGHT_HELPER_COLOR });
       (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helper;
     }
     return light;
@@ -315,14 +262,15 @@ export function createDefaultLight(key: DefaultLightKey, opts?: CreateDefaultLig
     z: rectTarget.z,
   };
   light.lookAt(rectTarget); // 面光法线指向 target
-  (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_TARGET_HANDLE] = createLightTargetHandle(
+  createLightTargetHandle(
     light,
     rectTarget.clone(),
-    'RectAreaLight'
+    'RectAreaLight',
+    { color: DEFAULT_LIGHT_HELPER_COLOR }
   );
   if (helperEnabled) {
     const helper = new RectAreaLightHelper(light);
-    configureLightHelper(helper, light);
+    configureEditorHelperObject(helper, light, { color: DEFAULT_LIGHT_HELPER_COLOR });
     (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_HELPER] = helper;
   }
   return light;

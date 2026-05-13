@@ -2,7 +2,7 @@
  * **对象点路径属性的历史提交**：封装 `setObjectPropertyByUuid` 的预览 seed、`take` 基线、相等短路、
  * `mergeKey` 与 do/undo 快照；通过 `writeValue` / `executeHistoryOperation` 注入 `ThreeEditor` 行为。
  */
-import type { EditorHistoryOperation } from '../HistoryManager';
+import type { EditorHistoryOperation } from './HistoryManager';
 
 import { seedObjectPropertyPendingBaseline, takeObjectPropertyHistoryBaseline } from './objectPropertyPending';
 

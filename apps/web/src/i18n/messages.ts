@@ -151,7 +151,13 @@ export interface AppMessages {
       ungroupWithShortcut: string;
       clear: string;
       reset: string;
+      exportPackage: string;
+      importPackage: string;
       exportJson: string;
+      exportFailedPrefix: string;
+      exportUnknownError: string;
+      /** 导出 JSON 时场景名未填写所用的默认文件名片段 */
+      exportFileDefaultSceneName: string;
       importJson: string;
       importFailedPrefix: string;
       importUnknownError: string;
@@ -666,7 +672,12 @@ export const appMessages: Record<Locale, AppMessages> = {
         ungroupWithShortcut: '取消组合（Ctrl+F / Command+F）',
         clear: '清空',
         reset: '重置',
+        exportPackage: '导出项目包',
+        importPackage: '导入项目包',
         exportJson: '导出 JSON',
+        exportFailedPrefix: '导出失败：',
+        exportUnknownError: '未知导出错误',
+        exportFileDefaultSceneName: '默认场景',
         importJson: '导入 JSON',
         importFailedPrefix: '导入失败：',
         importUnknownError: '未知错误',
@@ -1174,7 +1185,12 @@ export const appMessages: Record<Locale, AppMessages> = {
         ungroupWithShortcut: 'Ungroup (Ctrl+F / Command+F)',
         clear: 'Clear',
         reset: 'Reset',
+        exportPackage: 'Export Bundle',
+        importPackage: 'Import Bundle',
         exportJson: 'Export JSON',
+        exportFailedPrefix: 'Export failed: ',
+        exportUnknownError: 'Unknown export error',
+        exportFileDefaultSceneName: 'Default scene',
         importJson: 'Import JSON',
         importFailedPrefix: 'Import failed: ',
         importUnknownError: 'Unknown error',
@@ -1547,4 +1563,3 @@ export const loginMessages: Record<Locale, AppMessages['auth']['login']> = {
   'zh-CN': appMessages['zh-CN'].auth.login,
   'en-US': appMessages['en-US'].auth.login
 };
-

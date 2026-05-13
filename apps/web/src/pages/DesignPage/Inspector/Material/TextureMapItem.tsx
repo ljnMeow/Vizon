@@ -1,5 +1,17 @@
+/**
+ * 贴图槽 UI 组件。
+ *
+ * 这个组件只关心单个槽位的交互与回显：
+ * - 缩略图展示
+ * - 上传 / 清除按钮
+ * - 可选的强度控制
+ *
+ * 一个关键点是：预览图优先使用我们自己的会话缓存 URL，
+ * 避免 three Texture 内部 `image.src` 已被 revoke 后出现 `ERR_FILE_NOT_FOUND`。
+ */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Tooltip } from '../../../../components/Tooltip';
+import { getCachedTextureAssetPreviewUrl, getTextureAssetRef } from '../../../../utils/textureAssetSession';
 
 /**
  * 贴图强度参数类型：
@@ -61,6 +73,12 @@ export type TextureMapItemProps = {
 };
 
 function tryGetPreviewUrl(texture: any | null): string | null {
+  const assetRef = getTextureAssetRef(texture);
+  if (assetRef) {
+    // 先从会话缓存里拿稳定预览地址；它比 three 内部的 blob URL 生命周期更可控。
+    const cachedPreviewUrl = getCachedTextureAssetPreviewUrl(assetRef.id);
+    if (cachedPreviewUrl) return cachedPreviewUrl;
+  }
   // 优先读取 three Texture.image 上可直接预览的地址
   const img = texture?.image;
   if (!img) return null;
@@ -84,14 +102,18 @@ export function TextureMapItem({
 }: TextureMapItemProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
+  const prevTextureRef = useRef<any | null>(null);
 
+  // 本地预览优先级最高：用户刚上传时立即看到结果，等异步材质回写完成后再自然切回正式贴图引用。
   const previewUrl = useMemo(() => localPreviewUrl ?? tryGetPreviewUrl(texture), [localPreviewUrl, texture]);
 
-  // 父级清除贴图后 texture 变为 null，需同步清掉本地上传的 blob 预览，避免仍显示旧缩略图
+  // 贴图引用变更时，需要清掉上一对象/上一材质槽位的本地 blob 预览，避免切模型后仍显示旧图。
   useEffect(() => {
-    if (texture) return;
+    if (prevTextureRef.current === texture) return;
+    prevTextureRef.current = texture;
     setLocalPreviewUrl((prev) => {
-      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+      if (!prev) return prev;
+      if (prev.startsWith('blob:')) URL.revokeObjectURL(prev);
       return null;
     });
   }, [texture]);
@@ -149,7 +171,7 @@ export function TextureMapItem({
         onChange={(e) => {
           const f = e.target.files?.[0];
           if (!f) return;
-          // 本地预览先行，上传结果异步回写材质
+          // 本地预览先行，上传结果异步回写材质；这样 UI 不会等贴图加载完成才有反馈。
           const nextUrl = URL.createObjectURL(f);
           if (localPreviewUrl?.startsWith('blob:')) URL.revokeObjectURL(localPreviewUrl);
           setLocalPreviewUrl(nextUrl);

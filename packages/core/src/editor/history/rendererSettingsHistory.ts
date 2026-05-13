@@ -2,7 +2,7 @@
  * **渲染器设置的历史提交**：结合 `SingleSlotPending` 取预览基线，与 `next` 比较后入栈或短路。
  */
 import type { RendererSettings } from '../../settings/sceneSettings';
-import type { EditorHistoryOperation } from '../HistoryManager';
+import type { EditorHistoryOperation } from './HistoryManager';
 
 import type { SingleSlotPending } from './singleSlotPending';
 import { takeSingleSlotBaselineOrLive } from './singleSlotPending';

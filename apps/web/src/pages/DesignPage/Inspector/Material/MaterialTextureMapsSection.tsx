@@ -1,3 +1,9 @@
+/**
+ * 材质贴图区渲染组件。
+ *
+ * 它只负责“按材质能力把各类贴图槽和强度控件排出来”，
+ * 真正的状态读写、历史记录、禁用态缓存等逻辑都留在父组件中。
+ */
 import { loadEquirectEnvMapTextureFromFile, loadImageTextureFromFile } from 'vizon-3d-core';
 import { TextureMapItem, type TextureMapItemLabels } from './TextureMapItem';
 
@@ -20,6 +26,10 @@ type MaterialTextureMapsSectionProps = {
   p: any; tf: any; textureSupport: TextureSupport; textureMapLabels: TextureMapItemLabels;
   hasTextureGroupBasic: boolean; hasTextureGroupLighting: boolean; hasTextureGroupNormal: boolean; hasTextureGroupPbr: boolean; hasTextureGroupAdvanced: boolean;
   selectedEnvMapIntensity: number; setSelectedEnvMapIntensity: (v: number) => void;
+  /** 不同材质类型下，环境反射强度实际写入的字段可能不同。 */
+  envMapIntensityPropertyKey: string;
+  /** 不同字段的合理范围不同：PBR 常用 0~5，reflectivity 常用 0~1。 */
+  envMapIntensityMax: number;
   selectedAoMapIntensity: number; setSelectedAoMapIntensity: (v: number) => void;
   selectedNormalScale: { x: number; y: number }; setSelectedNormalScale: (v: { x: number; y: number }) => void;
   selectedClearcoatNormalScale: { x: number; y: number }; setSelectedClearcoatNormalScale: (v: { x: number; y: number }) => void;
@@ -36,7 +46,7 @@ type MaterialTextureMapsSectionProps = {
  */
 export function MaterialTextureMapsSection({
   p, tf, textureSupport, textureMapLabels, hasTextureGroupBasic, hasTextureGroupLighting, hasTextureGroupNormal, hasTextureGroupPbr, hasTextureGroupAdvanced,
-  selectedEnvMapIntensity, setSelectedEnvMapIntensity, selectedAoMapIntensity, setSelectedAoMapIntensity,
+  selectedEnvMapIntensity, setSelectedEnvMapIntensity, envMapIntensityPropertyKey, envMapIntensityMax, selectedAoMapIntensity, setSelectedAoMapIntensity,
   selectedNormalScale, setSelectedNormalScale, selectedClearcoatNormalScale, setSelectedClearcoatNormalScale,
   getTextureForUi, makeTextureDebugToggle, makeTextureUploadHandler, makeTextureClearHandler, onPropertyChange,
 }: MaterialTextureMapsSectionProps) {
@@ -48,7 +58,7 @@ export function MaterialTextureMapsSection({
         {/* 基础贴图组：BaseColor / 环境 / 透明相关 */}
         {hasTextureGroupBasic ? <div className="space-y-2"><div className="text-[10px] font-semibold tracking-wide text-[var(--text-secondary)]">{p.materialTextureMapsGroupBasic}</div>
           {textureSupport.map ? <TextureMapItem labels={textureMapLabels} title={tf.map} texture={getTextureForUi('map')} debugToggle={makeTextureDebugToggle('map')} onUpload={makeTextureUploadHandler('map', loadImageTextureFromFile)} onClear={makeTextureClearHandler('map')} /> : null}
-          {textureSupport.envMap ? <TextureMapItem labels={textureMapLabels} title={tf.envMap} texture={getTextureForUi('envMap')} debugToggle={makeTextureDebugToggle('envMap')} onUpload={makeTextureUploadHandler('envMap', loadEquirectEnvMapTextureFromFile)} onClear={makeTextureClearHandler('envMap')} intensity={{ type: 'number', label: p.materialTexturePropEnvMapIntensity, value: selectedEnvMapIntensity, min: 0, max: 5, step: 0.01, onDragStart: () => onPropertyChange('envMapIntensity__dragStart', selectedEnvMapIntensity), onPreviewChange: (v) => { setSelectedEnvMapIntensity(v); onPropertyChange('envMapIntensity__preview', v); }, onCommit: (v) => { setSelectedEnvMapIntensity(v); onPropertyChange('envMapIntensity', v); } }} /> : null}
+          {textureSupport.envMap ? <TextureMapItem labels={textureMapLabels} title={tf.envMap} texture={getTextureForUi('envMap')} debugToggle={makeTextureDebugToggle('envMap')} onUpload={makeTextureUploadHandler('envMap', loadEquirectEnvMapTextureFromFile)} onClear={makeTextureClearHandler('envMap')} intensity={{ type: 'number', label: p.materialTexturePropEnvMapIntensity, value: selectedEnvMapIntensity, min: 0, max: envMapIntensityMax, step: 0.01, onDragStart: () => onPropertyChange(`${envMapIntensityPropertyKey}__dragStart`, selectedEnvMapIntensity), onPreviewChange: (v) => { setSelectedEnvMapIntensity(v); onPropertyChange(`${envMapIntensityPropertyKey}__preview`, v); }, onCommit: (v) => { setSelectedEnvMapIntensity(v); onPropertyChange(envMapIntensityPropertyKey, v); } }} /> : null}
           {textureSupport.alphaMap ? <TextureMapItem labels={textureMapLabels} title={tf.alphaMap} texture={getTextureForUi('alphaMap')} debugToggle={makeTextureDebugToggle('alphaMap')} onUpload={makeTextureUploadHandler('alphaMap', loadImageTextureFromFile)} onClear={makeTextureClearHandler('alphaMap')} /> : null}
         </div> : null}
         {/* 光照贴图组：light/ao/emissive 等与光照表现相关 */}

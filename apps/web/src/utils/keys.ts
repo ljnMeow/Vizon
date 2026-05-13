@@ -46,9 +46,14 @@ export type DataTransferKeyName = keyof typeof DATA_TRANSFER_KEYS;
 /** 复用 core 的 key 定义，避免 web 重复声明。 */
 export { VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS, VIZON_HISTORY_KEYS };
 
-/** 仅 web 本地使用的 userData key。 */
+/** 仅 web 侧使用、且被编辑器 UI 与项目包链路共享的材质 userData key。 */
 export const WEB_USER_DATA_KEYS = {
   MATERIAL: {
-    TEXTURE_EFFECT_DISABLED: '__vizonTextureEffectDisabled'
+    /** 标记某个贴图槽位已经配置，但当前效果被临时关闭。 */
+    TEXTURE_EFFECT_DISABLED: '__vizonTextureEffectDisabled',
+    /** 保存禁用态槽位的运行时贴图，便于后续恢复。 */
+    TEXTURE_EFFECT_CACHE: '__vizonTextureEffectCache',
+    /** 保存槽位到资产 id 的绑定关系，供导出和禁用态恢复使用。 */
+    TEXTURE_BINDINGS: '__vizonTextureBindings'
   }
 } as const;

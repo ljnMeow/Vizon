@@ -1,17 +1,18 @@
+/**
+ * **SceneSettings**：编辑器的可序列化“场景真理源”。
+ *
+ * 职责：
+ * - 定义 UI 与 core 共享的场景配置结构；
+ * - 提供默认值工厂，保证冷启动状态完整；
+ * - 对导入/外部输入做 normalize，让 three.js 渲染层拿到稳定、安全、可预期的数据。
+ *
+ * 重要约束：
+ * - 本文件只处理纯数据，不创建 renderer、材质、纹理等运行时资源；
+ * - 所有枚举与颜色尽量保持 JSON 友好，便于持久化与历史记录。
+ */
 import type { SceneTreeNode } from './sceneTree';
 import { clamp, parseHexColor, toFiniteNumber } from '../infra/utils';
 import { DEFAULT_SCENE_SETTINGS } from '../defaults/registry';
-
-/**
- * SceneSettings：可序列化「场景真理源」，位于 `settings/` 目录。
- *
- * 职责：
- * - 类型定义（相机/渲染器/环境/网格/辅助线/场景树快照字段等）；
- * - `createDefaultSceneSettings` 提供编辑器冷启动默认值；
- * - `normalizeSceneSettings` 把 UI/导入的脏数据钳制到安全区间并统一颜色为 `#rrggbb`。
- *
- * 依赖：`three` 仅用于 `THREE.Color` 解析；不创建 WebGL 资源。
- */
 export type SceneSettingsVersion = number;
 
 // scene 的顶层数据结构：由 core 持有（数据真相），web 负责展示/编辑。
@@ -167,6 +168,7 @@ function normalizeSceneTreeNode(node: SceneTreeNode): SceneTreeNode {
     type: String(node.type ?? ''),
     visible: Boolean(node.visible),
     kind:
+      // 仅接受当前 editor 认识的 kind；未知值统一降级到 object，避免 UI 分支失控。
       node.kind === 'scene' || node.kind === 'camera' || node.kind === 'light' || node.kind === 'group'
         ? node.kind
         : 'object',
@@ -209,9 +211,10 @@ export function normalizeSceneSettings(input: SceneSettings): SceneSettings {
     renderer.shadowMapType === 'BasicShadowMap'
       ? 'BasicShadowMap'
       : renderer.shadowMapType === 'PCFSoftShadowMap'
-        ? 'PCFSoftShadowMap'
-        : 'PCFShadowMap';
+      ? 'PCFSoftShadowMap'
+      : 'PCFShadowMap';
 
+  // 先把相机核心数值钳到合法区间，再回写到结果里，避免 near >= far 之类非法状态泄漏到 three。
   const fov = clamp(toFiniteNumber(camera.fov, 50), 10, 120);
   const near = clamp(toFiniteNumber(camera.near, 0.01), 0.001, 100_000);
   const far = clamp(toFiniteNumber(camera.far, 10_000), near + 1e-3, 100_000);
@@ -221,6 +224,7 @@ export function normalizeSceneSettings(input: SceneSettings): SceneSettings {
     environment: {
       ...env,
       environmentStrength: clamp(toFiniteNumber(env.environmentStrength, 1), 0, 5),
+      // 所有颜色统一规整为 `#rrggbb`，这样 UI 回显、diff、持久化都不会被格式差异干扰。
       backgroundColor: `#${parseHexColor(env.backgroundColor, '#f3f4f6').getHexString()}`,
       fog: {
         ...fog,
@@ -270,4 +274,3 @@ export function normalizeSceneSettings(input: SceneSettings): SceneSettings {
     sceneTree: Array.isArray(sceneTree) ? sceneTree.map(normalizeSceneTreeNode) : []
   };
 }
-

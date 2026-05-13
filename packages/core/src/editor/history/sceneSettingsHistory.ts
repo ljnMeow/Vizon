@@ -2,7 +2,7 @@
  * **整份 SceneSettings 的历史提交**：normalize 后与基线 `isEqualForHistory` 比较，再 `executeHistoryOperation`。
  */
 import type { SceneSettings } from '../../settings/sceneSettings';
-import type { EditorHistoryOperation } from '../HistoryManager';
+import type { EditorHistoryOperation } from './HistoryManager';
 
 import type { SingleSlotPending } from './singleSlotPending';
 import { takeSingleSlotBaselineOrLive } from './singleSlotPending';

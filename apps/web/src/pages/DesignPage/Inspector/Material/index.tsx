@@ -7,9 +7,11 @@ import { useLocale } from '../../../../hooks/useLocale';
 import { appMessages, type AppMessages } from '../../../../i18n/messages';
 import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 import { WEB_USER_DATA_KEYS } from '../../../../utils/keys';
+import { attachTextureAssetRef, cacheTextureAssetFile, getTextureAssetRef } from '../../../../utils/textureAssetSession';
 import { MaterialMainControlsSection } from './MaterialMainControlsSection';
 import { MaterialTextureMapsSection } from './MaterialTextureMapsSection';
 import {
+  allTextureFieldKeys,
   blendingKeyToValue,
   materialBlendingOrder,
   materialSideKeyToValue,
@@ -38,12 +40,36 @@ import {
 import type { TextureMapItemLabels } from './TextureMapItem';
 
 /**
+ * 材质面板的贴图字段集合。
+ *
+ * 这里单独做成 Set，是为了让属性写入器能快速判断：
+ * 当前改动的是普通数值字段，还是需要同步维护贴图绑定关系的贴图字段。
+ */
+const textureFieldKeySet = new Set<string>(allTextureFieldKeys);
+
+/** 环境反射强度在不同材质上的实际字段名并不完全一致。 */
+function getEnvMapStrengthPropertyKey(materialType: MaterialTypeKey | null) {
+  if (materialType === 'MeshStandardMaterial' || materialType === 'MeshPhysicalMaterial') return 'envMapIntensity';
+  return 'reflectivity';
+}
+
+/** 与实际字段对应的推荐 UI 范围。 */
+function getEnvMapStrengthMax(materialType: MaterialTypeKey | null) {
+  if (materialType === 'MeshStandardMaterial' || materialType === 'MeshPhysicalMaterial') return 5;
+  return 1;
+}
+
+/**
  * 材质设置面板。
  * 订阅 editor 的 select 事件，从选中对象的第一个 Mesh 材质同步 UI 状态，
  * 并通过 historyOperation 提交可撤销的材质变更。
  */
 export function MaterialSettings() {
   const TEXTURE_EFFECT_DISABLED_KEY = WEB_USER_DATA_KEYS.MATERIAL.TEXTURE_EFFECT_DISABLED;
+  // userData 里这两个 key 用来承接“贴图配置了但暂时关闭”的状态，
+  // 这样材质字段被置空后，资源引用和缓存贴图仍然可恢复、可导出。
+  const TEXTURE_EFFECT_CACHE_KEY = WEB_USER_DATA_KEYS.MATERIAL.TEXTURE_EFFECT_CACHE;
+  const TEXTURE_BINDINGS_KEY = WEB_USER_DATA_KEYS.MATERIAL.TEXTURE_BINDINGS;
   // 编辑器实例：所有材质读写都通过当前选中对象进行
   const { editor } = useSceneSettings();
   // 当前语言环境：用于读取 i18n 文案
@@ -115,6 +141,9 @@ export function MaterialSettings() {
   const [selectedNormalScale, setSelectedNormalScale] = useState<{ x: number; y: number }>({ x: 1, y: 1 });
   // clearcoatNormalScale（x/y）
   const [selectedClearcoatNormalScale, setSelectedClearcoatNormalScale] = useState<{ x: number; y: number }>({ x: 1, y: 1 });
+  const [selectedMaterialInstanceId, setSelectedMaterialInstanceId] = useState<string | null>(null);
+  // 运行时贴图缓存：key 是材质 uuid，value 是该材质每个贴图槽的“被临时关闭前”贴图对象。
+  // 这份缓存只存在于当前 React 会话里，真正需要跨导入导出保留的信息还会同步到 material.userData。
   const textureDebugCacheRef = useRef<Record<string, Partial<Record<TextureFieldKey, any>>>>({});
   const activeTextureDebugMaterialIdRef = useRef<string | null>(null);
   const materialSliderBeforeRef = useRef<Record<string, Array<{ material: any; value: any }> | undefined>>({});
@@ -136,6 +165,7 @@ export function MaterialSettings() {
         activeTextureDebugMaterialIdRef.current = matId;
       }
       if (!mat) {
+        setSelectedMaterialInstanceId(null);
         setSelectedMaterialType(null);
         setSelectedMaterialSide(null);
         setSelectedMaterialColor(null);
@@ -158,6 +188,7 @@ export function MaterialSettings() {
 
       const rawType = String(mat?.type ?? 'MeshBasicMaterial');
       if (!materialTypeSet.has(rawType as MaterialTypeKey)) {
+        setSelectedMaterialInstanceId(null);
         setSelectedMaterialType(null);
         setSelectedMaterialSide(null);
         setSelectedMaterialColor(null);
@@ -178,6 +209,7 @@ export function MaterialSettings() {
         return;
       }
 
+      setSelectedMaterialInstanceId(matId);
       setSelectedMaterialType(rawType as MaterialTypeKey);
       // 如果材质上未显式暴露 side（极少数情况），仍默认按 FrontSide 展示，方便用户调整。
       setSelectedMaterialSide(getSideKey(mat) ?? 'FrontSide');
@@ -221,7 +253,7 @@ export function MaterialSettings() {
       const rawDepthWrite = (mat as any)?.depthWrite;
       setSelectedMaterialDepthWrite(typeof rawDepthWrite === 'boolean' ? rawDepthWrite : true);
 
-      const rawEnvIntensity = (mat as any)?.envMapIntensity;
+      const rawEnvIntensity = (mat as any)?.[getEnvMapStrengthPropertyKey(rawType as MaterialTypeKey)];
       setSelectedEnvMapIntensity(typeof rawEnvIntensity === 'number' && Number.isFinite(rawEnvIntensity) ? rawEnvIntensity : 1);
 
       const rawAoIntensity = (mat as any)?.aoMapIntensity;
@@ -326,14 +358,16 @@ export function MaterialSettings() {
         textureSupport.specularColorMap
     );
   }, [selectedMaterialType, textureSupport]);
+  const envMapIntensityPropertyKey = useMemo(() => getEnvMapStrengthPropertyKey(selectedMaterialType), [selectedMaterialType]);
+  const envMapIntensityMax = useMemo(() => getEnvMapStrengthMax(selectedMaterialType), [selectedMaterialType]);
 
   /** three.js 原地改材质不会触发 React 更新；变更后递增以强制重读材质上的贴图引用 */
   const [materialUiEpoch, setMaterialUiEpoch] = useState(0);
   const firstMeshMaterial = useMemo(
     () => (editor ? getFirstMeshMaterial(editor.getSelected()) : null),
-    // materialUiEpoch：three 原地改材质；selectedMaterialType：切换类型后强制重读实例
+    // materialUiEpoch：three 原地改材质；selectedMaterialInstanceId：切换到同类型不同材质时也要重读实例
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 依赖项用于失效刷新，useMemo 函数体内未直接读取
-    [editor, materialUiEpoch, selectedMaterialType]
+    [editor, materialUiEpoch, selectedMaterialInstanceId]
   );
 
   /**
@@ -377,11 +411,22 @@ export function MaterialSettings() {
       try {
         if (JSON.stringify(firstBeforeValue) === JSON.stringify(value)) return;
       } catch {
-        // ignore
+        // 忽略不可序列化值带来的比较异常，继续按“有变更”处理。
       }
       const applyValue = (nextValue: any) => {
         for (const m of mats) {
           (m as any)[key] = nextValue;
+          if (textureFieldKeySet.has(key)) {
+            // 贴图字段除了写值本身，还必须维护“槽位 -> 资产 id”的绑定关系，
+            // 否则导出项目包时无法在材质字段被清空/禁用的情况下找回原资源。
+            const ref = getTextureAssetRef(nextValue);
+            (m as any).userData ??= {};
+            if (ref) {
+              ((m as any).userData.__vizonTextureBindings ??= {})[key] = ref.id;
+            } else if ((m as any).userData.__vizonTextureBindings) {
+              delete (m as any).userData.__vizonTextureBindings[key];
+            }
+          }
           (m as any).needsUpdate = true;
         }
         setMaterialUiEpoch((e) => e + 1);
@@ -408,6 +453,15 @@ export function MaterialSettings() {
         undo: () => {
           for (const item of effectiveBefore) {
             (item.material as any)[key] = item.value;
+            if (textureFieldKeySet.has(key)) {
+              const ref = getTextureAssetRef(item.value);
+              (item.material as any).userData ??= {};
+              if (ref) {
+                ((item.material as any).userData.__vizonTextureBindings ??= {})[key] = ref.id;
+              } else if ((item.material as any).userData.__vizonTextureBindings) {
+                delete (item.material as any).userData.__vizonTextureBindings[key];
+              }
+            }
             (item.material as any).needsUpdate = true;
           }
           setMaterialUiEpoch((e) => e + 1);
@@ -437,38 +491,46 @@ export function MaterialSettings() {
     if (textureSupportByMaterialType[selectedMaterialType]?.[fieldKey] !== true) return;
 
     if (!enabled) {
-      // disable effect: cache -> set null
+      // 关闭效果：先缓存当前贴图，再把材质字段置空。
       for (const m of mats) {
         const id = (m as any)?.uuid;
         if (!id) continue;
         const prev = (m as any)[fieldKey] ?? null;
+        // React 侧缓存：给当前会话里的 UI 回显与恢复使用。
         textureDebugCacheRef.current[id] = {
           ...(textureDebugCacheRef.current[id] ?? {}),
           [fieldKey]: prev,
         };
         const u = ((m as any).userData ??= {});
+        // 持久到材质 userData：导出项目包、导入后恢复禁用态时仍可取回。
+        const runtimeCache = (u[TEXTURE_EFFECT_CACHE_KEY] ??= {});
+        runtimeCache[fieldKey] = prev;
         const disabledMap = (u[TEXTURE_EFFECT_DISABLED_KEY] ??= {});
         disabledMap[fieldKey] = true;
         (m as any)[fieldKey] = null;
         (m as any).needsUpdate = true;
       }
     } else {
-      // enable effect: restore from cache (if any)
+      // 开启效果：如果缓存里有贴图，就从缓存恢复回材质字段。
       for (const m of mats) {
         const id = (m as any)?.uuid;
         if (!id) continue;
         const u = ((m as any).userData ??= {});
         const disabledMap = (u[TEXTURE_EFFECT_DISABLED_KEY] ??= {});
         delete disabledMap[fieldKey];
-        const snap = textureDebugCacheRef.current[id];
+        // 优先读 React 会话缓存；如果这是一次“导入项目包后的首次恢复”，
+        // React 缓存可能还没有，则回退到 userData 里的持久缓存。
+        const runtimeCache = (u[TEXTURE_EFFECT_CACHE_KEY] ??= {});
+        const snap = textureDebugCacheRef.current[id] ?? runtimeCache;
         if (!snap || !(fieldKey in snap)) continue;
         (m as any)[fieldKey] = (snap as any)[fieldKey] ?? null;
+        runtimeCache[fieldKey] = (snap as any)[fieldKey] ?? null;
         (m as any).needsUpdate = true;
       }
     }
 
     setMaterialUiEpoch((e) => e + 1);
-  }, [TEXTURE_EFFECT_DISABLED_KEY, editor, selectedMaterialType]);
+  }, [TEXTURE_EFFECT_CACHE_KEY, TEXTURE_EFFECT_DISABLED_KEY, editor, selectedMaterialType]);
 
   const isTextureFieldEffectDisabled = useCallback(
     (fieldKey: TextureFieldKey) => {
@@ -478,11 +540,13 @@ export function MaterialSettings() {
       if (disabledMap[fieldKey] === true) return true;
       const id = mat?.uuid;
       const hasActiveTexture = Boolean(mat?.[fieldKey]);
-      const hasCachedTexture = Boolean(id && textureDebugCacheRef.current[id]?.[fieldKey]);
+      // “禁用态”不只看 React ref，也要看 userData 持久缓存；后者覆盖导入后首次回显场景。
+      const runtimeCache = mat?.userData?.[TEXTURE_EFFECT_CACHE_KEY] ?? {};
+      const hasCachedTexture = Boolean(id && (textureDebugCacheRef.current[id]?.[fieldKey] ?? runtimeCache?.[fieldKey]));
       // “禁用效果”定义为：材质字段已置空，但缓存里仍有原贴图（可恢复）
       return !hasActiveTexture && hasCachedTexture;
     },
-    [TEXTURE_EFFECT_DISABLED_KEY, firstMeshMaterial]
+    [TEXTURE_EFFECT_CACHE_KEY, TEXTURE_EFFECT_DISABLED_KEY, firstMeshMaterial]
   );
 
   /**
@@ -496,12 +560,12 @@ export function MaterialSettings() {
       if (!mat) return null;
       const id = mat?.uuid;
       if (id && isTextureFieldEffectDisabled(fieldKey)) {
-        const cached = textureDebugCacheRef.current[id]?.[fieldKey];
+        const cached = textureDebugCacheRef.current[id]?.[fieldKey] ?? mat?.userData?.[TEXTURE_EFFECT_CACHE_KEY]?.[fieldKey];
         return cached ?? null;
       }
       return mat?.[fieldKey] ?? null;
     },
-    [firstMeshMaterial, isTextureFieldEffectDisabled]
+    [TEXTURE_EFFECT_CACHE_KEY, firstMeshMaterial, isTextureFieldEffectDisabled]
   );
 
   /**
@@ -512,7 +576,9 @@ export function MaterialSettings() {
   const makeTextureUploadHandler = useCallback(
     (fieldKey: TextureFieldKey, loader: (f: File) => Promise<any>) => {
       return async (f: File) => {
+        const assetRef = await cacheTextureAssetFile(f);
         const tex = await loader(f);
+        attachTextureAssetRef(tex as { name?: string; userData?: Record<string, unknown> }, assetRef);
         // 若该贴图效果被禁用：只更新缓存，不让它立即影响渲染
         if (isTextureFieldEffectDisabled(fieldKey)) {
           const mat: any = firstMeshMaterial as any;
@@ -522,6 +588,10 @@ export function MaterialSettings() {
               ...(textureDebugCacheRef.current[id] ?? {}),
               [fieldKey]: tex,
             };
+            const u = ((mat as any).userData ??= {});
+            // 即使当前效果关闭，也要更新缓存与资产绑定，保证导出项目包时带得走这张图。
+            (u[TEXTURE_EFFECT_CACHE_KEY] ??= {})[fieldKey] = tex;
+            (u[TEXTURE_BINDINGS_KEY] ??= {})[fieldKey] = assetRef.id;
             setMaterialUiEpoch((e) => e + 1);
           }
           return;
@@ -530,7 +600,7 @@ export function MaterialSettings() {
         onPropertyChange(fieldKey, tex);
       };
     },
-    [firstMeshMaterial, isTextureFieldEffectDisabled, onPropertyChange]
+    [TEXTURE_BINDINGS_KEY, TEXTURE_EFFECT_CACHE_KEY, firstMeshMaterial, isTextureFieldEffectDisabled, onPropertyChange]
   );
 
   /**
@@ -548,6 +618,10 @@ export function MaterialSettings() {
             if (textureDebugCacheRef.current[id]) {
               delete (textureDebugCacheRef.current[id] as any)[fieldKey];
             }
+            const u = ((mat as any).userData ??= {});
+            // 清除时同时删掉运行时缓存和资产绑定，表示这个槽位真的没有贴图了。
+            if (u[TEXTURE_EFFECT_CACHE_KEY]) delete u[TEXTURE_EFFECT_CACHE_KEY][fieldKey];
+            if (u[TEXTURE_BINDINGS_KEY]) delete u[TEXTURE_BINDINGS_KEY][fieldKey];
             setMaterialUiEpoch((e) => e + 1);
           }
           return;
@@ -555,7 +629,7 @@ export function MaterialSettings() {
         onPropertyChange(fieldKey, null);
       };
     },
-    [firstMeshMaterial, isTextureFieldEffectDisabled, onPropertyChange]
+    [TEXTURE_BINDINGS_KEY, TEXTURE_EFFECT_CACHE_KEY, firstMeshMaterial, isTextureFieldEffectDisabled, onPropertyChange]
   );
 
   /**
@@ -1174,6 +1248,8 @@ export function MaterialSettings() {
               hasTextureGroupAdvanced={hasTextureGroupAdvanced} // 是否显示高级物理组
               selectedEnvMapIntensity={selectedEnvMapIntensity} // 环境贴图强度当前值
               setSelectedEnvMapIntensity={setSelectedEnvMapIntensity} // 更新环境贴图强度状态
+              envMapIntensityPropertyKey={envMapIntensityPropertyKey} // 当前材质环境贴图强度实际字段
+              envMapIntensityMax={envMapIntensityMax} // 当前材质环境贴图强度滑杆范围
               selectedAoMapIntensity={selectedAoMapIntensity} // AO 强度当前值
               setSelectedAoMapIntensity={setSelectedAoMapIntensity} // 更新 AO 强度状态
               selectedNormalScale={selectedNormalScale} // normalScale 当前值
@@ -1192,5 +1268,3 @@ export function MaterialSettings() {
     </div>
   );
 }
-
-

@@ -1,7 +1,7 @@
 /** `executeWithHistoryNotify` 顺序。 */
 import { describe, expect, it, vi } from 'vitest';
 
-import { HistoryManager } from '../../HistoryManager';
+import { HistoryManager } from '../HistoryManager';
 import { executeWithHistoryNotify } from '../executeWithHistoryNotify';
 
 describe('executeWithHistoryNotify', () => {

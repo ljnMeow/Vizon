@@ -1,5 +1,3 @@
-import * as THREE from 'three';
-
 /**
  * `infra/utils` 统一工具入口（单文件管理）。
  *
@@ -7,6 +5,7 @@ import * as THREE from 'three';
  * - 把常用的 clamp/数值解析/颜色解析/three Vector3 转换等聚合到一个入口文件；
  * - 避免 controller/settings 里散落多个“看似工具但分别存放”的小文件。
  */
+import * as THREE from 'three';
 
 /**
  * 将标量 n 钳制在闭区间 [min, max]。
@@ -97,6 +96,7 @@ export function forEachMaterial(
   if (material == null) return;
   if (Array.isArray(material)) {
     for (const m of material) {
+      // 材质数组里理论上可能混入空槽；做防御判断可减少调用端 if 噪音。
       if (m) callback(m);
     }
     return;
@@ -141,4 +141,3 @@ export { encodeHistoryI18nName, type HistoryI18nName } from './historyEncoding';
 export { VIZON_STORAGE_KEYS, VIZON_USER_DATA_KEYS, VIZON_HISTORY_KEYS } from './keys';
 export type { VizonUserData, VizonObject3D } from '../userData';
 export { getVizonUserData } from '../userData';
-

@@ -9,6 +9,7 @@ import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHel
 import type { VizonContentNode, VizonNode } from '../../types/document';
 import type { SceneTreeNodeKind } from '../../settings/sceneTree';
 import { VIZON_EDITOR_OVERLAY_LAYER } from '../picking/pickLayers';
+import { configureEditorHelperObject, createLightTargetHandle, readPersistedLightTarget } from '../helpers/lightHelperUtils';
 import { RUNTIME_HELPER_TYPES } from './vizonPersistConstants';
 import { isRecord, toBool, toFiniteNumber, toString } from './vizonPersistShared';
 
@@ -214,58 +215,6 @@ type PersistedHelperSnapshot = {
   objectSnapshot?: Record<string, unknown>;
 };
 
-function configureRuntimeHelperObject(helper: THREE.Object3D, pickTarget: THREE.Object3D) {
-  const ud = (helper.userData ??= {}) as any;
-  ud[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE] = true;
-  ud[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR] = true;
-  ud[VIZON_USER_DATA_KEYS.COMMON.PICK_TARGET] = pickTarget;
-
-  helper.traverse((node: any) => {
-    forEachMaterial(node?.material as THREE.Material | THREE.Material[] | undefined, (m) => {
-      (m as any).depthTest = false;
-      (m as any).depthWrite = false;
-      (m as any).toneMapped = false;
-      (m as any).transparent = true;
-      (m as any).opacity = typeof (m as any).opacity === 'number' ? (m as any).opacity : 0.9;
-      (m as any).needsUpdate = true;
-    });
-  });
-  helper.renderOrder = Math.max(helper.renderOrder ?? 0, 8_000);
-}
-
-function createLightTargetHandle(
-  light: THREE.Light,
-  target: THREE.Vector3,
-  lightType: 'DirectionalLight' | 'SpotLight' | 'RectAreaLight'
-) {
-  const handle = new THREE.Mesh(
-    new THREE.SphereGeometry(0.14, 12, 12),
-    new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      depthTest: false,
-      depthWrite: false,
-      transparent: true,
-      opacity: 0.92,
-      toneMapped: false,
-    })
-  );
-  handle.name = `${light.type}TargetHandle`;
-  handle.position.copy(target);
-  handle.renderOrder = 8_100;
-  handle.userData[VIZON_USER_DATA_KEYS.COMMON.PICK_TARGET] = light;
-  handle.userData[VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR] = true;
-  handle.userData[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET_HANDLE] = true;
-  handle.userData[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET_LIGHT_UUID] = light.uuid;
-  handle.userData[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET_LIGHT_TYPE] = lightType;
-  (light.userData as any)[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_TARGET_HANDLE] = handle;
-  if (lightType === 'DirectionalLight' || lightType === 'SpotLight') {
-    (light.userData as any)[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET] = { x: target.x, y: target.y, z: target.z };
-  } else if (lightType === 'RectAreaLight') {
-    (light.userData as any)[VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET] = { x: target.x, y: target.y, z: target.z };
-  }
-  return handle;
-}
-
 export function applyImportedLightTargetFromUserData(light: THREE.Light) {
   const anyLight: any = light as any;
   if (!(anyLight?.isDirectionalLight || anyLight?.isSpotLight)) return;
@@ -287,41 +236,16 @@ export function ensureImportedLightTargetHandle(light: THREE.Light) {
   const ud: any = light.userData ?? {};
   if (ud?.[VIZON_USER_DATA_KEYS.HELPERS.LIGHT_TARGET_HANDLE]) return;
 
+  const persisted = readPersistedLightTarget(light);
+  if (!persisted) return;
+
   const anyLight: any = light as any;
-  if (anyLight?.isDirectionalLight && anyLight.target) {
-    // 优先用持久化的 target（更稳定），否则 fallback 到 three 的 target 当前位置
-    const t = ud?.[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET];
-    const target = isRecord(t)
-      ? new THREE.Vector3(toFiniteNumber(t.x, 0), toFiniteNumber(t.y, 0), toFiniteNumber(t.z, 0))
-      : anyLight.target.position.clone();
-    if (anyLight.target?.position?.copy) anyLight.target.position.copy(target);
+  if ((persisted.type === 'DirectionalLight' || persisted.type === 'SpotLight') && anyLight.target) {
+    if (anyLight.target.position?.copy) anyLight.target.position.copy(persisted.target);
     anyLight.target?.updateMatrixWorld?.(true);
     anyLight.shadow?.updateMatrices?.(anyLight);
-    createLightTargetHandle(light, target, 'DirectionalLight');
-    return;
   }
-  if (anyLight?.isSpotLight && anyLight.target) {
-    const t = ud?.[VIZON_USER_DATA_KEYS.DEFAULTS.LIGHT_TARGET];
-    const target = isRecord(t)
-      ? new THREE.Vector3(toFiniteNumber(t.x, 0), toFiniteNumber(t.y, 0), toFiniteNumber(t.z, 0))
-      : anyLight.target.position.clone();
-    if (anyLight.target?.position?.copy) anyLight.target.position.copy(target);
-    anyLight.target?.updateMatrixWorld?.(true);
-    anyLight.shadow?.updateMatrices?.(anyLight);
-    createLightTargetHandle(light, target, 'SpotLight');
-    return;
-  }
-  if (anyLight?.isRectAreaLight) {
-    const rectTargetRaw = ud?.[VIZON_USER_DATA_KEYS.DEFAULTS.RECT_AREA_LIGHT_TARGET];
-    const target = isRecord(rectTargetRaw)
-      ? new THREE.Vector3(
-          toFiniteNumber(rectTargetRaw.x, 0),
-          toFiniteNumber(rectTargetRaw.y, 0),
-          toFiniteNumber(rectTargetRaw.z, 0)
-        )
-      : new THREE.Vector3(0, 0, 0);
-    createLightTargetHandle(light, target, 'RectAreaLight');
-  }
+  createLightTargetHandle(light, persisted.target, persisted.type, { persistTargetData: true });
 }
 
 export function createRuntimeLightHelper(light: THREE.Light): THREE.Object3D | null {
@@ -342,9 +266,7 @@ export function createRuntimeLightHelper(light: THREE.Light): THREE.Object3D | n
         if (n?.isCameraHelper || n?.type === 'CameraHelper') n.update?.();
       });
     };
-    configureRuntimeHelperObject(helperGroup, light);
-    helperGroup.traverse((child) => child !== helperGroup && configureRuntimeHelperObject(child, light));
-    return helperGroup;
+    return configureEditorHelperObject(helperGroup, light);
   }
   if (anyLight?.isPointLight) {
     const helperGroup = new THREE.Group();
@@ -352,9 +274,7 @@ export function createRuntimeLightHelper(light: THREE.Light): THREE.Object3D | n
     const lightHelper = new THREE.PointLightHelper(light as any, 0.45) as any;
     helperGroup.add(lightHelper);
     (helperGroup as any).update = () => (lightHelper as any).update?.();
-    configureRuntimeHelperObject(helperGroup, light);
-    helperGroup.traverse((child) => child !== helperGroup && configureRuntimeHelperObject(child, light));
-    return helperGroup;
+    return configureEditorHelperObject(helperGroup, light);
   }
   if (anyLight?.isSpotLight) {
     const helperGroup = new THREE.Group();
@@ -368,19 +288,17 @@ export function createRuntimeLightHelper(light: THREE.Light): THREE.Object3D | n
         if (n?.isCameraHelper || n?.type === 'CameraHelper') n.update?.();
       });
     };
-    configureRuntimeHelperObject(helperGroup, light);
-    helperGroup.traverse((child) => child !== helperGroup && configureRuntimeHelperObject(child, light));
-    return helperGroup;
+    return configureEditorHelperObject(helperGroup, light);
   }
   if (anyLight?.isHemisphereLight) {
     const helper = new THREE.HemisphereLightHelper(light as any, 0.9) as any;
-    configureRuntimeHelperObject(helper, light);
+    configureEditorHelperObject(helper, light);
     (helper as any).update?.();
     return helper;
   }
   if (anyLight?.isRectAreaLight) {
     const helper = new RectAreaLightHelper(light as any) as any;
-    configureRuntimeHelperObject(helper, light);
+    configureEditorHelperObject(helper, light);
     (helper as any).update?.();
     return helper;
   }
@@ -389,7 +307,7 @@ export function createRuntimeLightHelper(light: THREE.Light): THREE.Object3D | n
 
 export function createRuntimeCameraHelper(camera: THREE.Camera): THREE.CameraHelper {
   const helper = new THREE.CameraHelper(camera);
-  configureRuntimeHelperObject(helper, camera);
+  configureEditorHelperObject(helper, camera);
   helper.renderOrder = 9_000;
   return helper;
 }

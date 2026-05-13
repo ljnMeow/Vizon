@@ -1,7 +1,7 @@
 /** `runObjectPropertyHistoryStep`。 */
 import { describe, expect, it, vi } from 'vitest';
 
-import type { EditorHistoryOperation } from '../../HistoryManager';
+import type { EditorHistoryOperation } from '../HistoryManager';
 import { cloneForHistory, isHistoryValueEqual } from '../historyValueUtils';
 import { runObjectPropertyHistoryStep } from '../objectPropertyHistory';
 
