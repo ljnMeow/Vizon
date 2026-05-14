@@ -1,170 +1,31 @@
 import type { AppMessages } from '../../../../i18n/messages';
 import { ColorPicker } from '../../../../components/ColorPicker';
 import { useEffect, useState } from 'react';
+import type {
+  AxisKey,
+  DirectionalLightShadowState,
+  HemisphereLightParamsState,
+  LightColorState,
+  LightIntensityState,
+  LightTargetState,
+  OpacityState,
+  OrthographicCameraParamsState,
+  PerspectiveCameraParamsState,
+  PointLightParamsState,
+  PointLightShadowState,
+  RectAreaLightParamsState,
+  RenderOrderState,
+  SelectedObjectInfo,
+  ShadowState,
+  SpotLightParamsState,
+  SpotLightShadowState,
+  TransformState,
+  Vec3,
+  VisibilityPickFreezeState,
+} from './propertiesTypes';
 
 /** 属性设置面板使用的 i18n 文案类型 */
 type PropertiesLabels = AppMessages['designPage']['inspector']['propertiesSettings'];
-
-/** 三维坐标轴 key */
-type AxisKey = 'x' | 'y' | 'z';
-
-/** 通用三维向量结构 */
-type Vec3 = {
-  x: number;
-  y: number;
-  z: number;
-};
-
-/** 当前选中对象的位移 / 旋转 / 缩放状态 */
-type TransformState = {
-  position: Vec3;
-  rotation: Vec3;
-  scale: Vec3;
-};
-
-/** 阴影与裁剪相关状态 */
-type ShadowState = {
-  castShadow: boolean;
-  receiveShadow: boolean;
-  frustumCulled: boolean;
-  canCastShadow: boolean;
-  canReceiveShadow: boolean;
-  canFrustumCulled: boolean;
-};
-
-/** 可见性、可拾取性与冻结状态 */
-type VisibilityPickFreezeState = {
-  visible: boolean;
-  pickable: boolean;
-  frozen: boolean;
-  canPickable: boolean;
-  canFreeze: boolean;
-};
-
-/** 透明度编辑状态 */
-type OpacityState = {
-  opacity: number;
-  canOpacity: boolean;
-};
-
-/** 渲染顺序编辑状态 */
-type RenderOrderState = {
-  renderOrder: number;
-  canRenderOrder: boolean;
-};
-
-type PerspectiveCameraParamsState = {
-  fov: number;
-  near: number;
-  far: number;
-  zoom: number;
-  canEdit: boolean;
-};
-
-type OrthographicCameraParamsState = {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-  near: number;
-  far: number;
-  zoom: number;
-  canEdit: boolean;
-};
-
-type LightColorState = {
-  color: string;
-  canColor: boolean;
-};
-
-type LightIntensityState = {
-  intensity: number;
-  canIntensity: boolean;
-};
-
-type LightTargetState = {
-  target: Vec3;
-  canEdit: boolean;
-};
-
-type PointLightParamsState = {
-  distance: number;
-  decay: number;
-  canEdit: boolean;
-};
-
-type SpotLightParamsState = {
-  distance: number;
-  angle: number;
-  penumbra: number;
-  decay: number;
-  focus: number;
-  target: Vec3;
-  canEdit: boolean;
-};
-
-type HemisphereLightParamsState = {
-  groundColor: string;
-  canEdit: boolean;
-};
-
-type RectAreaLightParamsState = {
-  width: number;
-  height: number;
-  target: Vec3;
-  canEdit: boolean;
-};
-
-type DirectionalLightShadowState = {
-  intensity: number;
-  bias: number;
-  normalBias: number;
-  radius: number;
-  mapSizeWidth: number;
-  mapSizeHeight: number;
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-  near: number;
-  far: number;
-  helperVisible: boolean;
-  canEdit: boolean;
-};
-
-type SpotLightShadowState = {
-  intensity: number;
-  bias: number;
-  normalBias: number;
-  radius: number;
-  mapSizeWidth: number;
-  mapSizeHeight: number;
-  near: number;
-  far: number;
-  fov: number;
-  helperVisible: boolean;
-  canEdit: boolean;
-};
-
-type PointLightShadowState = {
-  intensity: number;
-  bias: number;
-  normalBias: number;
-  radius: number;
-  mapSizeWidth: number;
-  mapSizeHeight: number;
-  near: number;
-  far: number;
-  helperVisible: boolean;
-  canEdit: boolean;
-};
-
-/** 当前选中对象的基础信息 */
-type SelectedObjectInfo = {
-  uuid: string;
-  type: string;
-  name: string;
-} | null;
 
 /**
  * 单轴数值输入框。

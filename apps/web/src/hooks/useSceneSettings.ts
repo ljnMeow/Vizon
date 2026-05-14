@@ -40,6 +40,25 @@ function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
+/**
+ * 轻量 SceneSettings 差异检测，专为"无需记录历史的预览更新"设计。
+ *
+ * 跳过 sceneTree 字段 —— 它在每次拖拽/选中时都可能指向新数组引用，
+ * 但其内容由 core 管理，预览更新不会修改树结构，stringify 它只会带来
+ * 不必要的大对象序列化开销（尤其场景节点多时）。
+ */
+function sceneSettingsChanged(a: SceneSettings, b: SceneSettings): boolean {
+  try {
+    const stripTree = (s: SceneSettings) => {
+      const { sceneTree: _t, ...rest } = s as any;
+      return rest;
+    };
+    return JSON.stringify(stripTree(a)) !== JSON.stringify(stripTree(b));
+  } catch {
+    return true;
+  }
+}
+
 /** 浮点数近似比较，避免 Three.js / 表单联动产生微小误差导致误判。 */
 function almostEqual(a: number, b: number, eps = 1e-6) {
   return Math.abs(a - b) <= eps;
@@ -352,11 +371,7 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
     (updater: (prev: SceneSettings) => SceneSettings, options?: { recordHistory?: boolean; operationName?: string }) => {
       const next = updater(sceneSettingsRef.current);
       if (options?.recordHistory === false) {
-        try {
-          if (JSON.stringify(next) === JSON.stringify(sceneSettingsRef.current)) return;
-        } catch {
-          // fallback: 无法序列化时仍继续
-        }
+        if (!sceneSettingsChanged(next, sceneSettingsRef.current)) return;
       }
       setSceneSettings(next);
       if (!syncFromCoreRef.current) void applyToCore(next, options);

@@ -247,16 +247,6 @@ export async function buildProjectBundle(editor: ThreeEditor, options?: { genera
   };
 }
 
-/** 在导入后的场景树中按 uuid 查找对象。 */
-function getObjectByUuid(editor: ThreeEditor, objectId: string) {
-  let found: any = null;
-  editor.scene.traverse((object: any) => {
-    if (found || object.uuid !== objectId) return;
-    found = object;
-  });
-  return found;
-}
-
 /**
  * 把一个项目包导入到编辑器中。
  *
@@ -328,7 +318,7 @@ export async function importProjectBundle(editor: ThreeEditor, file: File) {
       throw new Error(`Bundle is missing texture asset: ${asset.path}`);
     }
 
-    const object = getObjectByUuid(editor, binding.objectId);
+    const object = editor.scene.getObjectByProperty('uuid', binding.objectId);
     if (!object) continue;
 
     const materials = getMaterials(object);

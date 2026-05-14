@@ -11,6 +11,28 @@ import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 import { VIZON_USER_DATA_KEYS } from '../../../../utils/keys';
 import { copyToClipboard } from '../../../../utils/utils';
 import { basicModels } from '../../../../utils/models';
+import type {
+  AxisKey,
+  DirectionalLightShadowState,
+  HemisphereLightParamsState,
+  LightColorState,
+  LightIntensityState,
+  LightTargetState,
+  OpacityState,
+  OrthographicCameraParamsState,
+  PerspectiveCameraParamsState,
+  PointLightParamsState,
+  PointLightShadowState,
+  RectAreaLightParamsState,
+  RenderOrderState,
+  SelectedObjectInfo,
+  ShadowState,
+  SpotLightParamsState,
+  SpotLightShadowState,
+  TransformState,
+  Vec3,
+  VisibilityPickFreezeState,
+} from './propertiesTypes';
 
 /** 内置基础模型 key 集合，用于判断当前对象是否支持参数化几何属性编辑 */
 const BASIC_MODEL_KEYS = new Set(basicModels.map((m) => m.key));
@@ -22,159 +44,14 @@ const RECT_AREA_LIGHT_TARGET_KEY: string =
 const LIGHT_TARGET_LIGHT_UUID_KEY: string =
   (VIZON_USER_DATA_KEYS as any)?.DEFAULTS?.LIGHT_TARGET_LIGHT_UUID ?? '__vizonLightTargetLightUuid';
 
-/** 三维坐标轴 key */
-type AxisKey = 'x' | 'y' | 'z';
+/** 两种语言的属性标签，appMessages 是静态导入，无需在组件内每次重新读取。 */
+const LABELS_ZH = appMessages['zh-CN'].designPage.inspector.propertiesSettings;
+const LABELS_EN = appMessages['en-US'].designPage.inspector.propertiesSettings;
 
-type Vec3 = {
-  x: number;
-  y: number;
-  z: number;
-};
-
-type TransformState = {
-  position: Vec3;
-  rotation: Vec3;
-  scale: Vec3;
-};
-
-type ShadowState = {
-  castShadow: boolean;
-  receiveShadow: boolean;
-  frustumCulled: boolean;
-  canCastShadow: boolean;
-  canReceiveShadow: boolean;
-  canFrustumCulled: boolean;
-};
-
-type VisibilityPickFreezeState = {
-  visible: boolean;
-  pickable: boolean;
-  frozen: boolean;
-  canPickable: boolean;
-  canFreeze: boolean;
-};
-
-type OpacityState = {
-  opacity: number;
-  canOpacity: boolean;
-};
-
-type RenderOrderState = {
-  renderOrder: number;
-  canRenderOrder: boolean;
-};
-
-type PerspectiveCameraParamsState = {
-  fov: number;
-  near: number;
-  far: number;
-  zoom: number;
-  canEdit: boolean;
-};
-
-type OrthographicCameraParamsState = {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-  near: number;
-  far: number;
-  zoom: number;
-  canEdit: boolean;
-};
-
-type LightColorState = {
-  color: string;
-  canColor: boolean;
-};
-
-type LightIntensityState = {
-  intensity: number;
-  canIntensity: boolean;
-};
-
-type LightTargetState = {
-  target: Vec3;
-  canEdit: boolean;
-};
-
-type PointLightParamsState = {
-  distance: number;
-  decay: number;
-  canEdit: boolean;
-};
-
-type SpotLightParamsState = {
-  distance: number;
-  angle: number;
-  penumbra: number;
-  decay: number;
-  focus: number;
-  target: Vec3;
-  canEdit: boolean;
-};
-
-type HemisphereLightParamsState = {
-  groundColor: string;
-  canEdit: boolean;
-};
-
-type RectAreaLightParamsState = {
-  width: number;
-  height: number;
-  target: Vec3;
-  canEdit: boolean;
-};
-
-type DirectionalLightShadowState = {
-  intensity: number;
-  bias: number;
-  normalBias: number;
-  radius: number;
-  mapSizeWidth: number;
-  mapSizeHeight: number;
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-  near: number;
-  far: number;
-  helperVisible: boolean;
-  canEdit: boolean;
-};
-
-type SpotLightShadowState = {
-  intensity: number;
-  bias: number;
-  normalBias: number;
-  radius: number;
-  mapSizeWidth: number;
-  mapSizeHeight: number;
-  near: number;
-  far: number;
-  fov: number;
-  helperVisible: boolean;
-  canEdit: boolean;
-};
-
-type PointLightShadowState = {
-  intensity: number;
-  bias: number;
-  normalBias: number;
-  radius: number;
-  mapSizeWidth: number;
-  mapSizeHeight: number;
-  near: number;
-  far: number;
-  helperVisible: boolean;
-  canEdit: boolean;
-};
-
-type SelectedObjectInfo = {
-  uuid: string;
-  type: string;
-  name: string;
-} | null;
+/** 构造双语历史记录操作名，纯函数，提取到模块级避免每次渲染重新创建闭包。 */
+function historyName(zhName: string, enName: string) {
+  return encodeHistoryI18nName({ 'zh-CN': zhName, 'en-US': enName });
+}
 
 /** 从当前选中对象读取基础信息 */
 function readSelectedInfo(obj: any): SelectedObjectInfo {
@@ -653,10 +530,6 @@ export function PropertiesSettings() {
   }, [editor, selectedInfo?.uuid]);
 
   const labels = useMemo(() => t.propertiesSettings, [t.propertiesSettings]);
-  const labelsZh = appMessages['zh-CN'].designPage.inspector.propertiesSettings;
-  const labelsEn = appMessages['en-US'].designPage.inspector.propertiesSettings;
-  const historyName = (zhName: string, enName: string) =>
-    encodeHistoryI18nName({ 'zh-CN': zhName, 'en-US': enName });
   const historyCategory = useMemo(() => getHistoryCategoryI18n(selectedInfo?.type), [selectedInfo?.type]);
 
   const showObjectAttributes = useMemo(() => {
@@ -678,8 +551,8 @@ export function PropertiesSettings() {
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'name', nextName, {
       recordHistory: true,
       operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.nameLabel} = ${displayValue}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.nameLabel} = ${displayValue}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.nameLabel} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.nameLabel} = ${displayValue}`
       )
     });
   };
@@ -708,8 +581,8 @@ export function PropertiesSettings() {
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, `position.${axis}`, next, {
       recordHistory: true,
       operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.positionLabel} = ${displayValue}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.positionLabel} = ${displayValue}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.positionLabel} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.positionLabel} = ${displayValue}`
       )
     });
   };
@@ -727,8 +600,8 @@ export function PropertiesSettings() {
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, `rotation.${axis}`, next, {
       recordHistory: true,
       operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.rotationLabel} = ${displayValue}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.rotationLabel} = ${displayValue}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.rotationLabel} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.rotationLabel} = ${displayValue}`
       )
     });
   };
@@ -746,8 +619,8 @@ export function PropertiesSettings() {
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, `scale.${axis}`, next, {
       recordHistory: true,
       operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.scaleLabel} = ${displayValue}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.scaleLabel} = ${displayValue}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.scaleLabel} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.scaleLabel} = ${displayValue}`
       )
     });
   };
@@ -757,8 +630,8 @@ export function PropertiesSettings() {
     const v = boolTextI18n(nextVisible);
     const ok = editor.setObjectVisibleByUuid(selectedInfo.uuid, nextVisible, {
       operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.visibleLabel} = ${v.zh}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.visibleLabel} = ${v.en}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.visibleLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.visibleLabel} = ${v.en}`
       )
     });
     if (!ok) return;
@@ -789,8 +662,8 @@ export function PropertiesSettings() {
     };
     void editor.executeHistoryOperation({
       name: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.pickableLabel} = ${v.zh}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.pickableLabel} = ${v.en}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.pickableLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.pickableLabel} = ${v.en}`
       ),
       do: () => applyPickable(nextPickable),
       undo: () => {
@@ -843,8 +716,8 @@ export function PropertiesSettings() {
     };
     void editor.executeHistoryOperation({
       name: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.freezeLabel} = ${v.zh}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.freezeLabel} = ${v.en}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.freezeLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.freezeLabel} = ${v.en}`
       ),
       do: () => applyFrozen(nextFrozen),
       undo: () => {
@@ -888,8 +761,8 @@ export function PropertiesSettings() {
     const before = materials.map((m) => ({ m, opacity: m.opacity, transparent: m.transparent }));
     void editor.executeHistoryOperation({
       name: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.opacityLabel} = ${displayValue}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.opacityLabel} = ${displayValue}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.opacityLabel} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.opacityLabel} = ${displayValue}`
       ),
       do: () => {
         for (const m of materials) {
@@ -925,8 +798,8 @@ export function PropertiesSettings() {
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'renderOrder', next, {
       recordHistory: true,
       operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.renderOrderLabel} = ${next}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.renderOrderLabel} = ${next}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.renderOrderLabel} = ${next}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.renderOrderLabel} = ${next}`
       )
     });
     setRenderOrderState({ renderOrder: next, canRenderOrder: true });
@@ -994,8 +867,8 @@ export function PropertiesSettings() {
     const v = boolTextI18n(nextCastShadow);
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'castShadow', nextCastShadow, {
       operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.castShadowLabel} = ${v.zh}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.castShadowLabel} = ${v.en}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.castShadowLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.castShadowLabel} = ${v.en}`
       )
     });
     setShadow((prev) => (prev ? { ...prev, castShadow: nextCastShadow, canCastShadow: true } : prev));
@@ -1009,8 +882,8 @@ export function PropertiesSettings() {
     const v = boolTextI18n(nextReceiveShadow);
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'receiveShadow', nextReceiveShadow, {
       operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.receiveShadowLabel} = ${v.zh}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.receiveShadowLabel} = ${v.en}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.receiveShadowLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.receiveShadowLabel} = ${v.en}`
       )
     });
     setShadow((prev) => (prev ? { ...prev, receiveShadow: nextReceiveShadow, canReceiveShadow: true } : prev));
@@ -1024,8 +897,8 @@ export function PropertiesSettings() {
     const v = boolTextI18n(nextFrustumCulled);
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'frustumCulled', nextFrustumCulled, {
       operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.frustumCulledLabel} = ${v.zh}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.frustumCulledLabel} = ${v.en}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.frustumCulledLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.frustumCulledLabel} = ${v.en}`
       )
     });
     setShadow((prev) => (prev ? { ...prev, frustumCulled: nextFrustumCulled, canFrustumCulled: true } : prev));
@@ -1050,8 +923,8 @@ export function PropertiesSettings() {
     if (!beforeColor || beforeColor === normalizedNext) return;
     void editor.executeHistoryOperation({
       name: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.colorLabel} = ${normalizedNext}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.colorLabel} = ${normalizedNext}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.colorLabel} = ${normalizedNext}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.colorLabel} = ${normalizedNext}`
       ),
       do: () => {
         obj.color.set(normalizedNext);
@@ -1084,8 +957,8 @@ export function PropertiesSettings() {
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, 'intensity', nextIntensity, {
       recordHistory: true,
       operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.lightIntensityLabel} = ${displayValue}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.lightIntensityLabel} = ${displayValue}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.lightIntensityLabel} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.lightIntensityLabel} = ${displayValue}`
       )
     });
     setLightIntensityState({ intensity: nextIntensity, canIntensity: true });
@@ -1107,8 +980,8 @@ export function PropertiesSettings() {
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, `target.position.${axis}`, next, {
       recordHistory: true,
       operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`
       )
     });
     setDirectionalLightTargetState((prev) => (prev ? { ...prev, target: { ...prev.target, [axis]: next } } : prev));
@@ -1131,11 +1004,11 @@ export function PropertiesSettings() {
   ) => {
     if (!editor || !selectedInfo) return;
     const labelMap = {
-      distance: { zh: labelsZh.lightDistanceLabel, en: labelsEn.lightDistanceLabel },
-      angle: { zh: labelsZh.spotAngleLabel, en: labelsEn.spotAngleLabel },
-      penumbra: { zh: labelsZh.spotPenumbraLabel, en: labelsEn.spotPenumbraLabel },
-      decay: { zh: labelsZh.lightDecayLabel, en: labelsEn.lightDecayLabel },
-      focus: { zh: labelsZh.spotFocusLabel, en: labelsEn.spotFocusLabel }
+      distance: { zh: LABELS_ZH.lightDistanceLabel, en: LABELS_EN.lightDistanceLabel },
+      angle: { zh: LABELS_ZH.spotAngleLabel, en: LABELS_EN.spotAngleLabel },
+      penumbra: { zh: LABELS_ZH.spotPenumbraLabel, en: LABELS_EN.spotPenumbraLabel },
+      decay: { zh: LABELS_ZH.lightDecayLabel, en: LABELS_EN.lightDecayLabel },
+      focus: { zh: LABELS_ZH.spotFocusLabel, en: LABELS_EN.spotFocusLabel }
     } as const;
     const displayValue = Number(nextValue.toFixed(6));
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, nextValue, {
@@ -1164,8 +1037,8 @@ export function PropertiesSettings() {
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, `target.position.${axis}`, next, {
       recordHistory: true,
       operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`
       )
     });
     setSpotLightParamsState((prev) => (prev ? { ...prev, target: { ...prev.target, [axis]: next } } : prev));
@@ -1182,8 +1055,8 @@ export function PropertiesSettings() {
   const commitPointParamNumber = (path: 'distance' | 'decay', nextValue: number) => {
     if (!editor || !selectedInfo) return;
     const labelMap = {
-      distance: { zh: labelsZh.lightDistanceLabel, en: labelsEn.lightDistanceLabel },
-      decay: { zh: labelsZh.lightDecayLabel, en: labelsEn.lightDecayLabel }
+      distance: { zh: LABELS_ZH.lightDistanceLabel, en: LABELS_EN.lightDistanceLabel },
+      decay: { zh: LABELS_ZH.lightDecayLabel, en: LABELS_EN.lightDecayLabel }
     } as const;
     const displayValue = Number(nextValue.toFixed(6));
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, nextValue, {
@@ -1215,8 +1088,8 @@ export function PropertiesSettings() {
     if (!before || before === normalizedNext) return;
     void editor.executeHistoryOperation({
       name: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.hemisphereGroundColorLabel} = ${normalizedNext}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.hemisphereGroundColorLabel} = ${normalizedNext}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.hemisphereGroundColorLabel} = ${normalizedNext}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.hemisphereGroundColorLabel} = ${normalizedNext}`
       ),
       do: () => {
         obj.groundColor.set(normalizedNext);
@@ -1242,8 +1115,8 @@ export function PropertiesSettings() {
   const commitRectAreaParamNumber = (path: 'width' | 'height', nextValue: number) => {
     if (!editor || !selectedInfo) return;
     const labelMap = {
-      width: { zh: labelsZh.rectAreaWidthLabel, en: labelsEn.rectAreaWidthLabel },
-      height: { zh: labelsZh.rectAreaHeightLabel, en: labelsEn.rectAreaHeightLabel }
+      width: { zh: LABELS_ZH.rectAreaWidthLabel, en: LABELS_EN.rectAreaWidthLabel },
+      height: { zh: LABELS_ZH.rectAreaHeightLabel, en: LABELS_EN.rectAreaHeightLabel }
     } as const;
     const displayValue = Number(nextValue.toFixed(6));
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, nextValue, {
@@ -1280,8 +1153,8 @@ export function PropertiesSettings() {
     const displayValue = Number(next.toFixed(4));
     void editor.executeHistoryOperation({
       name: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.lightTargetLabel} ${axis.toUpperCase()} = ${displayValue}`
       ),
       do: () => {
         obj.userData = obj.userData ?? {};
@@ -1364,18 +1237,18 @@ export function PropertiesSettings() {
         ? Math.max(1, Math.min(8192, Math.round(nextValue)))
         : nextValue;
     const labelMap = {
-      'shadow.intensity': { zh: labelsZh.shadowIntensityLabel, en: labelsEn.shadowIntensityLabel },
-      'shadow.bias': { zh: labelsZh.shadowBiasLabel, en: labelsEn.shadowBiasLabel },
-      'shadow.normalBias': { zh: labelsZh.shadowNormalBiasLabel, en: labelsEn.shadowNormalBiasLabel },
-      'shadow.radius': { zh: labelsZh.shadowRadiusLabel, en: labelsEn.shadowRadiusLabel },
-      'shadow.mapSize.width': { zh: labelsZh.shadowMapSizeWidthLabel, en: labelsEn.shadowMapSizeWidthLabel },
-      'shadow.mapSize.height': { zh: labelsZh.shadowMapSizeHeightLabel, en: labelsEn.shadowMapSizeHeightLabel },
-      'shadow.camera.left': { zh: labelsZh.shadowCameraLeftLabel, en: labelsEn.shadowCameraLeftLabel },
-      'shadow.camera.right': { zh: labelsZh.shadowCameraRightLabel, en: labelsEn.shadowCameraRightLabel },
-      'shadow.camera.top': { zh: labelsZh.shadowCameraTopLabel, en: labelsEn.shadowCameraTopLabel },
-      'shadow.camera.bottom': { zh: labelsZh.shadowCameraBottomLabel, en: labelsEn.shadowCameraBottomLabel },
-      'shadow.camera.near': { zh: labelsZh.shadowCameraNearLabel, en: labelsEn.shadowCameraNearLabel },
-      'shadow.camera.far': { zh: labelsZh.shadowCameraFarLabel, en: labelsEn.shadowCameraFarLabel }
+      'shadow.intensity': { zh: LABELS_ZH.shadowIntensityLabel, en: LABELS_EN.shadowIntensityLabel },
+      'shadow.bias': { zh: LABELS_ZH.shadowBiasLabel, en: LABELS_EN.shadowBiasLabel },
+      'shadow.normalBias': { zh: LABELS_ZH.shadowNormalBiasLabel, en: LABELS_EN.shadowNormalBiasLabel },
+      'shadow.radius': { zh: LABELS_ZH.shadowRadiusLabel, en: LABELS_EN.shadowRadiusLabel },
+      'shadow.mapSize.width': { zh: LABELS_ZH.shadowMapSizeWidthLabel, en: LABELS_EN.shadowMapSizeWidthLabel },
+      'shadow.mapSize.height': { zh: LABELS_ZH.shadowMapSizeHeightLabel, en: LABELS_EN.shadowMapSizeHeightLabel },
+      'shadow.camera.left': { zh: LABELS_ZH.shadowCameraLeftLabel, en: LABELS_EN.shadowCameraLeftLabel },
+      'shadow.camera.right': { zh: LABELS_ZH.shadowCameraRightLabel, en: LABELS_EN.shadowCameraRightLabel },
+      'shadow.camera.top': { zh: LABELS_ZH.shadowCameraTopLabel, en: LABELS_EN.shadowCameraTopLabel },
+      'shadow.camera.bottom': { zh: LABELS_ZH.shadowCameraBottomLabel, en: LABELS_EN.shadowCameraBottomLabel },
+      'shadow.camera.near': { zh: LABELS_ZH.shadowCameraNearLabel, en: LABELS_EN.shadowCameraNearLabel },
+      'shadow.camera.far': { zh: LABELS_ZH.shadowCameraFarLabel, en: LABELS_EN.shadowCameraFarLabel }
     } as const;
     const displayValue = Number(normalizedValue.toFixed(6));
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, normalizedValue, {
@@ -1409,8 +1282,8 @@ export function PropertiesSettings() {
     const v = boolTextI18n(nextVisible);
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, `userData.${VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE}`, nextVisible, {
       operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.shadowHelperVisibleLabel} = ${v.zh}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.shadowHelperVisibleLabel} = ${v.en}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.shadowHelperVisibleLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.shadowHelperVisibleLabel} = ${v.en}`
       )
     });
     setDirectionalLightShadowState((prev) => (prev ? { ...prev, helperVisible: nextVisible } : prev));
@@ -1472,15 +1345,15 @@ export function PropertiesSettings() {
         ? Math.max(1, Math.min(8192, Math.round(nextValue)))
         : nextValue;
     const labelMap = {
-      'shadow.intensity': { zh: labelsZh.shadowIntensityLabel, en: labelsEn.shadowIntensityLabel },
-      'shadow.bias': { zh: labelsZh.shadowBiasLabel, en: labelsEn.shadowBiasLabel },
-      'shadow.normalBias': { zh: labelsZh.shadowNormalBiasLabel, en: labelsEn.shadowNormalBiasLabel },
-      'shadow.radius': { zh: labelsZh.shadowRadiusLabel, en: labelsEn.shadowRadiusLabel },
-      'shadow.mapSize.width': { zh: labelsZh.shadowMapSizeWidthLabel, en: labelsEn.shadowMapSizeWidthLabel },
-      'shadow.mapSize.height': { zh: labelsZh.shadowMapSizeHeightLabel, en: labelsEn.shadowMapSizeHeightLabel },
-      'shadow.camera.near': { zh: labelsZh.shadowCameraNearLabel, en: labelsEn.shadowCameraNearLabel },
-      'shadow.camera.far': { zh: labelsZh.shadowCameraFarLabel, en: labelsEn.shadowCameraFarLabel },
-      'shadow.camera.fov': { zh: labelsZh.shadowCameraFovLabel, en: labelsEn.shadowCameraFovLabel }
+      'shadow.intensity': { zh: LABELS_ZH.shadowIntensityLabel, en: LABELS_EN.shadowIntensityLabel },
+      'shadow.bias': { zh: LABELS_ZH.shadowBiasLabel, en: LABELS_EN.shadowBiasLabel },
+      'shadow.normalBias': { zh: LABELS_ZH.shadowNormalBiasLabel, en: LABELS_EN.shadowNormalBiasLabel },
+      'shadow.radius': { zh: LABELS_ZH.shadowRadiusLabel, en: LABELS_EN.shadowRadiusLabel },
+      'shadow.mapSize.width': { zh: LABELS_ZH.shadowMapSizeWidthLabel, en: LABELS_EN.shadowMapSizeWidthLabel },
+      'shadow.mapSize.height': { zh: LABELS_ZH.shadowMapSizeHeightLabel, en: LABELS_EN.shadowMapSizeHeightLabel },
+      'shadow.camera.near': { zh: LABELS_ZH.shadowCameraNearLabel, en: LABELS_EN.shadowCameraNearLabel },
+      'shadow.camera.far': { zh: LABELS_ZH.shadowCameraFarLabel, en: LABELS_EN.shadowCameraFarLabel },
+      'shadow.camera.fov': { zh: LABELS_ZH.shadowCameraFovLabel, en: LABELS_EN.shadowCameraFovLabel }
     } as const;
     const displayValue = Number(normalizedValue.toFixed(6));
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, normalizedValue, {
@@ -1511,8 +1384,8 @@ export function PropertiesSettings() {
     const v = boolTextI18n(nextVisible);
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, `userData.${VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE}`, nextVisible, {
       operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.shadowHelperVisibleLabel} = ${v.zh}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.shadowHelperVisibleLabel} = ${v.en}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.shadowHelperVisibleLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.shadowHelperVisibleLabel} = ${v.en}`
       )
     });
     setSpotLightShadowState((prev) => (prev ? { ...prev, helperVisible: nextVisible } : prev));
@@ -1571,14 +1444,14 @@ export function PropertiesSettings() {
         ? Math.max(1, Math.min(8192, Math.round(nextValue)))
         : nextValue;
     const labelMap = {
-      'shadow.intensity': { zh: labelsZh.shadowIntensityLabel, en: labelsEn.shadowIntensityLabel },
-      'shadow.bias': { zh: labelsZh.shadowBiasLabel, en: labelsEn.shadowBiasLabel },
-      'shadow.normalBias': { zh: labelsZh.shadowNormalBiasLabel, en: labelsEn.shadowNormalBiasLabel },
-      'shadow.radius': { zh: labelsZh.shadowRadiusLabel, en: labelsEn.shadowRadiusLabel },
-      'shadow.mapSize.width': { zh: labelsZh.shadowMapSizeWidthLabel, en: labelsEn.shadowMapSizeWidthLabel },
-      'shadow.mapSize.height': { zh: labelsZh.shadowMapSizeHeightLabel, en: labelsEn.shadowMapSizeHeightLabel },
-      'shadow.camera.near': { zh: labelsZh.shadowCameraNearLabel, en: labelsEn.shadowCameraNearLabel },
-      'shadow.camera.far': { zh: labelsZh.shadowCameraFarLabel, en: labelsEn.shadowCameraFarLabel }
+      'shadow.intensity': { zh: LABELS_ZH.shadowIntensityLabel, en: LABELS_EN.shadowIntensityLabel },
+      'shadow.bias': { zh: LABELS_ZH.shadowBiasLabel, en: LABELS_EN.shadowBiasLabel },
+      'shadow.normalBias': { zh: LABELS_ZH.shadowNormalBiasLabel, en: LABELS_EN.shadowNormalBiasLabel },
+      'shadow.radius': { zh: LABELS_ZH.shadowRadiusLabel, en: LABELS_EN.shadowRadiusLabel },
+      'shadow.mapSize.width': { zh: LABELS_ZH.shadowMapSizeWidthLabel, en: LABELS_EN.shadowMapSizeWidthLabel },
+      'shadow.mapSize.height': { zh: LABELS_ZH.shadowMapSizeHeightLabel, en: LABELS_EN.shadowMapSizeHeightLabel },
+      'shadow.camera.near': { zh: LABELS_ZH.shadowCameraNearLabel, en: LABELS_EN.shadowCameraNearLabel },
+      'shadow.camera.far': { zh: LABELS_ZH.shadowCameraFarLabel, en: LABELS_EN.shadowCameraFarLabel }
     } as const;
     const displayValue = Number(normalizedValue.toFixed(6));
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, path, normalizedValue, {
@@ -1608,8 +1481,8 @@ export function PropertiesSettings() {
     const v = boolTextI18n(nextVisible);
     void editor.setObjectPropertyByUuid(selectedInfo.uuid, `userData.${VIZON_USER_DATA_KEYS.HELPERS.SHADOW_HELPER_VISIBLE}`, nextVisible, {
       operationName: historyName(
-        `${historyCategory.zh} - ${selectedInfo.uuid} - ${labelsZh.shadowHelperVisibleLabel} = ${v.zh}`,
-        `${historyCategory.en} - ${selectedInfo.uuid} - ${labelsEn.shadowHelperVisibleLabel} = ${v.en}`
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.shadowHelperVisibleLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.shadowHelperVisibleLabel} = ${v.en}`
       )
     });
     setPointLightShadowState((prev) => (prev ? { ...prev, helperVisible: nextVisible } : prev));
