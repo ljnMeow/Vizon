@@ -50,7 +50,7 @@ function clamp(n: number, min: number, max: number) {
 function sceneSettingsChanged(a: SceneSettings, b: SceneSettings): boolean {
   try {
     const stripTree = (s: SceneSettings) => {
-      const { sceneTree: _t, ...rest } = s as any;
+      const { sceneTree: _, ...rest } = s as any;
       return rest;
     };
     return JSON.stringify(stripTree(a)) !== JSON.stringify(stripTree(b));

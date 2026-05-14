@@ -31,7 +31,6 @@ export function ImagePreviewProvider({ children }: { children: ReactNode }) {
         carousel={{ finite: true }}
         render={{ buttonPrev: () => null, buttonNext: () => null }}
         styles={{
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           root: { '--yarl__color_backdrop': 'rgba(0, 0, 0, 0.65)' } as any,
           container: {
             width: 'min(760px, 90vw)',

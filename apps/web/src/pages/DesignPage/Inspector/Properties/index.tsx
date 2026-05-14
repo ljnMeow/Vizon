@@ -30,7 +30,6 @@ import type {
   SpotLightParamsState,
   SpotLightShadowState,
   TransformState,
-  Vec3,
   VisibilityPickFreezeState,
 } from './propertiesTypes';
 
