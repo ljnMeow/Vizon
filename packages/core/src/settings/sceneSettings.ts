@@ -28,6 +28,8 @@ export type SceneSettingsBackgroundMode = 'solid' | 'skybox';
 
 export type SceneSettingsUploadedHdri = {
   type: 'uploaded';
+  /** 指向 web 侧会话资产仓库中的稳定资源 id，供项目包导入导出复用。 */
+  assetId?: string;
   /**
    * WEB 侧通常会把用户上传文件转成 `blob:` url（通过 `URL.createObjectURL(file)`）。
    * 注意：blob url 是运行时临时资源，不适合长期导出为“可长期复用的 JSON”。

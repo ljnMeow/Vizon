@@ -250,16 +250,11 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
         target: { x: editor.orbit.target.x, y: editor.orbit.target.y, z: editor.orbit.target.z }
       };
 
-      const prevCamera = sceneSettingsRef.current.camera;
-      if (
-        isSameCamera(nextCamera, {
-          fov: prevCamera.fov,
-          near: prevCamera.near,
-          far: prevCamera.far,
-          position: prevCamera.position,
-          target: prevCamera.target
-        })
-      ) {
+      // 用 core 的权威相机值比较（setSceneSettings 开头已同步写入），
+      // 避免 sceneSettingsRef 在 sceneSettingsChange 事件到来前仍是旧值，
+      // 导致 OrbitControls change RAF 把刚恢复的导入设置（环境/渲染器/辅助器等）覆盖成默认值。
+      const coreCamera = editor.getSceneSettings().camera;
+      if (isSameCamera(nextCamera, coreCamera)) {
         return;
       }
 

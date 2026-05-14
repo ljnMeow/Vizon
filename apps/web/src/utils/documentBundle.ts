@@ -46,6 +46,7 @@ type BundleTextureBinding = {
 type BundleTexturesPayload = {
   items: Record<string, BundleTextureAsset>;
   bindings: BundleTextureBinding[];
+  environmentHdriAssetId?: string;
 };
 
 /** 在原始场景文档上扩展出的、带 web 侧贴图元数据的文档类型。 */
@@ -70,6 +71,61 @@ function getTextureLoader(fieldKey: TextureFieldKey) {
   return fieldKey === 'envMap' ? loadEquirectEnvMapTextureFromFile : loadImageTextureFromFile;
 }
 
+function toBundleTextureAsset(ref: {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  lastModified: number;
+}): BundleTextureAsset {
+  return {
+    id: ref.id,
+    path: `assets/textures/${ref.id}.${getAssetExtension(ref)}`,
+    originalName: ref.originalName,
+    mimeType: ref.mimeType,
+    size: ref.size,
+    lastModified: ref.lastModified
+  };
+}
+
+async function ensureEnvironmentHdriAsset(
+  hdri: VizonDocument['environment']['hdri']
+): Promise<
+  | {
+      asset: BundleTextureAsset;
+      assetId: string;
+    }
+  | null
+> {
+  if (hdri.type !== 'uploaded') return null;
+
+  const existingAssetId = typeof hdri.assetId === 'string' ? hdri.assetId : null;
+  if (existingAssetId) {
+    const cached = getCachedTextureAsset(existingAssetId);
+    if (cached) {
+      return {
+        asset: toBundleTextureAsset(cached),
+        assetId: cached.id
+      };
+    }
+  }
+
+  if (!hdri.url) return null;
+
+  const response = await fetch(hdri.url);
+  const blob = await response.blob();
+  const originalName = hdri.fileName?.trim() || 'environment-map';
+  const textureFile = new File([blob], originalName, {
+    type: hdri.mimeType || blob.type || 'application/octet-stream',
+    lastModified: Date.now()
+  });
+  const ref = await cacheTextureAssetFile(textureFile, existingAssetId ?? undefined);
+  return {
+    asset: toBundleTextureAsset(ref),
+    assetId: ref.id
+  };
+}
+
 /** 把 `object.material` 统一规整成数组，兼容单材质和多材质对象。 */
 function getMaterials(object: unknown): any[] {
   const material = (object as { material?: any } | null)?.material;
@@ -84,9 +140,29 @@ function getMaterials(object: unknown): any[] {
  * - 启用态贴图直接来自 `material[fieldKey]`
  * - 已配置但禁用的贴图来自 `TEXTURE_BINDINGS` 与会话缓存的组合
  */
-function buildBundleTexturePayload(editor: ThreeEditor): BundleTexturesPayload {
+async function buildBundleTexturePayload(editor: ThreeEditor, document: BundleDocument): Promise<BundleTexturesPayload> {
   const items: Record<string, BundleTextureAsset> = {};
   const bindings: BundleTextureBinding[] = [];
+  let environmentHdriAssetId: string | undefined;
+
+  const hdriAsset = await ensureEnvironmentHdriAsset(document.environment.hdri);
+  if (hdriAsset) {
+    items[hdriAsset.assetId] ??= hdriAsset.asset;
+    environmentHdriAssetId = hdriAsset.assetId;
+    const hdri = document.environment.hdri;
+    // ensureEnvironmentHdriAsset 仅在 uploaded 时返回非 null；此处收窄以便符合 SceneSettingsHdri
+    if (hdri.type === 'uploaded') {
+      document.environment = {
+        ...document.environment,
+        hdri: {
+          ...hdri,
+          assetId: hdriAsset.assetId,
+          fileName: hdriAsset.asset.originalName,
+          mimeType: hdriAsset.asset.mimeType
+        }
+      };
+    }
+  }
 
   editor.scene.traverse((object: any) => {
     const materials = getMaterials(object);
@@ -113,15 +189,7 @@ function buildBundleTexturePayload(editor: ThreeEditor): BundleTexturesPayload {
           })();
         if (!ref) return;
 
-        const assetPath = `assets/textures/${ref.id}.${getAssetExtension(ref)}`;
-        items[ref.id] ??= {
-          id: ref.id,
-          path: assetPath,
-          originalName: ref.originalName,
-          mimeType: ref.mimeType,
-          size: ref.size,
-          lastModified: ref.lastModified
-        };
+        items[ref.id] ??= toBundleTextureAsset(ref);
         bindings.push({
           objectId: object.uuid,
           materialIndex,
@@ -132,7 +200,7 @@ function buildBundleTexturePayload(editor: ThreeEditor): BundleTexturesPayload {
     });
   });
 
-  return { items, bindings };
+  return { items, bindings, environmentHdriAssetId };
 }
 
 /**
@@ -145,7 +213,7 @@ function buildBundleTexturePayload(editor: ThreeEditor): BundleTexturesPayload {
  */
 export async function buildProjectBundle(editor: ThreeEditor, options?: { generator?: string }) {
   const document = editor.getVizonDocument({ generator: options?.generator }) as BundleDocument;
-  const texturesPayload = buildBundleTexturePayload(editor);
+  const texturesPayload = await buildBundleTexturePayload(editor, document);
 
   document.assets = {
     ...(document.assets ?? {}),
@@ -208,6 +276,42 @@ export async function importProjectBundle(editor: ThreeEditor, file: File) {
 
   const document = decodeJson<BundleDocument>(sceneBytes);
   const texturesPayload = document.assets?.textures;
+  let importedHdriObjectUrl: string | null = null;
+
+  if (texturesPayload?.environmentHdriAssetId && document.environment?.hdri?.type === 'uploaded') {
+    const asset = texturesPayload.items[texturesPayload.environmentHdriAssetId];
+    if (asset) {
+      const assetBytes = entries.get(asset.path);
+      if (!assetBytes) {
+        throw new Error(`Bundle is missing texture asset: ${asset.path}`);
+      }
+
+      const fileBytes = new Uint8Array(assetBytes.byteLength);
+      fileBytes.set(assetBytes);
+      const hdriFile = new File([fileBytes], asset.originalName, {
+        type: asset.mimeType,
+        lastModified: asset.lastModified
+      });
+      const ref = await cacheTextureAssetFile(hdriFile, asset.id);
+      importedHdriObjectUrl = URL.createObjectURL(hdriFile);
+      document.environment = {
+        ...document.environment,
+        hdri: {
+          ...document.environment.hdri,
+          assetId: ref.id,
+          url: importedHdriObjectUrl,
+          fileName: asset.originalName,
+          mimeType: asset.mimeType
+        }
+      };
+    }
+  } else if (document.environment?.hdri?.type === 'uploaded') {
+    document.environment = {
+      ...document.environment,
+      hdri: { type: 'none' }
+    };
+  }
+
   await importDocument(editor, document);
 
   if (!texturesPayload) {

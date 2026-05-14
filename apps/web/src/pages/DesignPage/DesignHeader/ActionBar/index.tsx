@@ -131,24 +131,6 @@ export function ActionBar() {
     setLocale(locale === 'zh-CN' ? 'en-US' : 'zh-CN');
   };
 
-  const onExportDocument = () => {
-    if (!editor) return;
-    const doc = editor.getVizonDocument({ generator: 'apps/web-actionbar' });
-    const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const ts = dayjs().format('YYYY-MM-DD_HH-mm-ss');
-    const configured = sceneSettings.basic.sceneName.trim();
-    const rawBase = configured || labels.exportFileDefaultSceneName;
-    const safeBase = sanitizeExportFileBaseName(rawBase) || labels.exportFileDefaultSceneName;
-    a.href = url;
-    a.download = `${safeBase}-${ts}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
-
   const onExportBundle = async () => {
     if (!editor) return;
     try {
@@ -169,12 +151,6 @@ export function ActionBar() {
       const raw = err instanceof Error ? err.message : String(err);
       window.alert(`${labels.exportFailedPrefix}${raw || labels.exportUnknownError}`);
     }
-  };
-
-  const onImportDocumentClick = () => {
-    // 系统文件框可能导致 Shift 的 keyup 丢失；先重置修饰态，避免导入后视口拾取一直处于 toggle、Gizmo 不显示。
-    editor?.resetShiftMultiselectState();
-    importInputRef.current?.click();
   };
 
   const onImportBundleClick = () => {
@@ -308,9 +284,9 @@ export function ActionBar() {
         className="hidden"
         onChange={onImportBundleChange}
       />
-      <button
+      {/* <button
         type="button"
-        onClick={onExportDocument}
+        onClick={() => {}}
         disabled={!editor}
         className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-xs text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
       >
@@ -318,12 +294,12 @@ export function ActionBar() {
       </button>
       <button
         type="button"
-        onClick={onImportDocumentClick}
+        onClick={() => importInputRef.current?.click()}
         disabled={!editor}
         className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-xs text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {labels.importJson}
-      </button>
+      </button> */}
       <input
         ref={importInputRef}
         type="file"

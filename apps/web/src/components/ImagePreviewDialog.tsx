@@ -81,16 +81,20 @@ export function ImagePreviewDialog({
         </div>
 
         <div className="p-4">
-          {loading ? (
+          {loading && (
             <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">{loadingText}</div>
-          ) : error ? (
+          )}
+          {!loading && error && (
             <div className="text-xs text-[var(--text-muted)]">{error}</div>
-          ) : !isValid ? (
+          )}
+          {!loading && !error && !isValid && (
             <div className="text-xs text-[var(--text-muted)]">{resolvedUnsupported}</div>
-          ) : (
-            <div className="h-[360px] w-full overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/30">
+          )}
+          {/* 始终渲染 img，仅在加载中或出错时用 hidden 隐藏，确保 onLoad/onError 能正常触发以结束加载状态。 */}
+          {isValid && fileUrl && !error && (
+            <div className={`h-[360px] w-full overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/30${loading ? ' hidden' : ''}`}>
               <img
-                src={fileUrl ?? undefined}
+                src={fileUrl}
                 alt={title}
                 className="h-full w-full object-contain"
                 onLoad={() => setLoading(false)}

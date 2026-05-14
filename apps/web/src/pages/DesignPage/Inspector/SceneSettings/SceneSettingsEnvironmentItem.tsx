@@ -5,6 +5,7 @@ import { ImagePreviewDialog } from '../../../../components/ImagePreviewDialog';
 import { Select } from '../../../../components/Select';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
+import { cacheTextureAssetFile } from '../../../../utils/textureAssetSession';
 
 /** 环境设置项的 i18n 文案（背景模式、HDRI、雾效等） */
 export type SceneSettingsEnvironmentLabels = {
@@ -80,6 +81,17 @@ export function SceneSettingsEnvironmentItem({
 
   // 环境 HDRI：UI 预留“资源库选择”入口（当前仍为空）
   const [hdrSelectKey, setHdrSelectKey] = useState('');
+  const hdrSelectOptions = useMemo(
+    () =>
+      hdri.type === 'uploaded'
+        ? [{ value: hdri.assetId ?? hdri.url, label: hdrFileName ?? env.environmentHdriUploadLabel }]
+        : [],
+    [env.environmentHdriUploadLabel, hdri, hdrFileName]
+  );
+
+  useEffect(() => {
+    setHdrSelectKey(hdri.type === 'uploaded' ? hdri.assetId ?? hdri.url : '');
+  }, [hdri]);
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const historyName = (zhName: string, enName: string) =>
@@ -144,9 +156,10 @@ export function SceneSettingsEnvironmentItem({
               <Select
                 value={hdrSelectKey}
                 onChange={(v) => setHdrSelectKey(v)}
-                options={[]}
+                options={hdrSelectOptions}
                 placeholder={env.environmentHdriSelectPlaceholder}
                 ariaLabel={env.environmentHdriSelectPlaceholder}
+                disabled={hdrSelectOptions.length === 0}
               />
 
               <div className="flex items-center gap-3">
@@ -155,13 +168,34 @@ export function SceneSettingsEnvironmentItem({
                     type="file"
                     accept=".hdr,.exr,image/*"
                     className="hidden"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const f = e.target.files?.[0] ?? null;
+                      e.currentTarget.value = '';
                       setPreviewOpen(false);
-                      setHdri(
-                        f
-                          ? { type: 'uploaded', url: URL.createObjectURL(f), fileName: f.name, mimeType: f.type }
-                          : { type: 'none' }
+                      if (!f) {
+                        setHdri({ type: 'none' });
+                        return;
+                      }
+
+                      const assetRef = await cacheTextureAssetFile(f);
+                      updateSceneSettings(
+                        (prev) => ({
+                          ...prev,
+                          environment: {
+                            ...prev.environment,
+                            backgroundMode: 'skybox',
+                            hdri: {
+                              type: 'uploaded',
+                              assetId: assetRef.id,
+                              url: URL.createObjectURL(f),
+                              fileName: f.name,
+                              mimeType: f.type
+                            }
+                          }
+                        }),
+                        {
+                          operationName: historyName('修改场景属性-环境-HDRI = uploaded', 'Set environment HDRI = uploaded')
+                        }
                       );
                     }}
                   />
@@ -348,4 +382,3 @@ export function SceneSettingsEnvironmentItem({
     </>
   );
 }
-

@@ -118,7 +118,18 @@ export function getCachedTextureAssetPreviewUrl(assetId: string): string | null 
 export async function getCachedTextureAssetBytes(assetId: string): Promise<Uint8Array | null> {
   const record = textureAssetSession.get(assetId);
   if (!record) return null;
-  return new Uint8Array(await record.file.arrayBuffer());
+  const fileLike = record.file as File & { arrayBuffer?: () => Promise<ArrayBuffer> };
+  if (typeof fileLike.arrayBuffer === 'function') {
+    return new Uint8Array(await fileLike.arrayBuffer());
+  }
+
+  const blobBytes = await new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read cached texture asset.'));
+    reader.readAsArrayBuffer(record.file);
+  });
+  return new Uint8Array(blobBytes);
 }
 
 /** 导出项目包时优先从文件名、其次从 MIME 推断扩展名。 */
