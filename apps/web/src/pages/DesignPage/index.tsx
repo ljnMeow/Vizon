@@ -5,6 +5,7 @@ import { AssetPane } from './AssetPane';
 import { ThreeViewport } from './drawer/ThreeViewport';
 import { InspectorPanel } from './Inspector';
 import { SceneSettingsProvider, useSceneSettings } from '../../hooks/useSceneSettings';
+import { ImagePreviewProvider } from '../../components/ImagePreviewContext';
 
 /**
  * 设计页主界面：
@@ -64,7 +65,9 @@ function DesignPageInner() {
 export default function DesignPage() {
   return (
     <SceneSettingsProvider>
-      <DesignPageInner />
+      <ImagePreviewProvider>
+        <DesignPageInner />
+      </ImagePreviewProvider>
     </SceneSettingsProvider>
   );
 }

@@ -21,7 +21,6 @@ type SceneSettingsAccordionKey = 'basic' | 'environment' | 'renderer' | 'camera'
 export function SceneSettings() {
   const { locale } = useLocale();
   const t = appMessages[locale].designPage.inspector.sceneSettings as typeof appMessages['zh-CN']['designPage']['inspector']['sceneSettings'];
-  const c = appMessages[locale].common;
 
   const env = t.environmentSettings;
   const renderer = t.rendererSettings;
@@ -50,9 +49,6 @@ export function SceneSettings() {
     fogNearLabel: env.fogNearLabel,
     fogFarLabel: env.fogFarLabel,
     environmentHdriPreviewTitle: env.environmentHdriPreviewTitle,
-    environmentHdriPreviewLoading: env.environmentHdriPreviewLoading,
-    environmentHdriPreviewError: env.environmentHdriPreviewError,
-    environmentHdriPreviewUnsupported: env.environmentHdriPreviewUnsupported
   };
 
   const rendererLabels: SceneSettingsRendererLabels = {
@@ -106,7 +102,7 @@ export function SceneSettings() {
         {
           key: 'environment',
           header: environmentLabels.title,
-          content: <SceneSettingsEnvironmentItem env={environmentLabels} cancelText={c.cancel} />
+          content: <SceneSettingsEnvironmentItem env={environmentLabels} />
         } satisfies AccordionItem<'environment'>,
         {
           key: 'renderer',

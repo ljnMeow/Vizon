@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { ColorPicker } from '../../../../components/ColorPicker';
-import { ImagePreviewDialog } from '../../../../components/ImagePreviewDialog';
 import { Select } from '../../../../components/Select';
+import { useImagePreview } from '../../../../components/ImagePreviewContext';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 import { cacheTextureAssetFile } from '../../../../utils/textureAssetSession';
@@ -30,9 +30,6 @@ export type SceneSettingsEnvironmentLabels = {
   fogFarLabel: string;
 
   environmentHdriPreviewTitle: string;
-  environmentHdriPreviewLoading: string;
-  environmentHdriPreviewError: string;
-  environmentHdriPreviewUnsupported?: string;
 };
 
 /**
@@ -41,10 +38,8 @@ export type SceneSettingsEnvironmentLabels = {
  */
 export function SceneSettingsEnvironmentItem({
   env,
-  cancelText
 }: {
   env: SceneSettingsEnvironmentLabels;
-  cancelText: string;
 }) {
   const {
     sceneSettings,
@@ -93,7 +88,7 @@ export function SceneSettingsEnvironmentItem({
     setHdrSelectKey(hdri.type === 'uploaded' ? hdri.assetId ?? hdri.url : '');
   }, [hdri]);
 
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const { openPreview } = useImagePreview();
   const historyName = (zhName: string, enName: string) =>
     encodeHistoryI18nName({ 'zh-CN': zhName, 'en-US': enName });
 
@@ -119,8 +114,6 @@ export function SceneSettingsEnvironmentItem({
             onChange={(v) => {
               const next = v as typeof backgroundMode;
               setBackgroundMode(next);
-              // 切到纯色模式时，不允许继续预览/配置贴图
-              if (next === 'solid') setPreviewOpen(false);
             }}
             options={[
               { value: 'solid', label: env.backgroundModeOptions.solid },
@@ -171,7 +164,6 @@ export function SceneSettingsEnvironmentItem({
                     onChange={async (e) => {
                       const f = e.target.files?.[0] ?? null;
                       e.currentTarget.value = '';
-                      setPreviewOpen(false);
                       if (!f) {
                         setHdri({ type: 'none' });
                         return;
@@ -205,7 +197,7 @@ export function SceneSettingsEnvironmentItem({
                 {isPreviewableImage && hdrObjectUrl ? (
                   <button
                     type="button"
-                    onClick={() => setPreviewOpen(true)}
+                    onClick={() => openPreview(hdrObjectUrl, env.environmentHdriPreviewTitle)}
                     className={[
                       'min-w-0 flex-1 truncate text-left text-xs text-[var(--text-muted)]',
                       'hover:text-[var(--text-primary)] underline underline-offset-2'
@@ -368,17 +360,6 @@ export function SceneSettingsEnvironmentItem({
           ) : null}
         </div>
       </div>
-
-      <ImagePreviewDialog
-        open={previewOpen}
-        fileUrl={hdrObjectUrl}
-        title={env.environmentHdriPreviewTitle}
-        loadingText={env.environmentHdriPreviewLoading}
-        errorText={env.environmentHdriPreviewError}
-        unsupportedText={env.environmentHdriPreviewUnsupported}
-        closeText={cancelText}
-        onClose={() => setPreviewOpen(false)}
-      />
     </>
   );
 }

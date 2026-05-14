@@ -11,6 +11,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Tooltip } from '../../../../components/Tooltip';
+import { useImagePreview } from '../../../../components/ImagePreviewContext';
 import { getCachedTextureAssetPreviewUrl, getTextureAssetRef } from '../../../../utils/textureAssetSession';
 
 /**
@@ -103,6 +104,7 @@ export function TextureMapItem({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
   const prevTextureRef = useRef<any | null>(null);
+  const { openPreview } = useImagePreview();
 
   // 本地预览优先级最高：用户刚上传时立即看到结果，等异步材质回写完成后再自然切回正式贴图引用。
   const previewUrl = useMemo(() => localPreviewUrl ?? tryGetPreviewUrl(texture), [localPreviewUrl, texture]);
@@ -182,11 +184,24 @@ export function TextureMapItem({
 
       <div className="flex items-center gap-3">
         {previewUrl ? (
-          <div className="h-10 w-10 overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)]">
-            <img src={previewUrl} alt={title} className="h-full w-full object-cover" />
+          <div className="group relative h-10 w-10 shrink-0">
+            <div className="h-10 w-10 overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[var(--bg-input)]">
+              <img src={previewUrl} alt={title} className="h-full w-full object-cover" />
+            </div>
+            <button
+              type="button"
+              onClick={() => openPreview(previewUrl, title)}
+              className="absolute inset-0 hidden items-center justify-center rounded-md bg-black/50 text-white group-hover:flex"
+              aria-label="Preview"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
           </div>
         ) : (
-          <div className="h-10 w-10 rounded-md border border-dashed border-[var(--border-subtle)] bg-[var(--bg-input)]" />
+          <div className="h-10 w-10 shrink-0 rounded-md border border-dashed border-[var(--border-subtle)] bg-[var(--bg-input)]" />
         )}
         <Tooltip
           content={texture ? texture.name || texture.uuid || labels.textureFallback : labels.empty}
