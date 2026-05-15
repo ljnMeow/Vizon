@@ -137,6 +137,7 @@ export interface AppMessages {
         translate: string;
         zoom: string;
         rotate: string;
+        snap: string;
       };
     };
     actionBar: {
@@ -162,6 +163,7 @@ export interface AppMessages {
       importFailedPrefix: string;
       importUnknownError: string;
       importNoObjectSnapshot: string;
+      screenshotExport: string;
     };
     inspector: {
       tabs: {
@@ -657,7 +659,8 @@ export const appMessages: Record<Locale, AppMessages> = {
         tools: {
           translate: '平移',
           zoom: '缩放',
-          rotate: '旋转'
+          rotate: '旋转',
+          snap: '吸附'
         }
       },
       actionBar: {
@@ -682,7 +685,8 @@ export const appMessages: Record<Locale, AppMessages> = {
         importFailedPrefix: '导入失败：',
         importUnknownError: '未知错误',
         importNoObjectSnapshot:
-          '未在文档中找到有效的场景快照。请使用本编辑器导出的 JSON，并确保 content 节点包含 Three.js 序列化数据。'
+          '未在文档中找到有效的场景快照。请使用本编辑器导出的 JSON，并确保 content 节点包含 Three.js 序列化数据。',
+        screenshotExport: '截图导出'
       },
       inspector: {
         tabs: {
@@ -1170,7 +1174,8 @@ export const appMessages: Record<Locale, AppMessages> = {
         tools: {
           translate: 'Translate',
           zoom: 'Zoom',
-          rotate: 'Rotate'
+          rotate: 'Rotate',
+          snap: 'Snap'
         }
       },
       actionBar: {
@@ -1195,7 +1200,8 @@ export const appMessages: Record<Locale, AppMessages> = {
         importFailedPrefix: 'Import failed: ',
         importUnknownError: 'Unknown error',
         importNoObjectSnapshot:
-          'No valid scene snapshot was found in the document. Export JSON from this editor and ensure content nodes include Three.js serialization data.'
+          'No valid scene snapshot was found in the document. Export JSON from this editor and ensure content nodes include Three.js serialization data.',
+        screenshotExport: 'Export Screenshot'
       },
       inspector: {
         tabs: {

@@ -131,6 +131,26 @@ export function ActionBar() {
     setLocale(locale === 'zh-CN' ? 'en-US' : 'zh-CN');
   };
 
+  const onExportScreenshot = () => {
+    if (!editor) return;
+    try {
+      const dataUrl = editor.takeScreenshot();
+      const configured = sceneSettings.basic.sceneName.trim();
+      const rawBase = configured || labels.exportFileDefaultSceneName;
+      const safeBase = sanitizeExportFileBaseName(rawBase) || labels.exportFileDefaultSceneName;
+      const ts = dayjs().format('YYYY-MM-DD_HH-mm-ss');
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `${safeBase}-${ts}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      window.alert(`${labels.exportFailedPrefix}${raw || labels.exportUnknownError}`);
+    }
+  };
+
   const onExportBundle = async () => {
     if (!editor) return;
     try {
@@ -284,6 +304,14 @@ export function ActionBar() {
         className="hidden"
         onChange={onImportBundleChange}
       />
+      <button
+        type="button"
+        onClick={onExportScreenshot}
+        disabled={!editor}
+        className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-xs text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {labels.screenshotExport}
+      </button>
       {/* <button
         type="button"
         onClick={() => {}}

@@ -1160,6 +1160,27 @@ export class ThreeEditor {
   }
 
   /**
+   * 截图并返回 PNG 数据 URL。
+   * - 仅渲染 layer 0（场景内容），排除 layer 1 编辑器辅助层（网格、坐标轴、Helper 等）
+   * - 隐藏 transform gizmo，避免 gizmo 出现在截图中
+   * - 经过 EffectComposer 渲染路径，包含用户设置的辉光/描边等后期效果
+   */
+  takeScreenshot(): string {
+    const layersMask = this.camera.layers.mask;
+    const transformVisible = this.transform.visible;
+    // 只渲染 layer 0（场景对象），跳过编辑器辅助层
+    this.camera.layers.set(0);
+    this.transform.visible = false;
+    // 经 EffectComposer 全效果渲染
+    this.effectsController.render(this.renderer);
+    const dataUrl = this.canvas.toDataURL('image/png');
+    // 恢复
+    this.camera.layers.mask = layersMask;
+    this.transform.visible = transformVisible;
+    return dataUrl;
+  }
+
+  /**
    * 阴影开启时每帧遍历场景内 `castShadow` 灯光，强制更新 shadow camera 与矩阵，
    * 避免编辑态下视锥/投影与物体不同步导致的阴影撕裂或消失。
    */
@@ -1363,6 +1384,19 @@ export class ThreeEditor {
     }
     this.transform.detach();
     this.transform.visible = false;
+  }
+
+  /**
+   * 配置变换吸附：传入具体数值启用，传 null 禁用。
+   * - translateSnap：平移步长（世界单位）
+   * - rotationSnap：旋转步长（弧度）
+   * - scaleSnap：缩放步长（无量纲倍率）
+   */
+  setSnapSettings(settings: { translateSnap: number | null; rotationSnap: number | null; scaleSnap: number | null }): void {
+    // three-stdlib 类型定义的 setter 只接受 number，但底层实现以 null 判断是否启用吸附；用类型转换传 null 来禁用。
+    this.transform.setTranslationSnap(settings.translateSnap as number);
+    this.transform.setRotationSnap(settings.rotationSnap as number);
+    this.transform.setScaleSnap(settings.scaleSnap as number);
   }
 
   /**

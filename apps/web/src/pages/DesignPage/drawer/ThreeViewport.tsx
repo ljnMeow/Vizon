@@ -74,6 +74,7 @@ export function ThreeViewport({
   // 工具非必选：未选中时不允许拾取/变换交互
   const [tool, setTool] = useState<ViewportTool | null>("translate");
   const [hideViewportTool, setHideViewportTool] = useState(false);
+  const [snapEnabled, setSnapEnabled] = useState(false);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -194,6 +195,15 @@ export function ThreeViewport({
     editor.current?.setTransformToolEnabled(true);
   };
 
+  const handleSnapChange = (enabled: boolean) => {
+    setSnapEnabled(enabled);
+    editor.current?.setSnapSettings(
+      enabled
+        ? { translateSnap: 0.5, rotationSnap: Math.PI / 12, scaleSnap: 0.1 }
+        : { translateSnap: null, rotationSnap: null, scaleSnap: null }
+    );
+  };
+
   const onDragOver = (e: DragEvent<HTMLDivElement>) => {
     // 必须阻止默认行为，否则 drop 不会触发
     e.preventDefault();
@@ -271,7 +281,7 @@ export function ThreeViewport({
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
       <ViewPresetToolbar value={view} onChange={setPreset} />
       {!hideViewportTool ? (
-        <TransformToolbar value={tool} onChange={setViewportTool} />
+        <TransformToolbar value={tool} onChange={setViewportTool} snapEnabled={snapEnabled} onSnapChange={handleSnapChange} />
       ) : null}
     </div>
   );
