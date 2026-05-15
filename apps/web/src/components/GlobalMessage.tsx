@@ -27,6 +27,8 @@ type MessageItem = {
   text: string;
   blockInteraction: boolean;
   leaving: boolean;
+  /** 进度值 0-100；定义时在消息下方渲染细进度条。 */
+  progress?: number;
 };
 
 type ShowResult = {
@@ -37,6 +39,8 @@ type ShowResult = {
 type Controller = {
   show(opts: ShowOptions): ShowResult;
   hide(id?: string): void;
+  /** 更新已有消息的文本和/或进度值（通常用于 loading 类型的动态更新）。 */
+  update(id: string, opts: { text?: string; progress?: number }): void;
 };
 
 let controller: Controller | null = null;
@@ -78,6 +82,8 @@ export type MessageLoadingHandle = {
   id: string;
   done: Promise<void>;
   hide: () => void;
+  /** 动态更新消息文本和进度条（0-100），常用于多阶段 loading。 */
+  update: (opts: { text?: string; progress?: number }) => void;
 };
 
 /**
@@ -146,7 +152,8 @@ export const message = {
     return {
       id: r.id,
       done: r.done,
-      hide: () => controller?.hide(r.id)
+      hide: () => controller?.hide(r.id),
+      update: (opts) => controller?.update(r.id, opts)
     };
   },
   hide(): void {
@@ -281,6 +288,19 @@ export function GlobalMessageProvider({ children }: GlobalMessageProviderProps) 
           for (const m of prev) scheduleRemove(m.id);
           return prev.map((m) => ({ ...m, leaving: true }));
         });
+      },
+
+      update(id: string, opts: { text?: string; progress?: number }) {
+        setItems((prev) =>
+          prev.map((m) => {
+            if (m.id !== id) return m;
+            return {
+              ...m,
+              ...(opts.text !== undefined ? { text: opts.text } : {}),
+              ...(opts.progress !== undefined ? { progress: Math.max(0, Math.min(100, opts.progress)) } : {})
+            };
+          })
+        );
       }
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -343,7 +363,17 @@ export function GlobalMessageProvider({ children }: GlobalMessageProviderProps) 
                       ].join(' ')}
                     >
                       <Icon type={m.type} />
-                      <div className="truncate text-[11px] text-[var(--text-primary)]">{m.text}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate text-[11px] text-[var(--text-primary)]">{m.text}</div>
+                        {m.progress !== undefined && (
+                          <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.1)]">
+                            <div
+                              className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-300 ease-out"
+                              style={{ width: `${m.progress}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

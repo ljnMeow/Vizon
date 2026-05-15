@@ -4,6 +4,7 @@ import { Tabs, TabItem } from '../../../components/Tabs';
 import { useLocale } from '../../../hooks/useLocale';
 import { appMessages } from '../../../i18n/messages';
 import { SystemAssets } from './SystemAssets/index';
+import { UserAssets } from './UserAssets/index';
 import { Structure } from './Structure/index';
 import { History } from './History/index';
 
@@ -50,7 +51,7 @@ export function AssetPane({ visible }: { visible: boolean }) {
             return <SystemAssets />;
           }
           if (key === 'mine') {
-            return <div className="h-full overflow-y-auto p-3 text-xs text-[var(--text-muted)]">{t.minePlaceholder}</div>;
+            return <UserAssets isActive={activeTab === 'mine'} />;
           }
           if (key === 'structure') {
             return <Structure />;

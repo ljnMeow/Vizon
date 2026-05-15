@@ -2148,53 +2148,69 @@ export class ThreeEditor {
   }
 
   private markDirty(next: { renderer?: boolean; shadow?: boolean; scene?: boolean }) {
+    // 如果请求标记 renderer 脏，置位 rendererDirty 并累加统计计数
     if (next.renderer) {
-      this.rendererDirty = true;
-      this.dirtyStats.renderer += 1;
+      this.rendererDirty = true;       // 下一帧需要重新执行渲染器参数同步
+      this.dirtyStats.renderer += 1;   // 累计 renderer 脏次数，用于调试统计
     }
+    // 如果请求标记 shadow 脏，置位 shadowDirty 并累加统计计数
     if (next.shadow) {
-      this.shadowDirty = true;
-      this.dirtyStats.shadow += 1;
+      this.shadowDirty = true;         // 下一帧需要重新生成阴影贴图
+      this.dirtyStats.shadow += 1;     // 累计 shadow 脏次数
     }
+    // 如果请求标记 scene 脏，置位 sceneDirty 并累加统计计数
     if (next.scene) {
-      this.sceneDirty = true;
-      this.dirtyStats.scene += 1;
+      this.sceneDirty = true;          // 下一帧需要重新渲染场景
+      this.dirtyStats.scene += 1;      // 累计 scene 脏次数
     }
   }
 
   private maybeLogDirtyStats() {
+    // 未开启 dirty 统计调试时直接跳过，避免每帧产生不必要的性能开销
     if (!this.isDirtyStatsDebugEnabled()) return;
+    // 获取当前时间戳，用于节流：同一秒内只打印一次
     const now = Date.now();
+    // 距上次打印不足 1 秒时直接返回，防止日志刷屏
     if (now - this.dirtyStatsLastLogAt < 1000) return;
+    // 更新上次打印时间
     this.dirtyStatsLastLogAt = now;
+    // 没有任何脏标志时不输出日志，减少无效输出
     if (!this.rendererDirty && !this.shadowDirty && !this.sceneDirty) return;
+    // 以 debug 级别输出当前脏标志状态和累计脏次数，便于排查不必要的渲染触发
     console.debug('[ThreeEditor][dirty]', {
       flags: {
-        rendererDirty: this.rendererDirty,
-        shadowDirty: this.shadowDirty,
-        sceneDirty: this.sceneDirty
+        rendererDirty: this.rendererDirty,   // renderer 参数是否脏
+        shadowDirty: this.shadowDirty,       // 阴影贴图是否脏
+        sceneDirty: this.sceneDirty          // 场景是否脏
       },
-      hits: this.dirtyStats
+      hits: this.dirtyStats   // 各维度累计脏次数，用于量化触发热度
     });
   }
 
   private isDirtyStatsDebugEnabled() {
     try {
+      // 从 localStorage 读取调试开关，值为 '1' 时表示启用 dirty 统计日志
       return window.localStorage?.getItem('VIZON_EDITOR_DEBUG_DIRTY') === '1';
     } catch {
+      // localStorage 不可用（SSR/隐私模式）时静默返回 false，不影响正常运行
       return false;
     }
   }
 
   private isPerFrameRendererSyncEnabled() {
     try {
+      // 从 localStorage 读取强制每帧同步 renderer 参数的调试开关
+      // 正常情况下 renderer 参数只在脏时同步；此开关用于排查参数未生效等问题
       return window.localStorage?.getItem('VIZON_EDITOR_FORCE_RENDERER_SYNC') === '1';
     } catch {
+      // localStorage 不可用时静默返回 false
       return false;
     }
   }
 
   private applyShadowFrustumVisibilityForAllLights() {
+    // 委托给 editorHelperManager 遍历所有灯光，更新阴影视锥体辅助对象的可见性
+    // 该方法在灯光参数变更或场景重建后调用，确保视锥辅助与灯光状态保持同步
     this.editorHelperManager.applyShadowFrustumVisibilityForAllLights();
   }
 }

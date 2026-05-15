@@ -112,6 +112,43 @@ export interface AppMessages {
       emptyCharacters: string;
     };
   };
+  /** 我的资源面板的翻译键。 */
+  userAssets: {
+    /** 项目 Tab 标签 */
+    projectTab: string;
+    /** 场景名为空时的占位文案 */
+    noName: string;
+    /** 载入按钮 */
+    loadScene: string;
+    /** 删除按钮 */
+    deleteScene: string;
+    /** 刷新按钮 */
+    refresh: string;
+    /** 列表为空时的提示 */
+    emptyProjects: string;
+    /** 场景列表加载失败提示 */
+    loadFailed: string;
+    /** 删除确认弹窗前缀（后跟场景名） */
+    deleteConfirmPrefix: string;
+    /** 删除确认弹窗标题 */
+    deleteConfirmTitle: string;
+    /** 删除确认弹窗内容后缀（跟在场景名之后，用于闭合引号/问号） */
+    deleteConfirmSuffix: string;
+    /** 删除成功提示 */
+    deleteSuccess: string;
+    /** 删除失败前缀 */
+    deleteFailedPrefix: string;
+    /** 载入场景时的 loading 文案 */
+    loadSceneLoading: string;
+    /** 下载 bundle 阶段的进度文案前缀（后跟百分比数字和 %） */
+    loadSceneDownloading: string;
+    /** bundle 导入阶段的文案 */
+    loadSceneImporting: string;
+    /** 载入成功提示 */
+    loadSceneSuccess: string;
+    /** 载入失败前缀 */
+    loadSceneFailedPrefix: string;
+  };
   modelNames: {
     cube: string;
     sphere: string;
@@ -163,7 +200,19 @@ export interface AppMessages {
       importFailedPrefix: string;
       importUnknownError: string;
       importNoObjectSnapshot: string;
+      /** 导入项目包时的 loading 文案 */
+      importBundleLoading: string;
+      /** 导入进度前缀（后跟百分比数字和 %） */
+      importBundleProgress: string;
       screenshotExport: string;
+      /** 保存场景按钮标签 */
+      saveScene: string;
+      /** 保存进行中的 loading 提示文案 */
+      saveSceneUploading: string;
+      /** 保存成功的 toast 提示 */
+      saveSceneSuccess: string;
+      /** 保存失败的错误前缀，后跟错误消息 */
+      saveSceneFailedPrefix: string;
     };
     inspector: {
       tabs: {
@@ -635,6 +684,25 @@ export const appMessages: Record<Locale, AppMessages> = {
         emptyCharacters: '暂无角色模型'
       }
     },
+    userAssets: {
+      projectTab: '项目',
+      noName: '未命名',
+      loadScene: '载入',
+      deleteScene: '删除',
+      refresh: '刷新',
+      emptyProjects: '暂无保存的场景，点击顶部「保存场景」即可保存当前场景。',
+      loadFailed: '加载场景列表失败',
+      deleteConfirmPrefix: '确认删除场景「',
+      deleteConfirmTitle: '删除确认',
+      deleteConfirmSuffix: '」？',
+      deleteSuccess: '已删除',
+      deleteFailedPrefix: '删除失败：',
+      loadSceneLoading: '正在载入场景...',
+      loadSceneDownloading: '正在下载',
+      loadSceneImporting: '正在导入场景...',
+      loadSceneSuccess: '场景已载入',
+      loadSceneFailedPrefix: '载入失败：'
+    },
     modelNames: {
       cube: '立方体',
       sphere: '球体',
@@ -686,7 +754,13 @@ export const appMessages: Record<Locale, AppMessages> = {
         importUnknownError: '未知错误',
         importNoObjectSnapshot:
           '未在文档中找到有效的场景快照。请使用本编辑器导出的 JSON，并确保 content 节点包含 Three.js 序列化数据。',
-        screenshotExport: '截图导出'
+        importBundleLoading: '正在导入项目包...',
+        importBundleProgress: '正在导入',
+        screenshotExport: '截图导出',
+        saveScene: '保存场景',
+        saveSceneUploading: '保存中...',
+        saveSceneSuccess: '保存成功',
+        saveSceneFailedPrefix: '保存失败：'
       },
       inspector: {
         tabs: {
@@ -1150,6 +1224,25 @@ export const appMessages: Record<Locale, AppMessages> = {
         emptyCharacters: 'No character models'
       }
     },
+    userAssets: {
+      projectTab: 'Projects',
+      noName: 'Untitled',
+      loadScene: 'Load',
+      deleteScene: 'Delete',
+      refresh: 'Refresh',
+      emptyProjects: 'No saved scenes yet. Click "Save Scene" at the top to save the current scene.',
+      loadFailed: 'Failed to load scenes',
+      deleteConfirmPrefix: 'Delete scene "',
+      deleteConfirmTitle: 'Confirm Delete',
+      deleteConfirmSuffix: '"?',
+      deleteSuccess: 'Deleted',
+      deleteFailedPrefix: 'Delete failed: ',
+      loadSceneLoading: 'Loading scene...',
+      loadSceneDownloading: 'Downloading',
+      loadSceneImporting: 'Importing scene...',
+      loadSceneSuccess: 'Scene loaded',
+      loadSceneFailedPrefix: 'Load failed: '
+    },
     modelNames: {
       cube: 'Cube',
       sphere: 'Sphere',
@@ -1201,7 +1294,13 @@ export const appMessages: Record<Locale, AppMessages> = {
         importUnknownError: 'Unknown error',
         importNoObjectSnapshot:
           'No valid scene snapshot was found in the document. Export JSON from this editor and ensure content nodes include Three.js serialization data.',
-        screenshotExport: 'Export Screenshot'
+        importBundleLoading: 'Importing bundle...',
+        importBundleProgress: 'Importing',
+        screenshotExport: 'Export Screenshot',
+        saveScene: 'Save Scene',
+        saveSceneUploading: 'Saving...',
+        saveSceneSuccess: 'Scene saved',
+        saveSceneFailedPrefix: 'Save failed: '
       },
       inspector: {
         tabs: {

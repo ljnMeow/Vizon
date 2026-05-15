@@ -2,10 +2,13 @@ import { useEffect, useMemo, useRef, useState, type ChangeEventHandler } from 'r
 import { importDocument, VIZON_IMPORT_ERROR_NO_OBJECT_SNAPSHOT } from 'vizon-3d-core';
 import dayjs from 'dayjs';
 import { GlobalMenu } from '../../../../components/GlobalMenu';
+import { message } from '../../../../components/GlobalMessage';
 import { useLocale } from '../../../../hooks/useLocale';
+import { useLoadedScene } from '../../../../hooks/useLoadedScene';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { useTheme } from '../../../../hooks/useTheme';
 import { appMessages } from '../../../../i18n/messages';
+import { createScene, updateScene } from '../../../../api/scenes';
 import { buildProjectBundle, importProjectBundle } from '../../../../utils/documentBundle';
 import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 
@@ -37,6 +40,7 @@ export function ActionBar() {
   const { editor, sceneSettings } = useSceneSettings();
   const { locale, setLocale } = useLocale();
   const { theme, toggleTheme } = useTheme();
+  const { loadedSceneId, setLoadedSceneId } = useLoadedScene();
   const [open, setOpen] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -44,6 +48,8 @@ export function ActionBar() {
   const [hasSelection, setHasSelection] = useState(false);
   const [canGroup, setCanGroup] = useState(false);
   const [canUngroup, setCanUngroup] = useState(false);
+  // 保存进行中时禁用按钮，防止重复提交
+  const [isSaving, setIsSaving] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const importBundleInputRef = useRef<HTMLInputElement | null>(null);
@@ -147,7 +153,7 @@ export function ActionBar() {
       a.remove();
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
-      window.alert(`${labels.exportFailedPrefix}${raw || labels.exportUnknownError}`);
+      void message.error(`${labels.exportFailedPrefix}${raw || labels.exportUnknownError}`);
     }
   };
 
@@ -169,7 +175,44 @@ export function ActionBar() {
       URL.revokeObjectURL(url);
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
-      window.alert(`${labels.exportFailedPrefix}${raw || labels.exportUnknownError}`);
+      void message.error(`${labels.exportFailedPrefix}${raw || labels.exportUnknownError}`);
+    }
+  };
+
+  /**
+   * 保存当前场景到服务端。
+   * - 若当前编辑器中已有载入的服务端场景（loadedSceneId 非 null），则覆盖更新
+   * - 否则新建场景
+   * 保存期间显示 loading toast（阻止交互），完成后提示成功或失败。
+   */
+  const onSaveScene = async () => {
+    if (!editor) return;
+    setIsSaving(true);
+    const loadingHandle = message.loading(labels.saveSceneUploading);
+    try {
+      const name = sceneSettings.basic.sceneName.trim();
+      const screenshotDataUrl = editor.takeScreenshot();
+      const thumbnailBlob = await fetch(screenshotDataUrl).then((r) => r.blob());
+      const { blob: bundleBlob } = await buildProjectBundle(editor, { generator: 'apps/web-save-scene' });
+
+      if (loadedSceneId) {
+        // 已有载入场景：覆盖更新，保持场景 ID 不变
+        await updateScene(loadedSceneId, { name, bundle: bundleBlob, thumbnail: thumbnailBlob });
+      } else {
+        // 全新场景：新建
+        const created = await createScene({ name, bundle: bundleBlob, thumbnail: thumbnailBlob });
+        // 新建成功后标记为已载入，下次保存将走覆盖逻辑
+        setLoadedSceneId(created.scene_id);
+      }
+
+      loadingHandle.hide();
+      void message.success(labels.saveSceneSuccess);
+    } catch (err) {
+      loadingHandle.hide();
+      const raw = err instanceof Error ? err.message : String(err);
+      void message.error(`${labels.saveSceneFailedPrefix}${raw || labels.exportUnknownError}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -207,7 +250,7 @@ export function ActionBar() {
       const raw = err instanceof Error ? err.message : String(err);
       const msg =
         raw === VIZON_IMPORT_ERROR_NO_OBJECT_SNAPSHOT ? labels.importNoObjectSnapshot : raw || labels.importUnknownError;
-      window.alert(`${labels.importFailedPrefix}${msg}`);
+      void message.error(`${labels.importFailedPrefix}${msg}`);
     } finally {
       // 允许重复导入同一文件（浏览器对同名同文件不会重复触发 change）。
       inputEl.value = '';
@@ -220,6 +263,8 @@ export function ActionBar() {
     const inputEl = e.currentTarget;
     const file = e.target.files?.[0];
     if (!file || !editor) return;
+    const loadingHandle = message.loading(labels.importBundleLoading);
+    loadingHandle.update({ progress: 0 });
     try {
       const before = editor.getVizonDocument({ generator: 'apps/web-actionbar' });
       await editor.executeHistoryOperation({
@@ -228,7 +273,12 @@ export function ActionBar() {
           'en-US': 'Import project bundle'
         }),
         do: async () => {
-          await importProjectBundle(editor, file);
+          await importProjectBundle(editor, file, (percent) => {
+            loadingHandle.update({
+              text: `${labels.importBundleProgress} ${percent}%`,
+              progress: percent
+            });
+          });
         },
         undo: async () => {
           await importDocument(editor, before);
@@ -237,9 +287,11 @@ export function ActionBar() {
           await importProjectBundle(editor, file);
         }
       });
+      loadingHandle.hide();
     } catch (err) {
+      loadingHandle.hide();
       const raw = err instanceof Error ? err.message : String(err);
-      window.alert(`${labels.importFailedPrefix}${raw || labels.importUnknownError}`);
+      void message.error(`${labels.importFailedPrefix}${raw || labels.importUnknownError}`);
     } finally {
       inputEl.value = '';
       editor?.resetShiftMultiselectState();
@@ -311,6 +363,14 @@ export function ActionBar() {
         className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-xs text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {labels.screenshotExport}
+      </button>
+      <button
+        type="button"
+        onClick={() => { void onSaveScene(); }}
+        disabled={!editor || isSaving}
+        className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/70 px-3 py-1 text-xs text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {labels.saveScene}
       </button>
       {/* <button
         type="button"

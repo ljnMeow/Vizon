@@ -5,6 +5,7 @@ import { AssetPane } from './AssetPane';
 import { ThreeViewport } from './drawer/ThreeViewport';
 import { InspectorPanel } from './Inspector';
 import { SceneSettingsProvider, useSceneSettings } from '../../hooks/useSceneSettings';
+import { LoadedSceneProvider } from '../../hooks/useLoadedScene';
 import { ImagePreviewProvider } from '../../components/ImagePreviewContext';
 
 /**
@@ -65,9 +66,11 @@ function DesignPageInner() {
 export default function DesignPage() {
   return (
     <SceneSettingsProvider>
-      <ImagePreviewProvider>
-        <DesignPageInner />
-      </ImagePreviewProvider>
+      <LoadedSceneProvider>
+        <ImagePreviewProvider>
+          <DesignPageInner />
+        </ImagePreviewProvider>
+      </LoadedSceneProvider>
     </SceneSettingsProvider>
   );
 }

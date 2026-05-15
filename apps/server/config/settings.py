@@ -162,7 +162,14 @@ INSTALLED_APPS = [
     # 你自己的业务模块
     'customers',   # 客户用户模块（本次新增）
     'auth_api',    # 认证模块（login/token；暂时只做 login）
+    'scenes',      # 场景管理模块（保存/加载项目包）
 ]
+
+# 媒体文件根目录（FileField/ImageField 上传存储位置）。
+# 生产环境应配置为独立挂载点或对象存储；本地开发直接落在 apps/server/media/ 目录。
+MEDIA_ROOT = BASE_DIR / 'media'
+# 媒体文件访问 URL 前缀；开发环境由 Django 直接伺服，生产环境交给 Nginx。
+MEDIA_URL = '/media/'
 
 # 请求处理的“管道”。每个中间件都会按顺序处理 request / response。
 # 例如 CSRF 校验、会话、认证、一些安全头等，都是在这里生效的。

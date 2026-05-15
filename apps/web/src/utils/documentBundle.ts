@@ -22,7 +22,7 @@ import {
   getTextureAssetRef
 } from './textureAssetSession';
 import { WEB_USER_DATA_KEYS } from './keys';
-import { createStoredZip, parseStoredZip } from './zipStore';
+import { createZip, parseZip } from './zipStore';
 
 /** 记录在项目包清单中的单个贴图资产项。 */
 type BundleTextureAsset = {
@@ -56,9 +56,9 @@ type BundleDocument = VizonDocument & {
   };
 };
 
-/** 以稳定缩进格式编码 JSON，便于直接检查导出的 `scene.json`。 */
+/** 将对象编码为 JSON 字节。最小化输出以减小包体积，调试时可直接 JSON.parse 查看。 */
 function encodeJson(input: unknown) {
-  return new TextEncoder().encode(JSON.stringify(input, null, 2));
+  return new TextEncoder().encode(JSON.stringify(input));
 }
 
 /** 从解包后的字节中恢复 JSON 对象。 */
@@ -220,10 +220,12 @@ export async function buildProjectBundle(editor: ThreeEditor, options?: { genera
     textures: texturesPayload
   };
 
-  const entries: Array<{ path: string; data: Uint8Array; lastModified?: number }> = [
+  const entries: Array<{ path: string; data: Uint8Array; lastModified?: number; compress?: boolean }> = [
     {
       path: 'scene.json',
-      data: encodeJson(document)
+      data: encodeJson(document),
+      // 文本 JSON 压缩效果显著（约 70-80%），贴图已是压缩格式无需再压
+      compress: true
     }
   ];
 
@@ -240,7 +242,7 @@ export async function buildProjectBundle(editor: ThreeEditor, options?: { genera
     });
   }
 
-  const zipBytes = createStoredZip(entries);
+  const zipBytes = createZip(entries);
   return {
     document,
     blob: new Blob([zipBytes], { type: 'application/zip' })
@@ -256,9 +258,10 @@ export async function buildProjectBundle(editor: ThreeEditor, options?: { genera
  * 3. 按对象 / 材质绑定关系把贴图重新挂回去
  * 4. 如果槽位本来是禁用态，则只恢复缓存，不直接启用
  */
-export async function importProjectBundle(editor: ThreeEditor, file: File) {
+export async function importProjectBundle(editor: ThreeEditor, file: File, onProgress?: (percent: number) => void) {
   const zipBytes = new Uint8Array(await file.arrayBuffer());
-  const entries = parseStoredZip(zipBytes);
+  const entries = parseZip(zipBytes);
+  onProgress?.(5);
   const sceneBytes = entries.get('scene.json');
   if (!sceneBytes) {
     throw new Error('Bundle is missing scene.json.');
@@ -303,13 +306,17 @@ export async function importProjectBundle(editor: ThreeEditor, file: File) {
   }
 
   await importDocument(editor, document);
+  onProgress?.(40);
 
   if (!texturesPayload) {
     editor.render();
+    onProgress?.(100);
     return;
   }
 
-  for (const binding of texturesPayload.bindings) {
+  const total = texturesPayload.bindings.length;
+  for (let i = 0; i < total; i++) {
+    const binding = texturesPayload.bindings[i];
     const asset = texturesPayload.items[binding.assetId];
     if (!asset) continue;
 
@@ -349,7 +356,10 @@ export async function importProjectBundle(editor: ThreeEditor, file: File) {
     (material.userData ??= {});
     (material.userData[WEB_USER_DATA_KEYS.MATERIAL.TEXTURE_BINDINGS] ??= {})[binding.fieldKey] = asset.id;
     material.needsUpdate = true;
+    // 每张贴图加载完成后上报进度：贴图阶段占总进度的 40-95%
+    onProgress?.(Math.round(40 + ((i + 1) / total) * 55));
   }
 
   editor.render();
+  onProgress?.(100);
 }
