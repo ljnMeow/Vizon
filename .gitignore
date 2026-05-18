@@ -9,3 +9,4 @@ node_modules
 dist/
 **/dist/
 
+packages/core/src/editor/.DS_Store
