@@ -7,9 +7,9 @@
  */
 import * as THREE from 'three';
 import type { SceneSettings } from '../../settings/sceneSettings';
-import type { VizonDocument } from '../../types/document';
+import type { VizonContentNode, VizonDocument } from '../../types/document';
 import { LATEST_SCHEMA_VERSION } from './vizonPersistConstants';
-import { nowIso } from './vizonPersistShared';
+import { isRecord, nowIso } from './vizonPersistShared';
 import { serializeVizonSceneContent } from './vizonPersistScene';
 
 /**
@@ -27,16 +27,41 @@ export interface VizonDocumentBuildEditorLike {
 }
 
 /**
- * 从编辑器当前状态快照构建一个完整的 `VizonDocument`。
+ * 递归移除 content 节点树中所有 objectSnapshot 里的纹理相关数据。
  *
- * 调用顺序：
- * 1. 读取场景设置（sceneSettings）
- * 2. 序列化场景节点树（content）
- * 3. 组装 meta + 各设置字段 + content，返回完整文档
+ * Three.js 的 Object3D.toJSON() 会将所有引用的纹理图片以 base64 data URI 形式
+ * 写入 objectSnapshot.images 数组，每个图片可达数 MB。这些数据在项目包中是冗余的，
+ * 因为项目包 ZIP 已将纹理文件作为独立二进制文件存储于 assets/textures/<id>.<ext>，
+ * 且导入时 importProjectBundle 会从 ZIP 中重新加载纹理并覆盖到材质槽位。
  *
- * @param options.generator  可选，写入 meta.generator 字段，标识是哪个模块生成的文档
- *                           （例如 `'apps/web-save-scene'`），便于调试时追溯来源。
+ * 同时移除 images 和 textures 数组：仅删除 images 而保留 textures 会导致
+ * ObjectLoader.parseTextures() 通过 UUID 查找 image 时崩溃
+ *（Cannot read properties of undefined (reading 'data')）。
+ * 导入时 importProjectBundle 会从 ZIP 重新加载纹理并挂回材质槽位，
+ * 因此 textures 数组中的参数元数据（repeat/offset/wrap）也不需要保留。
+ *
+ * 保留 geometries/materials/object 等字段不变。
+ *
+ * 注意：如果未来引入 DataTexture（无外部文件对应的程序化纹理），需要在此处
+ * 增加保留逻辑，避免将无文件备份的纹理图片误删。
  */
+function stripImagesFromContentNodes(nodes: VizonContentNode[]): void {
+  for (const node of nodes) {
+    const snapshot = node.attribute?.objectSnapshot;
+    if (isRecord(snapshot)) {
+      if ('images' in snapshot) {
+        delete (snapshot as Record<string, unknown>).images;
+      }
+      if ('textures' in snapshot) {
+        delete (snapshot as Record<string, unknown>).textures;
+      }
+    }
+    if (node.children?.length) {
+      stripImagesFromContentNodes(node.children);
+    }
+  }
+}
+
 export function buildVizonDocumentFromEditor(
   editor: VizonDocumentBuildEditorLike,
   options?: { generator?: string }
@@ -48,6 +73,9 @@ export function buildVizonDocumentFromEditor(
   // 遍历场景图，将每个顶层用户节点序列化为 VizonContentNode 树
   // 仅顶层节点包含 objectSnapshot（Three.js 完整 JSON），子节点只含变换等轻量数据
   const content = serializeVizonSceneContent(editor.scene);
+  // 移除 objectSnapshot 中冗余的 base64 纹理图片数据
+  // （项目包已将纹理作为独立文件存储，导入时从 ZIP 恢复）
+  stripImagesFromContentNodes(content);
   return {
     meta: {
       // 写入当前最高 schema 版本号，导入时以此判断是否需要迁移

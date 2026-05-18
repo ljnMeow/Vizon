@@ -362,6 +362,15 @@ function importSceneFromContentNodes(editor: ThreeEditor, roots: VizonContentNod
    * @param snapshot - 符合 Three.js ObjectLoader 格式的普通对象（来自 attribute.objectSnapshot）
    */
   const addOne = (snapshot: Record<string, unknown>) => {
+    // 防御：若 textures 存在但 images 缺失或为空，ObjectLoader.parseTextures()
+    // 会因找不到 image UUID 而崩溃（Cannot read properties of undefined (reading 'data')）。
+    // 此场景可能出现在旧版项目包中（仅删除了 images 而未删除 textures），
+    // 需要同步移除 textures 以保证数据一致性。导入后 importProjectBundle 会从 ZIP 恢复纹理。
+    if (Array.isArray(snapshot.textures) && snapshot.textures.length > 0) {
+      if (!Array.isArray(snapshot.images) || snapshot.images.length === 0) {
+        delete snapshot.textures;
+      }
+    }
     const parsed = loader.parse(snapshot as any); // 将 JSON 格式的快照解析为 Three.js Object3D 对象
     addParsedObject(parsed); // 交给统一的添加函数处理 helper 注入和 editor.add
   };

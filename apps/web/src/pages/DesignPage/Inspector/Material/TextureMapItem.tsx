@@ -63,6 +63,8 @@ export type TextureMapItemProps = {
   labels: TextureMapItemLabels;
   texture: any | null;
   accept?: string;
+  /** 鼠标悬停在上传按钮时显示的格式提示文案 */
+  formatHint?: string;
   intensity?: TextureMapItemIntensity;
   debugToggle?: {
     label: string;
@@ -96,6 +98,7 @@ export function TextureMapItem({
   labels,
   texture,
   accept = 'image/*',
+  formatHint,
   intensity,
   debugToggle,
   onUpload,
@@ -144,13 +147,25 @@ export function TextureMapItem({
               />
             </label>
           ) : null}
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/50 px-2 py-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          >
-            {labels.upload}
-          </button>
+          {formatHint ? (
+            <Tooltip content={formatHint} placement="bottom">
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                className="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/50 px-2 py-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              >
+                {labels.upload}
+              </button>
+            </Tooltip>
+          ) : (
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/50 px-2 py-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            >
+              {labels.upload}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {

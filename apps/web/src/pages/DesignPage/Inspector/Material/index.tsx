@@ -7,6 +7,8 @@ import { useLocale } from '../../../../hooks/useLocale';
 import { appMessages, type AppMessages } from '../../../../i18n/messages';
 import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 import { WEB_USER_DATA_KEYS } from '../../../../utils/keys';
+import { message } from '../../../../components/GlobalMessage';
+import { normalizeTextureFile } from '../../../../utils/normalizeTextureFile';
 import { attachTextureAssetRef, cacheTextureAssetFile, getTextureAssetRef } from '../../../../utils/textureAssetSession';
 import { MaterialMainControlsSection } from './MaterialMainControlsSection';
 import { MaterialTextureMapsSection } from './MaterialTextureMapsSection';
@@ -576,31 +578,50 @@ export function MaterialSettings() {
   const makeTextureUploadHandler = useCallback(
     (fieldKey: TextureFieldKey, loader: (f: File) => Promise<any>) => {
       return async (f: File) => {
-        const assetRef = await cacheTextureAssetFile(f);
-        const tex = await loader(f);
-        attachTextureAssetRef(tex as { name?: string; userData?: Record<string, unknown> }, assetRef);
-        // 若该贴图效果被禁用：只更新缓存，不让它立即影响渲染
-        if (isTextureFieldEffectDisabled(fieldKey)) {
-          const mat: any = firstMeshMaterial as any;
-          const id = mat?.uuid;
-          if (id) {
-            textureDebugCacheRef.current[id] = {
-              ...(textureDebugCacheRef.current[id] ?? {}),
-              [fieldKey]: tex,
-            };
-            const u = ((mat as any).userData ??= {});
-            // 即使当前效果关闭，也要更新缓存与资产绑定，保证导出项目包时带得走这张图。
-            (u[TEXTURE_EFFECT_CACHE_KEY] ??= {})[fieldKey] = tex;
-            (u[TEXTURE_BINDINGS_KEY] ??= {})[fieldKey] = assetRef.id;
-            setMaterialUiEpoch((e) => e + 1);
+        const loadingHandle = message.loading();
+        try {
+          loadingHandle.update({ text: locale === 'zh-CN' ? '正在处理纹理…' : 'Processing texture...' });
+          const { file: processedFile, resized, originalWidth, originalHeight, width, height } = await normalizeTextureFile(f);
+          if (resized) {
+            message.warning(`纹理已从 ${originalWidth}×${originalHeight} 缩放至 ${width}×${height}`, { durationMs: 4000 });
           }
-          return;
+
+          const assetRef = await cacheTextureAssetFile(processedFile);
+
+          loadingHandle.update({ text: locale === 'zh-CN' ? '正在加载纹理…' : 'Loading texture...' });
+          const tex = await loader(processedFile);
+          attachTextureAssetRef(tex as { name?: string; userData?: Record<string, unknown> }, assetRef);
+          // 若该贴图效果被禁用：只更新缓存，不让它立即影响渲染
+          if (isTextureFieldEffectDisabled(fieldKey)) {
+            const mat: any = firstMeshMaterial as any;
+            const id = mat?.uuid;
+            if (id) {
+              textureDebugCacheRef.current[id] = {
+                ...(textureDebugCacheRef.current[id] ?? {}),
+                [fieldKey]: tex,
+              };
+              const u = ((mat as any).userData ??= {});
+              // 即使当前效果关闭，也要更新缓存与资产绑定，保证导出项目包时带得走这张图。
+              (u[TEXTURE_EFFECT_CACHE_KEY] ??= {})[fieldKey] = tex;
+              (u[TEXTURE_BINDINGS_KEY] ??= {})[fieldKey] = assetRef.id;
+              setMaterialUiEpoch((e) => e + 1);
+            }
+            return;
+          }
+          // 贴图效果开启时，写回材质字段并触发渲染
+          // onPropertyChange 内部会调用 editor.render()（同步，含 GPU 上传和 PMREM），
+          // 确保渲染完成后再关闭 loading 提示。
+          loadingHandle.update({ text: locale === 'zh-CN' ? '正在渲染纹理…' : 'Rendering texture...' });
+          onPropertyChange(fieldKey, tex);
+        } catch (err) {
+          message.error(locale === 'zh-CN' ? '纹理加载失败' : 'Texture load failed');
+          console.error('[MaterialSettings] Texture upload failed:', err);
+        } finally {
+          loadingHandle.hide();
         }
-        // 贴图效果开启时，直接写回材质字段并触发刷新
-        onPropertyChange(fieldKey, tex);
       };
     },
-    [TEXTURE_BINDINGS_KEY, TEXTURE_EFFECT_CACHE_KEY, firstMeshMaterial, isTextureFieldEffectDisabled, onPropertyChange]
+    [TEXTURE_BINDINGS_KEY, TEXTURE_EFFECT_CACHE_KEY, firstMeshMaterial, isTextureFieldEffectDisabled, locale, onPropertyChange]
   );
 
   /**

@@ -2,9 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { ColorPicker } from '../../../../components/ColorPicker';
 import { Select } from '../../../../components/Select';
+import { Tooltip } from '../../../../components/Tooltip';
 import { useImagePreview } from '../../../../components/ImagePreviewContext';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
+import { useLocale } from '../../../../hooks/useLocale';
+import { message } from '../../../../components/GlobalMessage';
 import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
+import { normalizeTextureFile } from '../../../../utils/normalizeTextureFile';
 import { cacheTextureAssetFile } from '../../../../utils/textureAssetSession';
 
 /** 环境设置项的 i18n 文案（背景模式、HDRI、雾效等） */
@@ -41,7 +45,9 @@ export function SceneSettingsEnvironmentItem({
 }: {
   env: SceneSettingsEnvironmentLabels;
 }) {
+  const { locale } = useLocale();
   const {
+    editor,
     sceneSettings,
     updateSceneSettings,
     setBackgroundMode,
@@ -156,10 +162,11 @@ export function SceneSettingsEnvironmentItem({
               />
 
               <div className="flex items-center gap-3">
+                <Tooltip content="HDR / EXR / PNG / JPEG / WebP" placement="bottom">
                 <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/50 px-2 py-1.5 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
                   <input
                     type="file"
-                    accept=".hdr,.exr,image/*"
+                    accept=".hdr,.exr,image/png,image/jpeg,image/webp"
                     className="hidden"
                     onChange={async (e) => {
                       const f = e.target.files?.[0] ?? null;
@@ -169,30 +176,55 @@ export function SceneSettingsEnvironmentItem({
                         return;
                       }
 
-                      const assetRef = await cacheTextureAssetFile(f);
-                      updateSceneSettings(
-                        (prev) => ({
-                          ...prev,
+                      const loadingHandle = message.loading();
+                      try {
+                        loadingHandle.update({ text: locale === 'zh-CN' ? '正在处理环境贴图…' : 'Processing environment map...' });
+                        const { file: processedFile, resized, originalWidth, originalHeight, width, height } = await normalizeTextureFile(f);
+                        if (resized) {
+                          message.warning(`纹理已从 ${originalWidth}×${originalHeight} 缩放至 ${width}×${height}`, { durationMs: 4000 });
+                        }
+
+                        loadingHandle.update({ text: locale === 'zh-CN' ? '正在加载环境贴图…' : 'Loading environment map...' });
+                        const assetRef = await cacheTextureAssetFile(processedFile);
+
+                        // 直接 await editor.setSceneSettings 确保环境贴图加载完成，
+                        // 再调用 editor.render() 确保 GPU 上传和 PMREM 处理完成后再关闭 loading。
+                        // 不能用 updateSceneSettings（fire-and-forget，不会等待异步加载）。
+                        const nextSettings = {
+                          ...sceneSettings,
                           environment: {
-                            ...prev.environment,
-                            backgroundMode: 'skybox',
+                            ...sceneSettings.environment,
+                            backgroundMode: 'skybox' as const,
                             hdri: {
-                              type: 'uploaded',
+                              type: 'uploaded' as const,
                               assetId: assetRef.id,
-                              url: URL.createObjectURL(f),
-                              fileName: f.name,
-                              mimeType: f.type
+                              url: URL.createObjectURL(processedFile),
+                              fileName: processedFile.name,
+                              mimeType: processedFile.type
                             }
                           }
-                        }),
-                        {
+                        };
+
+                        loadingHandle.update({ text: locale === 'zh-CN' ? '正在渲染环境贴图…' : 'Rendering environment map...' });
+                        if (!editor) return;
+                        await editor.setSceneSettings(nextSettings, {
+                          recordHistory: true,
                           operationName: historyName('修改场景属性-环境-HDRI = uploaded', 'Set environment HDRI = uploaded')
-                        }
-                      );
+                        });
+                        editor.render();
+                        // 同步 UI 状态
+                        updateSceneSettings(() => editor.getSceneSettings(), { recordHistory: false });
+                      } catch (err) {
+                        message.error(locale === 'zh-CN' ? '环境贴图加载失败' : 'Environment map load failed');
+                        console.error('[SceneSettingsEnvironmentItem] HDRI upload failed:', err);
+                      } finally {
+                        loadingHandle.hide();
+                      }
                     }}
                   />
                   {env.environmentHdriUploadLabel}
                 </label>
+                </Tooltip>
 
                 {isPreviewableImage && hdrObjectUrl ? (
                   <button
