@@ -43,7 +43,9 @@ class CustomerLoginSerializer(serializers.Serializer):
         try:
             return super().to_internal_value(data)
         except serializers.ValidationError as e:
-            raise merge_field_errors_to_detail(e, field_order=("username", "password")) from e
+            raise merge_field_errors_to_detail(
+                e, field_order=("username", "password")
+            ) from e
 
 
 class RefreshTokenSerializer(serializers.Serializer):
@@ -67,7 +69,7 @@ class LogoutSerializer(serializers.Serializer):
         allow_blank=True,
         error_messages={
             "blank": "refresh_token 不能为空",
-        }
+        },
     )
 
     def to_internal_value(self, data):
@@ -75,4 +77,3 @@ class LogoutSerializer(serializers.Serializer):
             return super().to_internal_value(data)
         except serializers.ValidationError as e:
             raise merge_field_errors_to_detail(e, field_order=("refresh_token",)) from e
-

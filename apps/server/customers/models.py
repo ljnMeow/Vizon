@@ -64,9 +64,10 @@ class CustomerPublicId(models.Model):
         related_name="public",
         db_index=True,
     )
-    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)
+    public_id = models.UUIDField(
+        default=uuid.uuid4, unique=True, editable=False, db_index=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "customer_accounts_public_id"
-

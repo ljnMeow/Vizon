@@ -1,0 +1,101 @@
+"""
+贴图模块的序列化器。
+
+负责定义贴图相关接口的输入/输出字段与校验规则：
+- TextureSerializer：读取贴图元数据（列表/详情），含缩略图/文件 URL
+- TextureCreateSerializer：新建贴图（接收 file + 可选 thumbnail + category）
+- TextureUpdateSerializer：更新贴图（仅支持重命名）
+"""
+
+from rest_framework import serializers
+
+from utils.datetime import format_datetime
+
+from .models import Texture
+
+
+class TextureSerializer(serializers.ModelSerializer):
+    """
+    贴图元数据读取序列化器（用于列表和详情响应）。
+
+    - public_id 作为对外 ID，不暴露自增主键
+    - thumbnail_url / file_url 通过请求上下文构建绝对 URL
+    """
+
+    texture_id = serializers.UUIDField(source="public_id", read_only=True)
+    thumbnail_url = serializers.SerializerMethodField()
+    file_url = serializers.SerializerMethodField()
+    created_at = serializers.SerializerMethodField()
+    updated_at = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Texture
+        fields = [
+            "texture_id",
+            "name",
+            "category",
+            "texture_slot",
+            "file_url",
+            "thumbnail_url",
+            "file_size",
+            "mime_type",
+            "width",
+            "height",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_thumbnail_url(self, obj: Texture) -> str | None:
+        if not obj.thumbnail:
+            return None
+        request = self.context.get("request")
+        if request is not None:
+            return request.build_absolute_uri(obj.thumbnail.url)
+        return obj.thumbnail.url
+
+    def get_file_url(self, obj: Texture) -> str | None:
+        if not obj.file:
+            return None
+        request = self.context.get("request")
+        if request is not None:
+            return request.build_absolute_uri(obj.file.url)
+        return obj.file.url
+
+    def get_created_at(self, obj: Texture) -> str:
+        return format_datetime(obj.created_at)
+
+    def get_updated_at(self, obj: Texture) -> str:
+        return format_datetime(obj.updated_at)
+
+
+class TextureCreateSerializer(serializers.Serializer):
+    """
+    新建贴图的请求序列化器（multipart/form-data）。
+
+    前端上传：
+    - name：贴图名称（可为空，默认取文件名）
+    - file：贴图文件（必填，支持 PNG/JPEG/WebP/HDR/EXR）
+    - thumbnail：缩略图 PNG（可选，客户端生成）
+    - category：贴图分类（必填，8 种固定值）
+    - texture_slot：原始贴图槽位（可选，如 'map', 'normalMap', 'hdri'）
+    """
+
+    name = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, default=""
+    )
+    file = serializers.FileField(required=True)
+    thumbnail = serializers.ImageField(required=False, allow_null=True)
+    category = serializers.ChoiceField(choices=Texture.CATEGORY_CHOICES, required=True)
+    texture_slot = serializers.CharField(
+        max_length=50, required=False, allow_blank=True, default=""
+    )
+
+
+class TextureUpdateSerializer(serializers.Serializer):
+    """
+    更新贴图的请求序列化器（仅支持重命名）。
+
+    文件替换需删除后重新上传。
+    """
+
+    name = serializers.CharField(max_length=255, required=True)

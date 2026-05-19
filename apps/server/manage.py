@@ -11,6 +11,7 @@ Django 的命令行入口（`manage.py`）。
 - Django 需要先知道“使用哪一份 settings 配置”（通过 `DJANGO_SETTINGS_MODULE`）
 - 然后再把命令行参数交给 Django 的管理命令系统去分发执行
 """
+
 import os
 import sys
 
@@ -22,7 +23,7 @@ def main():
     - 设置默认的 `DJANGO_SETTINGS_MODULE`
     - 把命令行参数透传给 Django 的命令执行器
     """
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
@@ -34,5 +35,5 @@ def main():
     execute_from_command_line(sys.argv)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -24,7 +24,9 @@ class CustomerReadSerializer(serializers.ModelSerializer):
     """
 
     # 从关联表 customer_accounts_public_id 读取 UUID
-    account_id = serializers.UUIDField(source="public.public_id", read_only=True, allow_null=True)
+    account_id = serializers.UUIDField(
+        source="public.public_id", read_only=True, allow_null=True
+    )
     # 时间格式化：YYYY-MM-DD HH:mm:ss（用方法字段避免类型桩不兼容）
     create_time = serializers.SerializerMethodField()
     update_time = serializers.SerializerMethodField()
@@ -66,7 +68,9 @@ class CustomerCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
 
     # 注册成功后只返回对外 account_id（即 public_id），不暴露内部自增 id
-    account_id = serializers.UUIDField(source="public.public_id", read_only=True, allow_null=True)
+    account_id = serializers.UUIDField(
+        source="public.public_id", read_only=True, allow_null=True
+    )
 
     class Meta:
         model = Customer
@@ -103,7 +107,10 @@ class CustomerUpdateSerializer(serializers.ModelSerializer):
     """
     更新客户资料时使用。
     """
-    account_id = serializers.UUIDField(source="public.public_id", read_only=True, allow_null=True)
+
+    account_id = serializers.UUIDField(
+        source="public.public_id", read_only=True, allow_null=True
+    )
     update_time = serializers.SerializerMethodField()
 
     class Meta:
@@ -123,6 +130,6 @@ class CustomerUpdateSerializer(serializers.ModelSerializer):
             "max_length": "昵称长度为 10 个字符串以内",
         },
     )
-        
+
     def get_update_time(self, obj: Customer) -> str:
         return format_datetime(obj.update_time)

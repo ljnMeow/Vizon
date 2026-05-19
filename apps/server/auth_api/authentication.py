@@ -57,7 +57,11 @@ class CustomerJWTAuthentication(BaseAuthentication):
         payload = decode_customer_token(token, expected_typ="access")
         account_id = payload["sub"]
 
-        customer = Customer.objects.select_related("public").filter(public__public_id=account_id).first()
+        customer = (
+            Customer.objects.select_related("public")
+            .filter(public__public_id=account_id)
+            .first()
+        )
         if customer is None:
             raise AuthenticationFailed("账号不存在")
 
@@ -82,4 +86,3 @@ class CustomerJWTAuthentication(BaseAuthentication):
         # 兼容当前使用的 DRF 类型存根：其声明返回 None。
         # 但运行时 DRF 需要一个非空值来生成 WWW-Authenticate，从而保持 401 不被降级为 403。
         return cast(None, self.keyword)
-

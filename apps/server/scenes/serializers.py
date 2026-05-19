@@ -24,7 +24,7 @@ class SceneSerializer(serializers.ModelSerializer):
     """
 
     # 对外暴露场景唯一标识（UUID 字符串）
-    scene_id = serializers.UUIDField(source='public_id', read_only=True)
+    scene_id = serializers.UUIDField(source="public_id", read_only=True)
     # 缩略图绝对 URL，thumbnail 为空时返回 None
     thumbnail_url = serializers.SerializerMethodField()
     # 创建/更新时间，格式化为 YYYY-MM-DD HH:mm:ss
@@ -34,12 +34,12 @@ class SceneSerializer(serializers.ModelSerializer):
     class Meta:
         model = Scene
         fields = [
-            'scene_id',
-            'name',
-            'thumbnail_url',
-            'bundle_size',
-            'created_at',
-            'updated_at',
+            "scene_id",
+            "name",
+            "thumbnail_url",
+            "bundle_size",
+            "created_at",
+            "updated_at",
         ]
 
     def get_thumbnail_url(self, obj: Scene) -> str | None:
@@ -47,7 +47,7 @@ class SceneSerializer(serializers.ModelSerializer):
         if not obj.thumbnail:
             return None
         # 借助 request context 构建带域名的绝对 URL
-        request = self.context.get('request')
+        request = self.context.get("request")
         if request is not None:
             return request.build_absolute_uri(obj.thumbnail.url)
         return obj.thumbnail.url
@@ -70,7 +70,9 @@ class SceneCreateSerializer(serializers.Serializer):
     """
 
     # 场景名，允许空字符串
-    name = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
+    name = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, default=""
+    )
     # ZIP 项目包文件（必填）
     bundle = serializers.FileField(required=True)
     # 截图缩略图（可选）
@@ -85,6 +87,8 @@ class SceneUpdateSerializer(serializers.Serializer):
     实际上我们要求 bundle 必传（覆盖更新语义），thumbnail 可选。
     """
 
-    name = serializers.CharField(max_length=255, required=False, allow_blank=True, default='')
+    name = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, default=""
+    )
     bundle = serializers.FileField(required=True)
     thumbnail = serializers.ImageField(required=False, allow_null=True)

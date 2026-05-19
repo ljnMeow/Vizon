@@ -10,6 +10,7 @@ import { message } from '../../../../components/GlobalMessage';
 import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 import { normalizeTextureFile } from '../../../../utils/normalizeTextureFile';
 import { cacheTextureAssetFile } from '../../../../utils/textureAssetSession';
+import { syncTextureToLibrary } from '../../../../utils/textureLibrarySync';
 
 /** 环境设置项的 i18n 文案（背景模式、HDRI、雾效等） */
 export type SceneSettingsEnvironmentLabels = {
@@ -214,6 +215,9 @@ export function SceneSettingsEnvironmentItem({
                         editor.render();
                         // 同步 UI 状态
                         updateSceneSettings(() => editor.getSceneSettings(), { recordHistory: false });
+
+                        // 非阻塞：将 HDRI 同步到用户资源库，失败不影响主流程
+                        syncTextureToLibrary(processedFile, 'hdri');
                       } catch (err) {
                         message.error(locale === 'zh-CN' ? '环境贴图加载失败' : 'Environment map load failed');
                         console.error('[SceneSettingsEnvironmentItem] HDRI upload failed:', err);

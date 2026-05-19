@@ -31,4 +31,3 @@ def format_datetime(dt: Optional[datetime], fmt: str = "%Y-%m-%d %H:%M:%S") -> s
         dt = timezone.localtime(dt)
 
     return dt.strftime(fmt) or ""
-

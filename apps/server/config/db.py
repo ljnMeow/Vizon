@@ -25,19 +25,19 @@ def build_databases(base_dir: Path) -> dict:
     - 这样可以避免“本地/CI 不小心回落到 sqlite”导致的数据不一致与排障困难
     """
 
-    postgres_db = os.getenv('POSTGRES_DB', '').strip()
-    postgres_user = os.getenv('POSTGRES_USER', '').strip()
-    postgres_password = os.getenv('POSTGRES_PASSWORD', '').strip()
-    postgres_host = os.getenv('POSTGRES_HOST', '').strip() or '127.0.0.1'
-    postgres_port = os.getenv('POSTGRES_PORT', '').strip() or '5432'
+    postgres_db = os.getenv("POSTGRES_DB", "").strip()
+    postgres_user = os.getenv("POSTGRES_USER", "").strip()
+    postgres_password = os.getenv("POSTGRES_PASSWORD", "").strip()
+    postgres_host = os.getenv("POSTGRES_HOST", "").strip() or "127.0.0.1"
+    postgres_port = os.getenv("POSTGRES_PORT", "").strip() or "5432"
 
     missing = []
     if not postgres_db:
-        missing.append('POSTGRES_DB')
+        missing.append("POSTGRES_DB")
     if not postgres_user:
-        missing.append('POSTGRES_USER')
+        missing.append("POSTGRES_USER")
     if not postgres_password:
-        missing.append('POSTGRES_PASSWORD')
+        missing.append("POSTGRES_PASSWORD")
 
     # HOST/PORT 我们给了默认值；DB/USER/PASSWORD 缺失会导致“连错库/连不上/连到默认库”
     # 这些问题在企业项目里非常难排查，所以这里直接 fail fast。
@@ -51,14 +51,13 @@ def build_databases(base_dir: Path) -> dict:
 
     # Django 内置支持 PostgreSQL，只需要正确的 ENGINE + 驱动（我们已安装 psycopg）
     return {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': postgres_db,
-            'USER': postgres_user,
-            'PASSWORD': postgres_password,
-            'HOST': postgres_host,
-            'PORT': postgres_port,
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": postgres_db,
+            "USER": postgres_user,
+            "PASSWORD": postgres_password,
+            "HOST": postgres_host,
+            "PORT": postgres_port,
             # 可选：如果你后续遇到“连接偶发断开”，可以在这里加 CONN_MAX_AGE 等参数
         }
     }
-

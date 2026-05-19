@@ -12,6 +12,7 @@ URL 路由入口（全局 URLConf）。
 
 参考文档：https://docs.djangoproject.com/en/6.0/topics/http/urls/
 """
+
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -23,13 +24,19 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # OpenAPI schema + Swagger UI
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
-    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+    path(
+        "api/docs/",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
+    ),
     # 认证相关（当前只有登录）
     path("api/", include("auth_api.urls")),
     # 对前端提供的接口都建议挂在 /api/ 下，避免和页面路由冲突
     path("api/", include("customers.urls")),
     # 场景管理接口
     path("api/", include("scenes.urls")),
+    # 贴图资源管理接口
+    path("api/", include("textures.urls")),
 ]
 
 # 开发环境下由 Django 直接伺服媒体文件（上传的 bundle/thumbnail）；

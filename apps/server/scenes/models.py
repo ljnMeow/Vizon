@@ -35,23 +35,23 @@ class Scene(models.Model):
     customer = models.ForeignKey(
         Customer,
         on_delete=models.CASCADE,
-        related_name='scenes',
+        related_name="scenes",
     )
     # 场景名称，允许空字符串（前端未填时为空）
-    name = models.CharField(max_length=255, blank=True, default='')
+    name = models.CharField(max_length=255, blank=True, default="")
     # ZIP 项目包，存放在 MEDIA_ROOT/scenes/bundles/ 目录
-    bundle = models.FileField(upload_to='scenes/bundles/')
+    bundle = models.FileField(upload_to="scenes/bundles/")
     # 预览缩略图，存放在 MEDIA_ROOT/scenes/thumbnails/ 目录，首次保存时由前端上传
-    thumbnail = models.ImageField(upload_to='scenes/thumbnails/', null=True, blank=True)
+    thumbnail = models.ImageField(upload_to="scenes/thumbnails/", null=True, blank=True)
     # ZIP 文件字节数，冗余存储避免每次列表请求都读取文件大小
     bundle_size = models.BigIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'scene_items'
+        db_table = "scene_items"
         # 列表默认按最近修改时间倒序，便于前端展示最新场景
-        ordering = ['-updated_at']
+        ordering = ["-updated_at"]
 
     def __str__(self) -> str:
-        return f'Scene({self.public_id}, name={self.name!r})'
+        return f"Scene({self.public_id}, name={self.name!r})"

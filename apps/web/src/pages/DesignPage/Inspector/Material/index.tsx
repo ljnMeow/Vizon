@@ -10,6 +10,7 @@ import { WEB_USER_DATA_KEYS } from '../../../../utils/keys';
 import { message } from '../../../../components/GlobalMessage';
 import { normalizeTextureFile } from '../../../../utils/normalizeTextureFile';
 import { attachTextureAssetRef, cacheTextureAssetFile, getTextureAssetRef } from '../../../../utils/textureAssetSession';
+import { syncTextureToLibrary } from '../../../../utils/textureLibrarySync';
 import { MaterialMainControlsSection } from './MaterialMainControlsSection';
 import { MaterialTextureMapsSection } from './MaterialTextureMapsSection';
 import {
@@ -613,6 +614,9 @@ export function MaterialSettings() {
           // 确保渲染完成后再关闭 loading 提示。
           loadingHandle.update({ text: locale === 'zh-CN' ? '正在渲染纹理…' : 'Rendering texture...' });
           onPropertyChange(fieldKey, tex);
+
+          // 非阻塞：将贴图同步到用户资源库，失败不影响主流程
+          syncTextureToLibrary(processedFile, fieldKey);
         } catch (err) {
           message.error(locale === 'zh-CN' ? '纹理加载失败' : 'Texture load failed');
           console.error('[MaterialSettings] Texture upload failed:', err);

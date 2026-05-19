@@ -116,6 +116,8 @@ export interface AppMessages {
   userAssets: {
     /** 项目 Tab 标签 */
     projectTab: string;
+    /** 贴图 Tab 标签 */
+    textureTab: string;
     /** 场景名为空时的占位文案 */
     noName: string;
     /** 载入按钮 */
@@ -148,6 +150,31 @@ export interface AppMessages {
     loadSceneSuccess: string;
     /** 载入失败前缀 */
     loadSceneFailedPrefix: string;
+    /** 贴图资源库相关文案 */
+    textureLibrary: {
+      categoryFilterPlaceholder: string;
+      categoryAll: string;
+      categoryColorMap: string;
+      categoryEnvironmentMap: string;
+      categoryOpacityMap: string;
+      categoryLightingMap: string;
+      categoryNormalMap: string;
+      categoryPbrMap: string;
+      categoryPhysicalMap: string;
+      categorySceneEnvironment: string;
+      uploadLabel: string;
+      emptyTextures: string;
+      loadFailed: string;
+      deleteConfirmPrefix: string;
+      deleteConfirmSuffix: string;
+      deleteSuccess: string;
+      deleteFailedPrefix: string;
+      renameSuccess: string;
+      renameFailedPrefix: string;
+      noThumbnail: string;
+      renamePlaceholder: string;
+      sizeLabel: string;
+    };
   };
   modelNames: {
     cube: string;
@@ -686,6 +713,7 @@ export const appMessages: Record<Locale, AppMessages> = {
     },
     userAssets: {
       projectTab: '项目',
+      textureTab: '贴图',
       noName: '未命名',
       loadScene: '载入',
       deleteScene: '删除',
@@ -701,7 +729,31 @@ export const appMessages: Record<Locale, AppMessages> = {
       loadSceneDownloading: '正在下载',
       loadSceneImporting: '正在导入场景...',
       loadSceneSuccess: '场景已载入',
-      loadSceneFailedPrefix: '载入失败：'
+      loadSceneFailedPrefix: '载入失败：',
+      textureLibrary: {
+        categoryFilterPlaceholder: '全部分类',
+        categoryAll: '全部',
+        categoryColorMap: '颜色贴图',
+        categoryEnvironmentMap: '环境贴图',
+        categoryOpacityMap: '透明度贴图',
+        categoryLightingMap: '光照贴图',
+        categoryNormalMap: '法线贴图',
+        categoryPbrMap: 'PBR 贴图',
+        categoryPhysicalMap: '物理贴图',
+        categorySceneEnvironment: '场景环境贴图',
+        uploadLabel: '上传',
+        emptyTextures: '暂无贴图资源，上传贴图或在使用材质贴图时自动保存。',
+        loadFailed: '加载贴图列表失败',
+        deleteConfirmPrefix: '确认删除贴图「',
+        deleteConfirmSuffix: '」？',
+        deleteSuccess: '已删除',
+        deleteFailedPrefix: '删除失败：',
+        renameSuccess: '重命名成功',
+        renameFailedPrefix: '重命名失败：',
+        noThumbnail: '无预览',
+        renamePlaceholder: '输入名称',
+        sizeLabel: '大小',
+      }
     },
     modelNames: {
       cube: '立方体',
@@ -1226,6 +1278,7 @@ export const appMessages: Record<Locale, AppMessages> = {
     },
     userAssets: {
       projectTab: 'Projects',
+      textureTab: 'Textures',
       noName: 'Untitled',
       loadScene: 'Load',
       deleteScene: 'Delete',
@@ -1241,7 +1294,31 @@ export const appMessages: Record<Locale, AppMessages> = {
       loadSceneDownloading: 'Downloading',
       loadSceneImporting: 'Importing scene...',
       loadSceneSuccess: 'Scene loaded',
-      loadSceneFailedPrefix: 'Load failed: '
+      loadSceneFailedPrefix: 'Load failed: ',
+      textureLibrary: {
+        categoryFilterPlaceholder: 'All categories',
+        categoryAll: 'All',
+        categoryColorMap: 'Color Map',
+        categoryEnvironmentMap: 'Environment Map',
+        categoryOpacityMap: 'Opacity Map',
+        categoryLightingMap: 'Lighting Map',
+        categoryNormalMap: 'Normal Map',
+        categoryPbrMap: 'PBR Map',
+        categoryPhysicalMap: 'Physical Map',
+        categorySceneEnvironment: 'Scene Environment',
+        uploadLabel: 'Upload Texture',
+        emptyTextures: 'No texture resources yet. Upload textures or they will be auto-saved when used in materials.',
+        loadFailed: 'Failed to load textures',
+        deleteConfirmPrefix: 'Delete texture "',
+        deleteConfirmSuffix: '"?',
+        deleteSuccess: 'Deleted',
+        deleteFailedPrefix: 'Delete failed: ',
+        renameSuccess: 'Renamed',
+        renameFailedPrefix: 'Rename failed: ',
+        noThumbnail: 'No preview',
+        renamePlaceholder: 'Enter name',
+        sizeLabel: 'Size',
+      }
     },
     modelNames: {
       cube: 'Cube',

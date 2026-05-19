@@ -6,22 +6,41 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('customers', '0002_rename_customers_customer_to_customer_accounts'),
+        ("customers", "0002_rename_customers_customer_to_customer_accounts"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='CustomerPublicId',
+            name="CustomerPublicId",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('public_id', models.UUIDField(db_index=True, default=uuid.uuid4, editable=False, unique=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('customer', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='public', to='customers.customer')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "public_id",
+                    models.UUIDField(
+                        db_index=True, default=uuid.uuid4, editable=False, unique=True
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "customer",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="public",
+                        to="customers.customer",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'customer_accounts_public_id',
+                "db_table": "customer_accounts_public_id",
             },
         ),
     ]

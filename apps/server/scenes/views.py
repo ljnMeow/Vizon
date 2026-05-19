@@ -36,8 +36,8 @@ class SceneNotFoundError(APIException):
     """
 
     status_code = 404
-    default_detail = '场景不存在'
-    default_code = 'not_found'
+    default_detail = "场景不存在"
+    default_code = "not_found"
 
 
 def _get_customer(request: Request) -> Customer:
@@ -73,7 +73,7 @@ class SceneViewSet(viewsets.ViewSet):
         """
         customer = _get_customer(request)
         scenes = Scene.objects.filter(customer=customer)
-        serializer = SceneSerializer(scenes, many=True, context={'request': request})
+        serializer = SceneSerializer(scenes, many=True, context={"request": request})
         return Response(serializer.data)
 
     def create(self, request: Request) -> Response:
@@ -86,24 +86,24 @@ class SceneViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
 
         customer = _get_customer(request)
-        bundle_file = serializer.validated_data['bundle']
-        thumbnail_file = serializer.validated_data.get('thumbnail')
-        name = serializer.validated_data.get('name', '')
+        bundle_file = serializer.validated_data["bundle"]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+        thumbnail_file = serializer.validated_data.get("thumbnail")  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
+        name = serializer.validated_data.get("name", "")  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
 
         # 从上传文件对象直接读取字节数，避免二次读取文件
-        bundle_size = bundle_file.size if hasattr(bundle_file, 'size') else 0
+        bundle_size = bundle_file.size if hasattr(bundle_file, "size") else 0  # pyright: ignore[reportOptionalMemberAccess]
 
         scene = Scene(
             customer=customer,
             name=name,
             bundle_size=bundle_size,
         )
-        scene.bundle.save(bundle_file.name, bundle_file, save=False)
+        scene.bundle.save(bundle_file.name, bundle_file, save=False)  # pyright: ignore[reportOptionalMemberAccess, reportArgumentType]
         if thumbnail_file:
             scene.thumbnail.save(thumbnail_file.name, thumbnail_file, save=False)
         scene.save()
 
-        out = SceneSerializer(scene, context={'request': request})
+        out = SceneSerializer(scene, context={"request": request})
         return Response(out.data, status=status.HTTP_201_CREATED)
 
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
@@ -112,7 +112,7 @@ class SceneViewSet(viewsets.ViewSet):
         获取单个场景元数据；场景不属于当前用户时返回 404。
         """
         scene = self._get_scene(request, pk)
-        serializer = SceneSerializer(scene, context={'request': request})
+        serializer = SceneSerializer(scene, context={"request": request})
         return Response(serializer.data)
 
     def update(self, request: Request, pk: str | None = None) -> Response:
@@ -124,22 +124,20 @@ class SceneViewSet(viewsets.ViewSet):
         serializer = SceneUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        bundle_file = serializer.validated_data['bundle']
-        thumbnail_file = serializer.validated_data.get('thumbnail')
-        name = serializer.validated_data.get('name', '')
+        bundle_file = serializer.validated_data["bundle"]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
+        thumbnail_file = serializer.validated_data.get("thumbnail")  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
+        name = serializer.validated_data.get("name", "")  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
 
         # 先删除旧文件，再保存新文件，避免磁盘空间累积
         old_bundle = scene.bundle
         old_thumbnail = scene.thumbnail
 
         scene.name = name
-        scene.bundle_size = bundle_file.size if hasattr(bundle_file, 'size') else 0
+        scene.bundle_size = bundle_file.size if hasattr(bundle_file, "size") else 0  # pyright: ignore[reportOptionalMemberAccess]
 
         # 保存新文件（save=False 延迟到 scene.save()）
-        scene.bundle = None  # type: ignore[assignment]
-        scene.bundle.save(bundle_file.name, bundle_file, save=False)
+        scene.bundle.save(bundle_file.name, bundle_file, save=False)  # pyright: ignore[reportOptionalMemberAccess, reportArgumentType]
         if thumbnail_file:
-            scene.thumbnail = None  # type: ignore[assignment]
             scene.thumbnail.save(thumbnail_file.name, thumbnail_file, save=False)
 
         scene.save()
@@ -149,7 +147,7 @@ class SceneViewSet(viewsets.ViewSet):
         if thumbnail_file:
             _delete_file_field(old_thumbnail)
 
-        out = SceneSerializer(scene, context={'request': request})
+        out = SceneSerializer(scene, context={"request": request})
         return Response(out.data)
 
     def destroy(self, request: Request, pk: str | None = None) -> Response:
@@ -169,9 +167,9 @@ class SceneViewSet(viewsets.ViewSet):
         _delete_file_field(bundle_field)
         _delete_file_field(thumbnail_field)
 
-        return Response({'deleted': True}, status=status.HTTP_200_OK)
+        return Response({"deleted": True}, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['get'], url_path='bundle')
+    @action(detail=True, methods=["get"], url_path="bundle")
     def bundle(self, request: Request, pk: str | None = None):
         """
         GET /api/scenes/{scene_id}/bundle/
@@ -185,13 +183,13 @@ class SceneViewSet(viewsets.ViewSet):
         scene = self._get_scene(request, pk)
 
         if not scene.bundle or not scene.bundle.name:
-            raise SceneNotFoundError('bundle 文件不存在')
+            raise SceneNotFoundError("bundle 文件不存在")
 
         # 以二进制模式打开文件，Django 会自动分块流式传输，避免内存峰值
-        filename = f'{scene.name or "bundle"}.zip'
+        filename = f"{scene.name or 'bundle'}.zip"
         return FileResponse(
-            scene.bundle.open('rb'),
-            content_type='application/zip',
+            scene.bundle.open("rb"),
+            content_type="application/zip",
             as_attachment=True,
             filename=filename,
         )
@@ -202,11 +200,7 @@ class SceneViewSet(viewsets.ViewSet):
         不存在或不属于当前用户时统一抛 404，避免信息泄漏。
         """
         customer = _get_customer(request)
-        scene = (
-            Scene.objects
-            .filter(public_id=pk, customer=customer)
-            .first()
-        )
+        scene = Scene.objects.filter(public_id=pk, customer=customer).first()
         if scene is None:
             raise SceneNotFoundError()
         return scene

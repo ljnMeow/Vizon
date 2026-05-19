@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 
 from django.db import migrations, models
 
@@ -14,7 +13,15 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="RevokedToken",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
                 ("jti", models.UUIDField(db_index=True, unique=True)),
                 ("token_type", models.CharField(db_index=True, max_length=20)),
                 ("account_id", models.UUIDField(db_index=True)),
@@ -26,4 +33,3 @@ class Migration(migrations.Migration):
             },
         ),
     ]
-

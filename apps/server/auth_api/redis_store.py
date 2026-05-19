@@ -45,7 +45,7 @@ def get_refresh_session_account_id(*, jti: str) -> Optional[str]:
     """
 
     v = _client().get(_refresh_session_key(jti))
-    return v if v else None
+    return str(v) if v else None
 
 
 def delete_refresh_session(*, jti: str) -> None:
@@ -54,4 +54,3 @@ def delete_refresh_session(*, jti: str) -> None:
     """
 
     _client().delete(_refresh_session_key(jti))
-

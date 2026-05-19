@@ -14,8 +14,8 @@ from .views import SceneViewSet
 
 router = DefaultRouter()
 # lookup_value_regex 宽松匹配 UUID（含连字符）
-router.register(r'scenes', SceneViewSet, basename='scenes')
+router.register(r"scenes", SceneViewSet, basename="scenes")
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path("", include(router.urls)),
 ]

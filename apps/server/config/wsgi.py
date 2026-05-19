@@ -20,7 +20,7 @@ import os
 from django.core.wsgi import get_wsgi_application
 
 # 指定 Django 启动时读取哪一份 settings（这里是 `config/settings.py`）
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
 # WSGI 入口：WSGI server 会调用它来处理 HTTP 请求
 application = get_wsgi_application()

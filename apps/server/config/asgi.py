@@ -19,7 +19,7 @@ import os
 from django.core.asgi import get_asgi_application
 
 # 指定 Django 启动时读取哪一份 settings（这里是 `config/settings.py`）
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
 # ASGI 入口：ASGI server 会调用它来处理请求/连接
 application = get_asgi_application()

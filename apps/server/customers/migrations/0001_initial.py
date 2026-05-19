@@ -4,26 +4,35 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Customer',
+            name="Customer",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('username', models.CharField(db_index=True, max_length=150, unique=True)),
-                ('password', models.CharField(max_length=128)),
-                ('nickname', models.CharField(blank=True, max_length=150)),
-                ('is_active', models.BooleanField(default=True)),
-                ('create_time', models.DateTimeField(auto_now_add=True)),
-                ('update_time', models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "username",
+                    models.CharField(db_index=True, max_length=150, unique=True),
+                ),
+                ("password", models.CharField(max_length=128)),
+                ("nickname", models.CharField(blank=True, max_length=150)),
+                ("is_active", models.BooleanField(default=True)),
+                ("create_time", models.DateTimeField(auto_now_add=True)),
+                ("update_time", models.DateTimeField(auto_now=True)),
             ],
             options={
-                'db_table': 'customers_customer',
+                "db_table": "customers_customer",
             },
         ),
     ]

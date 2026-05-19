@@ -36,7 +36,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # - 我们不会把真实的 `.env` 提交到仓库（避免泄漏密码）
 # - 但本地开发时，你可以在 `apps/server/.env` 里写 Postgres 账号密码等配置
 # - `override=False` 表示：如果你在系统环境变量里已经设置了同名变量，则以系统的为准
-load_dotenv(dotenv_path=BASE_DIR / '.env', override=False)
+load_dotenv(dotenv_path=BASE_DIR / ".env", override=False)
+
 
 def _require_bool_env(name: str) -> bool:
     """
@@ -53,7 +54,9 @@ def _require_bool_env(name: str) -> bool:
 
     raw = os.getenv(name)
     if raw is None:
-        raise RuntimeError(f"缺少必须的环境变量：{name}（请在 apps/server/.env 或系统环境变量中显式配置）")
+        raise RuntimeError(
+            f"缺少必须的环境变量：{name}（请在 apps/server/.env 或系统环境变量中显式配置）"
+        )
 
     v = raw.strip().lower()
     if v in ("1", "true", "yes"):
@@ -99,7 +102,9 @@ except Exception as e:
 def _require_positive_int_env(name: str) -> int:
     raw = os.getenv(name)
     if raw is None:
-        raise RuntimeError(f"缺少必须的环境变量：{name}（请在 apps/server/.env 或系统环境变量中显式配置）")
+        raise RuntimeError(
+            f"缺少必须的环境变量：{name}（请在 apps/server/.env 或系统环境变量中显式配置）"
+        )
     try:
         v = int(raw.strip())
     except Exception as ex:
@@ -111,7 +116,9 @@ def _require_positive_int_env(name: str) -> int:
 
 # token 有效期（单位：秒）
 ACCESS_TOKEN_EXPIRES_SECONDS = _require_positive_int_env("ACCESS_TOKEN_EXPIRES_SECONDS")
-REFRESH_TOKEN_EXPIRES_SECONDS = _require_positive_int_env("REFRESH_TOKEN_EXPIRES_SECONDS")
+REFRESH_TOKEN_EXPIRES_SECONDS = _require_positive_int_env(
+    "REFRESH_TOKEN_EXPIRES_SECONDS"
+)
 
 
 # Quick-start development settings - unsuitable for production
@@ -120,7 +127,7 @@ REFRESH_TOKEN_EXPIRES_SECONDS = _require_positive_int_env("REFRESH_TOKEN_EXPIRES
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY 用于加密签名（比如 session/csrf token 等）。
 # 生产环境务必放到环境变量/密钥管理系统里，不要写死在仓库。
-SECRET_KEY = 'django-insecure-(s!m9#kf^0e9ywm1c&fy=3&9q4$q-$!uxom-63il@yg9$$57$^'
+SECRET_KEY = "django-insecure-(s!m9#kf^0e9ywm1c&fy=3&9q4$q-$!uxom-63il@yg9$$57$^"
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG=True 时：报错页面会展示更完整的调试信息（方便开发，但不适合线上）。
@@ -135,13 +142,13 @@ DEBUG = True
 # 企业项目建议：
 # - 生产环境务必通过环境变量明确配置（避免 Host header 攻击）
 # - 开发环境可以放行 localhost/127.0.0.1/0.0.0.0 方便联调
-_allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '').strip()
+_allowed_hosts_env = os.getenv("ALLOWED_HOSTS", "").strip()
 if _allowed_hosts_env:
     # 用逗号分隔：ALLOWED_HOSTS=example.com,api.example.com
-    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(',') if h.strip()]
+    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(",") if h.strip()]
 else:
     # 默认开发白名单（不使用 '*'，避免养成坏习惯）
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"]
 
 
 # Application definition
@@ -149,59 +156,60 @@ else:
 # Django 会根据 INSTALLED_APPS 注册模型、管理后台、模板、静态文件等能力。
 # 后续你创建自己的 app（例如 `api`）也会加到这里。
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
     # Django REST Framework：让我们更容易写出规范的 JSON API（序列化、校验、权限等）
-    'rest_framework',
+    "rest_framework",
     # OpenAPI/Swagger 文档（/api/schema/ + /api/docs/）
-    'drf_spectacular',
+    "drf_spectacular",
     # 你自己的业务模块
-    'customers',   # 客户用户模块（本次新增）
-    'auth_api',    # 认证模块（login/token；暂时只做 login）
-    'scenes',      # 场景管理模块（保存/加载项目包）
+    "customers",  # 客户用户模块（本次新增）
+    "auth_api",  # 认证模块（login/token；暂时只做 login）
+    "scenes",  # 场景管理模块（保存/加载项目包）
+    "textures",  # 贴图资源管理模块（上传/分类/预览）
 ]
 
 # 媒体文件根目录（FileField/ImageField 上传存储位置）。
 # 生产环境应配置为独立挂载点或对象存储；本地开发直接落在 apps/server/media/ 目录。
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = BASE_DIR / "media"
 # 媒体文件访问 URL 前缀；开发环境由 Django 直接伺服，生产环境交给 Nginx。
-MEDIA_URL = '/media/'
+MEDIA_URL = "/media/"
 
 # 请求处理的“管道”。每个中间件都会按顺序处理 request / response。
 # 例如 CSRF 校验、会话、认证、一些安全头等，都是在这里生效的。
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 # 全局路由入口模块（对应 `config/urls.py`）
-ROOT_URLCONF = 'config.urls'
+ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'config.wsgi.application'
+WSGI_APPLICATION = "config.wsgi.application"
 
 
 # Database
@@ -215,16 +223,16 @@ DATABASES = build_databases(BASE_DIR)
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
@@ -234,11 +242,11 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # 默认语言（影响 admin 后台、表单错误提示等）。
 # 你如果希望中文界面，可以改成 'zh-hans'（或未来做多语言）。
-LANGUAGE_CODE = 'zh-hans'
+LANGUAGE_CODE = "zh-hans"
 
 # 时区（建议按业务所在时区设置）。配合 USE_TZ=True，Django 内部会用 UTC 存储，
 # 但展示时会按 TIME_ZONE 转换（我们在 utils.format_datetime 里也会做 localtime）。
-TIME_ZONE = 'Asia/Shanghai'
+TIME_ZONE = "Asia/Shanghai"
 
 USE_I18N = True
 
@@ -249,7 +257,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "static/"
 
 # 日志（开发期先把错误打到控制台，便于你快速定位 500）
 #
@@ -289,23 +297,25 @@ LOGGING = {
 # - 权限：默认需要登录；注册接口会在视图里单独放行
 REST_FRAMEWORK = {
     # 统一 JSON 返回结构（对前端更友好；也避免每个接口都手动包装 Response）
-    'DEFAULT_RENDERER_CLASSES': [
-        'config.api.UnifiedJSONRenderer',
+    "DEFAULT_RENDERER_CLASSES": [
+        "config.api.UnifiedJSONRenderer",
     ],
-    'DEFAULT_AUTHENTICATION_CLASSES': [
+    "DEFAULT_AUTHENTICATION_CLASSES": [
         # 客户 JWT（Authorization: Bearer <token>）
-        'auth_api.authentication.CustomerJWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
+        "auth_api.authentication.CustomerJWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
     ],
-    'DEFAULT_PERMISSION_CLASSES': [
+    "DEFAULT_PERMISSION_CLASSES": [
         # 这里不靠“隐式默认”，而是由 OPEN_API_AUTH 显式决定
-        'rest_framework.permissions.AllowAny' if OPEN_API_AUTH else 'rest_framework.permissions.IsAuthenticated',
+        "rest_framework.permissions.AllowAny"
+        if OPEN_API_AUTH
+        else "rest_framework.permissions.IsAuthenticated",
     ],
     # OpenAPI schema 生成器（Swagger/Redoc 都依赖它）
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     # 统一异常输出（配合 Renderer 变成统一错误结构）
-    'EXCEPTION_HANDLER': 'config.api.unified_exception_handler',
+    "EXCEPTION_HANDLER": "config.api.unified_exception_handler",
 }
 
 # drf-spectacular 的基础配置（先给最小可用集）

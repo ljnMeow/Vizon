@@ -1,8 +1,10 @@
 .cursor
+.claude
 .vscode
 .tocodex
 .playwright-mcp
 .turbo
+.ruff_cache
 node_modules
 
 # ignore all build outputs

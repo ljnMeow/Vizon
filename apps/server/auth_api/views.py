@@ -13,16 +13,25 @@ from typing import Any, Dict, cast
 from django.contrib.auth.hashers import check_password
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from customers.models import Customer, CustomerPublicId
 from customers.serializers import CustomerReadSerializer
 
-from .jwt import decode_customer_refresh_token_no_session_check, decode_customer_token, issue_customer_access_token, issue_customer_refresh_token
+from .jwt import (
+    decode_customer_refresh_token_no_session_check,
+    decode_customer_token,
+    issue_customer_access_token,
+    issue_customer_refresh_token,
+)
 from .redis_store import delete_refresh_session, set_refresh_session
-from .serializers import CustomerLoginSerializer, LogoutSerializer, RefreshTokenSerializer
+from .serializers import (
+    CustomerLoginSerializer,
+    LogoutSerializer,
+    RefreshTokenSerializer,
+)
 from .authentication import CustomerJWTAuthentication
 
 
@@ -37,7 +46,9 @@ class CustomerLoginView(APIView):
     @extend_schema(
         request=CustomerLoginSerializer,
         responses={
-            200: OpenApiResponse(description="登录成功，返回 access_token/refresh_token 与用户信息"),
+            200: OpenApiResponse(
+                description="登录成功，返回 access_token/refresh_token 与用户信息"
+            ),
             400: OpenApiResponse(description="参数错误/账号或密码错误"),
         },
         tags=["auth"],
@@ -50,23 +61,35 @@ class CustomerLoginView(APIView):
         username = data["username"]
         password = data["password"]
 
-        customer = Customer.objects.select_related("public").filter(username=username).first()
+        customer = (
+            Customer.objects.select_related("public").filter(username=username).first()
+        )
         if customer is None:
-            return Response({"detail": "用户名或密码错误"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "用户名或密码错误"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         if not customer.is_active:
-            return Response({"detail": "账号已冻结"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "账号已冻结"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         if not check_password(password, customer.password):
-            return Response({"detail": "用户名或密码错误"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "用户名或密码错误"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         pub, _ = CustomerPublicId.objects.get_or_create(customer=customer)
         access_token = issue_customer_access_token(account_id=str(pub.public_id))
-        refresh_token, refresh_jti, refresh_exp_ts = issue_customer_refresh_token(account_id=str(pub.public_id))
+        refresh_token, refresh_jti, refresh_exp_ts = issue_customer_refresh_token(
+            account_id=str(pub.public_id)
+        )
 
         # 写入 refresh 会话（Redis）
         ttl = int(refresh_exp_ts - datetime.now(tz=timezone.utc).timestamp())
-        set_refresh_session(jti=refresh_jti, account_id=str(pub.public_id), ttl_seconds=ttl)
+        set_refresh_session(
+            jti=refresh_jti, account_id=str(pub.public_id), ttl_seconds=ttl
+        )
 
         return Response(
             {
@@ -77,6 +100,7 @@ class CustomerLoginView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
 
 class RefreshTokenView(APIView):
     """
@@ -92,7 +116,9 @@ class RefreshTokenView(APIView):
     @extend_schema(
         request=RefreshTokenSerializer,
         responses={
-            200: OpenApiResponse(description="刷新成功，返回新的 access_token/refresh_token"),
+            200: OpenApiResponse(
+                description="刷新成功，返回新的 access_token/refresh_token"
+            ),
             400: OpenApiResponse(description="参数错误或 refresh_token 无效"),
             401: OpenApiResponse(description="refresh_token 过期/无效"),
         },
@@ -115,7 +141,9 @@ class RefreshTokenView(APIView):
 
         # 下发新的 access/refresh，并写入 Redis 会话
         access_token = issue_customer_access_token(account_id=account_id)
-        new_refresh_token, new_jti, new_exp_ts = issue_customer_refresh_token(account_id=account_id)
+        new_refresh_token, new_jti, new_exp_ts = issue_customer_refresh_token(
+            account_id=account_id
+        )
         ttl = int(new_exp_ts - datetime.now(tz=timezone.utc).timestamp())
         set_refresh_session(jti=new_jti, account_id=account_id, ttl_seconds=ttl)
         return Response(
@@ -204,6 +232,10 @@ class IsLoginView(APIView):
 
         principal, _token = result
         return Response(
-            {"is_login": True, "account_id": principal.account_id, "user": CustomerReadSerializer(principal.customer).data},
+            {
+                "is_login": True,
+                "account_id": principal.account_id,
+                "user": CustomerReadSerializer(principal.customer).data,
+            },
             status=status.HTTP_200_OK,
         )

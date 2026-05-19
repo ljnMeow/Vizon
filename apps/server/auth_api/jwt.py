@@ -20,7 +20,9 @@ import uuid
 from .redis_store import get_refresh_session_account_id
 
 
-def issue_customer_access_token(*, account_id: str, expires_in_seconds: int | None = None) -> str:
+def issue_customer_access_token(
+    *, account_id: str, expires_in_seconds: int | None = None
+) -> str:
     """
     签发 access token（JWT）。
     """
@@ -47,7 +49,9 @@ def issue_customer_refresh_token(
     """
 
     if expires_in_seconds is None:
-        expires_in_seconds = int(getattr(settings, "REFRESH_TOKEN_EXPIRES_SECONDS", 300))
+        expires_in_seconds = int(
+            getattr(settings, "REFRESH_TOKEN_EXPIRES_SECONDS", 300)
+        )
 
     now = datetime.now(tz=timezone.utc)
     jti = str(uuid.uuid4())
@@ -63,7 +67,9 @@ def issue_customer_refresh_token(
     return token, jti, exp_ts
 
 
-def decode_customer_token(token: str, *, expected_typ: Literal["access", "refresh"]) -> Dict[str, Any]:
+def decode_customer_token(
+    token: str, *, expected_typ: Literal["access", "refresh"]
+) -> Dict[str, Any]:
     """
     校验并解析 JWT。
 
@@ -129,4 +135,3 @@ def decode_customer_refresh_token_no_session_check(token: str) -> Dict[str, Any]
         raise AuthenticationFailed("token 缺少 exp")
 
     return payload
-

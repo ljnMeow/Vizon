@@ -12,4 +12,3 @@ urlpatterns = [
     path("auth/logout/", LogoutView.as_view(), name="customer-logout"),
     path("auth/is-login/", IsLoginView.as_view(), name="customer-is-login"),
 ]
-

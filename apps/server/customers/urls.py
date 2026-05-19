@@ -17,4 +17,3 @@ router.register(r"customers", CustomerViewSet, basename="customers")
 urlpatterns = [
     path("", include(router.urls)),
 ]
-

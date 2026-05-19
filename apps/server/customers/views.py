@@ -100,7 +100,9 @@ class CustomerViewSet(viewsets.ModelViewSet):
         """
 
         customer = self.get_object()
-        serializer = CustomerUpdateSerializer(customer, data=request.data, partial=False)
+        serializer = CustomerUpdateSerializer(
+            customer, data=request.data, partial=False
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -114,6 +116,6 @@ class CustomerViewSet(viewsets.ModelViewSet):
         public = getattr(customer, "public", None)
         account_id = str(public.public_id) if public is not None else None
         customer.delete()
-        return Response({"account_id": account_id, "deleted": True}, status=status.HTTP_200_OK)
-
-
+        return Response(
+            {"account_id": account_id, "deleted": True}, status=status.HTTP_200_OK
+        )

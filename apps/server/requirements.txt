@@ -1,4 +1,7 @@
+ruff>=0.15.0
+
 asgiref==3.11.1
+imageio>=2.36.0
 Django==6.0.3
 django-stubs==6.0.0
 django-stubs-ext==6.0.0

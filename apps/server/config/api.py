@@ -34,6 +34,7 @@ from typing import Any, Optional
 from rest_framework import status
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
+
 logger = logging.getLogger("vizon.api")
 
 
@@ -46,7 +47,9 @@ def ok(data: Any = None, message: str = "ok") -> Response:
     用这个函数会更直观。
     """
 
-    return Response({"code": 0, "message": message, "data": data}, status=status.HTTP_200_OK)
+    return Response(
+        {"code": 0, "message": message, "data": data}, status=status.HTTP_200_OK
+    )
 
 
 class UnifiedJSONRenderer(JSONRenderer):
@@ -59,7 +62,12 @@ class UnifiedJSONRenderer(JSONRenderer):
     - 失败响应：包装为 {code, message, errors}
     """
 
-    def render(self, data: Any, accepted_media_type: Optional[str] = None, renderer_context: Optional[dict] = None):
+    def render(
+        self,
+        data: Any,
+        accepted_media_type: Optional[str] = None,
+        renderer_context: Optional[dict] = None,
+    ):
         renderer_context = renderer_context or {}
         response = renderer_context.get("response")
 
@@ -138,8 +146,14 @@ def unified_exception_handler(exc: Exception, context: dict):
     # 未被 DRF 捕获的异常（一般是 500）
     request = context.get("request")
     if request is not None:
-        logger.exception("Unhandled exception in API: %s %s", getattr(request, "method", "-"), getattr(request, "path", "-"))
+        logger.exception(
+            "Unhandled exception in API: %s %s",
+            getattr(request, "method", "-"),
+            getattr(request, "path", "-"),
+        )
     else:
         logger.exception("Unhandled exception in API (no request in context)")
-    return Response({"detail": "internal_server_error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+    return Response(
+        {"detail": "internal_server_error"},
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )

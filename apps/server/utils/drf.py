@@ -70,4 +70,3 @@ def merge_field_errors_to_detail(
     if not merged:
         return err
     return serializers.ValidationError({"detail": merged})
-
