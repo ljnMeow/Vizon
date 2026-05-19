@@ -23,10 +23,10 @@ import { appMessages } from '../../../../i18n/messages';
 import {
   type TextureCategory,
   type TextureMeta,
-  createTexture,
   deleteTexture,
   listTextures,
   updateTexture,
+  uploadTextureWithProgress,
 } from '../../../../api/textures';
 import { generateThumbnail } from '../../../../utils/textureThumbnail';
 
@@ -116,19 +116,36 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
     e.target.value = '';
 
     setUploading(true);
+    const loadingHandle = message.loading(`${t.uploading} 0%`);
+    loadingHandle.update({ progress: 0 });
+
     try {
       const thumbnail = await generateThumbnail(file);
-      await createTexture({
-        name: file.name,
-        file,
-        thumbnail: thumbnail ?? undefined,
-        category: categoryFilter,
-      });
-      void message.success(t.renameSuccess);
+
+      await uploadTextureWithProgress(
+        {
+          name: file.name,
+          file,
+          thumbnail: thumbnail ?? undefined,
+          category: categoryFilter,
+        },
+        (percent) => {
+          if (percent >= 100) {
+            loadingHandle.update({ text: t.uploadProcessing, progress: 100 });
+          } else {
+            loadingHandle.update({ text: `${t.uploading} ${percent}%`, progress: percent });
+          }
+        }
+      );
+
       await fetchTextures();
+
+      loadingHandle.hide();
+      void message.success(t.uploadSuccess);
     } catch (err) {
+      loadingHandle.hide();
       const raw = err instanceof Error ? err.message : String(err);
-      void message.error(`${t.renameFailedPrefix}${raw}`);
+      void message.error(`${t.uploadFailedPrefix}${raw}`);
     } finally {
       setUploading(false);
     }

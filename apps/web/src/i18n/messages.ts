@@ -174,6 +174,10 @@ export interface AppMessages {
       noThumbnail: string;
       renamePlaceholder: string;
       sizeLabel: string;
+      uploading: string;
+      uploadProcessing: string;
+      uploadSuccess: string;
+      uploadFailedPrefix: string;
     };
   };
   modelNames: {
@@ -753,6 +757,10 @@ export const appMessages: Record<Locale, AppMessages> = {
         noThumbnail: '无预览',
         renamePlaceholder: '输入名称',
         sizeLabel: '大小',
+        uploading: '正在上传',
+        uploadProcessing: '正在处理',
+        uploadSuccess: '上传成功',
+        uploadFailedPrefix: '上传失败：',
       }
     },
     modelNames: {
@@ -1318,6 +1326,10 @@ export const appMessages: Record<Locale, AppMessages> = {
         noThumbnail: 'No preview',
         renamePlaceholder: 'Enter name',
         sizeLabel: 'Size',
+        uploading: 'Uploading',
+        uploadProcessing: 'Processing',
+        uploadSuccess: 'Uploaded',
+        uploadFailedPrefix: 'Upload failed: ',
       }
     },
     modelNames: {

@@ -364,7 +364,7 @@ export function GlobalMessageProvider({ children }: GlobalMessageProviderProps) 
                     >
                       <Icon type={m.type} />
                       <div className="flex-1 min-w-0">
-                        <div className="truncate text-[11px] text-[var(--text-primary)]">{m.text}</div>
+                        <div className="text-[11px] text-[var(--text-primary)] break-words">{m.text}</div>
                         {m.progress !== undefined && (
                           <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.1)]">
                             <div
