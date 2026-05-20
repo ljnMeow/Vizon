@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Accordion } from '../../../../components/Accordion';
+import { Tooltip } from '../../../../components/Tooltip';
 import { dialog } from '../../../../components/GlobalDialog';
 import { message } from '../../../../components/GlobalMessage';
 import { useImagePreview } from '../../../../components/ImagePreviewContext';
@@ -215,7 +216,7 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
           className="relative w-full bg-[var(--bg-base)] cursor-pointer"
           style={{ paddingTop: '100%' }}
           onClick={() => {
-            const src = tex.file_url || tex.thumbnail_url;
+            const src = tex.thumbnail_url || tex.file_url;
             if (src) openPreview(src, name);
           }}
         >
@@ -251,18 +252,21 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
               autoFocus
             />
           ) : (
-            <p
-              className="truncate text-xs font-medium text-[var(--text-primary)] leading-tight cursor-text"
-              title={name}
-              onDoubleClick={() => startRename(tex)}
-            >
-              {name}
-            </p>
+            <Tooltip content={name} triggerClassName="w-full min-w-0">
+              <p
+                className="truncate text-xs font-medium text-[var(--text-primary)] leading-tight cursor-text"
+                onDoubleClick={() => startRename(tex)}
+              >
+                {name}
+              </p>
+            </Tooltip>
           )}
 
           {/* 分类 + 大小 */}
           <p className="mt-0.5 text-[10px] text-[var(--text-muted)] flex items-center justify-between">
-            <span className="truncate">{categoryLabelMap[tex.category]}</span>
+            <Tooltip content={categoryLabelMap[tex.category]} triggerClassName="min-w-0">
+              <span className="truncate">{categoryLabelMap[tex.category]}</span>
+            </Tooltip>
             <span className="ml-1 shrink-0">{formatSize(tex.file_size)}</span>
           </p>
 
