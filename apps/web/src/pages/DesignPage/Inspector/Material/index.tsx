@@ -91,6 +91,7 @@ export function MaterialSettings() {
   const textureMapLabels: TextureMapItemLabels = {
     upload: p.materialTextureUpload,
     clear: p.materialTextureClear,
+    select: p.materialTextureSelect,
     empty: p.materialTextureEmpty,
     textureFallback: p.materialTextureNameFallback,
   };
@@ -577,7 +578,7 @@ export function MaterialSettings() {
    * @param loader 文件 -> Texture 的异步加载函数
    */
   const makeTextureUploadHandler = useCallback(
-    (fieldKey: TextureFieldKey, loader: (f: File) => Promise<any>) => {
+    (fieldKey: TextureFieldKey, loader: (f: File) => Promise<any>, skipLibrarySync = false) => {
       return async (f: File) => {
         const loadingHandle = message.loading();
         try {
@@ -615,8 +616,8 @@ export function MaterialSettings() {
           loadingHandle.update({ text: locale === 'zh-CN' ? '正在渲染纹理…' : 'Rendering texture...' });
           onPropertyChange(fieldKey, tex);
 
-          // 非阻塞：将贴图同步到用户资源库，失败不影响主流程
-          syncTextureToLibrary(processedFile, fieldKey);
+          // 非阻塞：将贴图同步到用户资源库，失败不影响主流程（资源库选择时跳过，避免重复上传）
+          if (!skipLibrarySync) syncTextureToLibrary(processedFile, fieldKey);
         } catch (err) {
           message.error(locale === 'zh-CN' ? '纹理加载失败' : 'Texture load failed');
           console.error('[MaterialSettings] Texture upload failed:', err);
@@ -626,6 +627,31 @@ export function MaterialSettings() {
       };
     },
     [TEXTURE_BINDINGS_KEY, TEXTURE_EFFECT_CACHE_KEY, firstMeshMaterial, isTextureFieldEffectDisabled, locale, onPropertyChange]
+  );
+
+  /** 生成某贴图字段的"从资源库选择"处理器：fetch 文件后委托给现有上传流程（跳过资源库同步）。 */
+  const makeTextureSelectFromLibraryHandler = useCallback(
+    (fieldKey: TextureFieldKey, loader: (f: File) => Promise<any>) => {
+      const uploadHandler = makeTextureUploadHandler(fieldKey, loader, true);
+      return async (meta: import('../../../../api/textures').TextureMeta) => {
+        if (!meta.file_url) {
+          message.error(locale === 'zh-CN' ? '该资源无文件地址' : 'No file URL for this resource');
+          return;
+        }
+        try {
+          const resp = await fetch(meta.file_url);
+          if (!resp.ok) throw new Error(resp.statusText);
+          const blob = await resp.blob();
+          const fileName = meta.name || 'texture';
+          const file = new File([blob], fileName, { type: meta.mime_type || blob.type });
+          await uploadHandler(file);
+        } catch (err) {
+          message.error(locale === 'zh-CN' ? '资源加载失败' : 'Failed to load resource');
+          console.error('[MaterialSettings] Texture select from library failed:', err);
+        }
+      };
+    },
+    [makeTextureUploadHandler, locale]
   );
 
   /**
@@ -1284,6 +1310,7 @@ export function MaterialSettings() {
               getTextureForUi={getTextureForUi} // 获取 UI 应显示的贴图（含缓存逻辑）
               makeTextureDebugToggle={makeTextureDebugToggle} // 生成单项贴图效果开关
               makeTextureUploadHandler={makeTextureUploadHandler} // 生成上传处理器
+              makeTextureSelectFromLibraryHandler={makeTextureSelectFromLibraryHandler} // 生成资源库选择处理器
               makeTextureClearHandler={makeTextureClearHandler} // 生成清除处理器
               onPropertyChange={onPropertyChange} // 通用材质字段写入器
             />

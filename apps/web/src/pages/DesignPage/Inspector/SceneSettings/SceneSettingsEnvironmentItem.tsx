@@ -3,10 +3,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { ColorPicker } from '../../../../components/ColorPicker';
 import { Select } from '../../../../components/Select';
 import { Tooltip } from '../../../../components/Tooltip';
+import { TexturePicker } from '../../../../components/TexturePicker';
 import { useImagePreview } from '../../../../components/ImagePreviewContext';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { useLocale } from '../../../../hooks/useLocale';
 import { message } from '../../../../components/GlobalMessage';
+import { type TextureMeta } from '../../../../api/textures';
 import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 import { normalizeTextureFile } from '../../../../utils/normalizeTextureFile';
 import { cacheTextureAssetFile } from '../../../../utils/textureAssetSession';
@@ -81,23 +83,62 @@ export function SceneSettingsEnvironmentItem({
   const hdrFileName = hdri.type === 'uploaded' ? hdri.fileName ?? null : null;
   const hdrMimeType = hdri.type === 'uploaded' ? hdri.mimeType ?? null : null;
 
-  // 环境 HDRI：UI 预留“资源库选择”入口（当前仍为空）
-  const [hdrSelectKey, setHdrSelectKey] = useState('');
-  const hdrSelectOptions = useMemo(
-    () =>
-      hdri.type === 'uploaded'
-        ? [{ value: hdri.assetId ?? hdri.url, label: hdrFileName ?? env.environmentHdriUploadLabel }]
-        : [],
-    [env.environmentHdriUploadLabel, hdri, hdrFileName]
-  );
-
-  useEffect(() => {
-    setHdrSelectKey(hdri.type === 'uploaded' ? hdri.assetId ?? hdri.url : '');
-  }, [hdri]);
-
   const { openPreview } = useImagePreview();
   const historyName = (zhName: string, enName: string) =>
     encodeHistoryI18nName({ 'zh-CN': zhName, 'en-US': enName });
+
+  const onHdriSelectFromLibrary = async (meta: TextureMeta) => {
+    if (!meta.file_url) {
+      message.error(locale === 'zh-CN' ? '该资源无文件地址' : 'No file URL for this resource');
+      return;
+    }
+    const loadingHandle = message.loading();
+    try {
+      loadingHandle.update({ text: locale === 'zh-CN' ? '正在下载环境贴图…' : 'Downloading environment map...' });
+      const resp = await fetch(meta.file_url);
+      if (!resp.ok) throw new Error(resp.statusText);
+      const blob = await resp.blob();
+      const file = new File([blob], meta.name || 'hdri', { type: meta.mime_type || blob.type });
+
+      loadingHandle.update({ text: locale === 'zh-CN' ? '正在处理环境贴图…' : 'Processing environment map...' });
+      const { file: processedFile, resized, originalWidth, originalHeight, width, height } = await normalizeTextureFile(file);
+      if (resized) {
+        message.warning(`纹理已从 ${originalWidth}×${originalHeight} 缩放至 ${width}×${height}`, { durationMs: 4000 });
+      }
+
+      loadingHandle.update({ text: locale === 'zh-CN' ? '正在加载环境贴图…' : 'Loading environment map...' });
+      const assetRef = await cacheTextureAssetFile(processedFile);
+
+      const nextSettings = {
+        ...sceneSettings,
+        environment: {
+          ...sceneSettings.environment,
+          backgroundMode: 'skybox' as const,
+          hdri: {
+            type: 'uploaded' as const,
+            assetId: assetRef.id,
+            url: URL.createObjectURL(processedFile),
+            fileName: processedFile.name,
+            mimeType: processedFile.type
+          }
+        }
+      };
+
+      loadingHandle.update({ text: locale === 'zh-CN' ? '正在渲染环境贴图…' : 'Rendering environment map...' });
+      if (!editor) return;
+      await editor.setSceneSettings(nextSettings, {
+        recordHistory: true,
+        operationName: historyName('修改场景属性-环境-HDRI = selected', 'Set environment HDRI = selected')
+      });
+      editor.render();
+      updateSceneSettings(() => editor.getSceneSettings(), { recordHistory: false });
+    } catch (err) {
+      message.error(locale === 'zh-CN' ? '环境贴图加载失败' : 'Environment map load failed');
+      console.error('[SceneSettingsEnvironmentItem] HDRI select from library failed:', err);
+    } finally {
+      loadingHandle.hide();
+    }
+  };
 
   const isPreviewableImage = useMemo(() => {
     if (hdri.type !== 'uploaded') return false;
@@ -153,13 +194,10 @@ export function SceneSettingsEnvironmentItem({
               {env.environmentHdriLabel}
             </label>
             <div className="space-y-1.5">
-              <Select
-                value={hdrSelectKey}
-                onChange={(v) => setHdrSelectKey(v)}
-                options={hdrSelectOptions}
-                placeholder={env.environmentHdriSelectPlaceholder}
-                ariaLabel={env.environmentHdriSelectPlaceholder}
-                disabled={hdrSelectOptions.length === 0}
+              <TexturePicker
+                category="scene_environment"
+                onSelect={onHdriSelectFromLibrary}
+                label={env.environmentHdriSelectPlaceholder}
               />
 
               <div className="flex items-center gap-3">

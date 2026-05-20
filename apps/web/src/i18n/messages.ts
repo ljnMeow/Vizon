@@ -20,6 +20,7 @@ export interface AppMessages {
     globalMenuAriaLabel: string;
     imagePreviewUnsupported: string;
     imagePreviewLoadFailed: string;
+    texturePickerEmpty: string;
   };
   auth: {
     sessionInvalidToast: string;
@@ -368,6 +369,7 @@ export interface AppMessages {
         materialTextureMapsGroupAdvanced: string;
         materialTextureUpload: string;
         materialTextureClear: string;
+        materialTextureSelect: string;
         materialTextureEmpty: string;
         materialTextureNameFallback: string;
         materialTexturePropEnvMapIntensity: string;
@@ -625,7 +627,8 @@ export const appMessages: Record<Locale, AppMessages> = {
       errorBoundaryBackToLogin: '返回登录',
       globalMenuAriaLabel: '菜单',
       imagePreviewUnsupported: '暂不支持预览此文件类型。',
-      imagePreviewLoadFailed: '图片加载失败。'
+      imagePreviewLoadFailed: '图片加载失败。',
+      texturePickerEmpty: '暂无贴图',
     },
     auth: {
       sessionInvalidToast: '登录状态失效，请重新登录',
@@ -944,6 +947,7 @@ export const appMessages: Record<Locale, AppMessages> = {
           materialTextureMapsGroupAdvanced: '高级',
           materialTextureUpload: '上传',
           materialTextureClear: '清除',
+          materialTextureSelect: '选择',
           materialTextureEmpty: '无',
           materialTextureNameFallback: '贴图',
           materialTexturePropEnvMapIntensity: '环境强度 (envMapIntensity)',
@@ -1194,7 +1198,8 @@ export const appMessages: Record<Locale, AppMessages> = {
       errorBoundaryBackToLogin: 'Back to sign in',
       globalMenuAriaLabel: 'Menu',
       imagePreviewUnsupported: 'This file type cannot be previewed.',
-      imagePreviewLoadFailed: 'Failed to load image.'
+      imagePreviewLoadFailed: 'Failed to load image.',
+      texturePickerEmpty: 'No textures',
     },
     auth: {
       sessionInvalidToast: 'Your session has expired. Please sign in again.',
@@ -1513,6 +1518,7 @@ export const appMessages: Record<Locale, AppMessages> = {
           materialTextureMapsGroupAdvanced: 'Advanced',
           materialTextureUpload: 'Upload',
           materialTextureClear: 'Clear',
+          materialTextureSelect: 'Select',
           materialTextureEmpty: 'None',
           materialTextureNameFallback: 'Texture',
           materialTexturePropEnvMapIntensity: 'Environment intensity (envMapIntensity)',

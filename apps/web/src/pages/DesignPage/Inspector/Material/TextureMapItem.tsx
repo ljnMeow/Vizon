@@ -11,7 +11,9 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Tooltip } from '../../../../components/Tooltip';
+import { TexturePicker } from '../../../../components/TexturePicker';
 import { useImagePreview } from '../../../../components/ImagePreviewContext';
+import { type TextureCategory } from '../../../../api/textures';
 import { getCachedTextureAssetPreviewUrl, getTextureAssetRef } from '../../../../utils/textureAssetSession';
 
 /**
@@ -53,6 +55,7 @@ export type TextureMapItemIntensity =
 export type TextureMapItemLabels = {
   upload: string;
   clear: string;
+  select: string;
   empty: string;
   textureFallback: string;
 };
@@ -65,6 +68,8 @@ export type TextureMapItemProps = {
   accept?: string;
   /** 鼠标悬停在上传按钮时显示的格式提示文案 */
   formatHint?: string;
+  /** 贴图分类（传入后显示"从资源库选择"按钮） */
+  category?: TextureCategory;
   intensity?: TextureMapItemIntensity;
   debugToggle?: {
     label: string;
@@ -73,6 +78,8 @@ export type TextureMapItemProps = {
   };
   onUpload: (file: File) => void;
   onClear: () => void;
+  /** 从资源库选择贴图回调 */
+  onSelectFromLibrary?: (meta: import('../../../../api/textures').TextureMeta) => void;
 };
 
 function tryGetPreviewUrl(texture: any | null): string | null {
@@ -99,10 +106,12 @@ export function TextureMapItem({
   texture,
   accept = 'image/*',
   formatHint,
+  category,
   intensity,
   debugToggle,
   onUpload,
   onClear,
+  onSelectFromLibrary,
 }: TextureMapItemProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
@@ -166,6 +175,13 @@ export function TextureMapItem({
               {labels.upload}
             </button>
           )}
+          {category && onSelectFromLibrary ? (
+            <TexturePicker
+              category={category}
+              onSelect={onSelectFromLibrary}
+              label={labels.select}
+            />
+          ) : null}
           <button
             type="button"
             onClick={() => {

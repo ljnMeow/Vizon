@@ -253,22 +253,22 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
             />
           ) : (
             <Tooltip content={name} triggerClassName="w-full min-w-0">
-              <p
+              <div
                 className="truncate text-xs font-medium text-[var(--text-primary)] leading-tight cursor-text"
                 onDoubleClick={() => startRename(tex)}
               >
                 {name}
-              </p>
+              </div>
             </Tooltip>
           )}
 
           {/* 分类 + 大小 */}
-          <p className="mt-0.5 text-[10px] text-[var(--text-muted)] flex items-center justify-between">
+          <div className="mt-0.5 text-[10px] text-[var(--text-muted)] flex items-center justify-between">
             <Tooltip content={categoryLabelMap[tex.category]} triggerClassName="min-w-0">
               <span className="truncate">{categoryLabelMap[tex.category]}</span>
             </Tooltip>
             <span className="ml-1 shrink-0">{formatSize(tex.file_size)}</span>
-          </p>
+          </div>
 
           {/* 删除按钮 */}
           <div className="mt-1 flex items-center justify-end">

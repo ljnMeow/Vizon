@@ -164,6 +164,8 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Django REST Framework：让我们更容易写出规范的 JSON API（序列化、校验、权限等）
     "rest_framework",
+    # CORS 支持：允许前端开发服务器跨域访问 API 和媒体文件
+    "corsheaders",
     # OpenAPI/Swagger 文档（/api/schema/ + /api/docs/）
     "drf_spectacular",
     # 你自己的业务模块
@@ -183,12 +185,19 @@ MEDIA_URL = "/media/"
 # 例如 CSRF 校验、会话、认证、一些安全头等，都是在这里生效的。
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+# CORS 配置：允许前端开发服务器跨域访问 API 和媒体文件
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
 
 # 全局路由入口模块（对应 `config/urls.py`）
