@@ -33,6 +33,10 @@ export type VizonUserData = {
   [VIZON_USER_DATA_KEYS.HELPERS.LIGHT_TARGET_HANDLE]?: THREE.Object3D;
 
   [VIZON_USER_DATA_KEYS.CONDUIT.EDIT_ENABLED]?: boolean;
+
+  [VIZON_USER_DATA_KEYS.AUTOSCALE.ORIGINAL_MAX_DIM]?: number;
+  [VIZON_USER_DATA_KEYS.AUTOSCALE.SCALE_FACTOR]?: number;
+  [VIZON_USER_DATA_KEYS.AUTOSCALE.APPLIED]?: boolean;
 };
 
 export type VizonObject3D = THREE.Object3D & { userData: VizonUserData };

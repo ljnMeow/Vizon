@@ -33,6 +33,8 @@ export type StorageKeyName = keyof typeof STORAGE_KEYS;
 export const DATA_TRANSFER_KEYS = {
   /** 模型资源拖拽标识 */
   MODEL_MIME: 'application/x-vizon-model-key',
+  /** 用户上传模型拖拽标识，data 为模型 file_url */
+  USER_MODEL_MIME: 'application/x-vizon-user-model-url',
   /** 相机资源拖拽标识 */
   CAMERA_MIME: 'application/x-vizon-camera-key',
   /** 灯光资源拖拽标识 */

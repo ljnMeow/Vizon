@@ -61,7 +61,7 @@ export function Accordion<T extends string = string>({
     if (!controlled) setUncontrolledOpen(next);
   }, [controlled, onOpenKeysChange]);
 
-  const headerRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const headerRefs = useRef<Array<HTMLElement | null>>([]);
   const panelRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [panelMaxHeights, setPanelMaxHeights] = useState<number[]>([]);
   const panelMaxHeightsRef = useRef<number[]>([]);
@@ -204,16 +204,21 @@ export function Accordion<T extends string = string>({
               itemClassName
             ].join(' ')}
           >
-            <button
+            <div
               ref={(el) => { headerRefs.current[index] = el; }}
               id={headerId}
-              type="button"
-              disabled={item.disabled}
+              role="button"
+              tabIndex={item.disabled ? -1 : 0}
               aria-disabled={item.disabled || undefined}
               aria-expanded={expanded}
               aria-controls={panelId}
               onClick={() => toggle(item.key)}
               onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  toggle(item.key);
+                  return;
+                }
                 if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return;
                 e.preventDefault();
                 const max = items.length - 1;
@@ -229,7 +234,9 @@ export function Accordion<T extends string = string>({
                 'w-full select-none px-3 py-2 text-left text-sm',
                 'flex items-center justify-between gap-3',
                 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
-                'transition-colors'
+                'transition-colors',
+                'outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1',
+                item.disabled ? 'cursor-default' : 'cursor-pointer'
               ].join(' ')}
             >
               <span className="min-w-0 flex-1">{item.header}</span>
@@ -243,7 +250,7 @@ export function Accordion<T extends string = string>({
               >
                 ▼
               </span>
-            </button>
+            </div>
 
             <div
               id={panelId}

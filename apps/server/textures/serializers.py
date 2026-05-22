@@ -10,6 +10,7 @@
 from rest_framework import serializers
 
 from utils.datetime import format_datetime
+from utils.file_validation import get_texture_file_validators, get_thumbnail_validators
 
 from .models import Texture
 
@@ -83,8 +84,8 @@ class TextureCreateSerializer(serializers.Serializer):
     name = serializers.CharField(
         max_length=255, required=False, allow_blank=True, default=""
     )
-    file = serializers.FileField(required=True)
-    thumbnail = serializers.ImageField(required=False, allow_null=True)
+    file = serializers.FileField(required=True, validators=get_texture_file_validators())
+    thumbnail = serializers.ImageField(required=False, allow_null=True, validators=get_thumbnail_validators())
     category = serializers.ChoiceField(choices=Texture.CATEGORY_CHOICES, required=True)
     texture_slot = serializers.CharField(
         max_length=50, required=False, allow_blank=True, default=""

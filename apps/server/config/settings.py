@@ -120,6 +120,12 @@ REFRESH_TOKEN_EXPIRES_SECONDS = _require_positive_int_env(
     "REFRESH_TOKEN_EXPIRES_SECONDS"
 )
 
+# 文件上传大小上限（字节），可被环境变量覆盖
+FILE_UPLOAD_MAX_SIZE_TEXTURE = int(os.getenv("FILE_UPLOAD_MAX_SIZE_TEXTURE", 50 * 1024 * 1024))
+FILE_UPLOAD_MAX_SIZE_MODEL = int(os.getenv("FILE_UPLOAD_MAX_SIZE_MODEL", 200 * 1024 * 1024))
+FILE_UPLOAD_MAX_SIZE_SCENE = int(os.getenv("FILE_UPLOAD_MAX_SIZE_SCENE", 200 * 1024 * 1024))
+FILE_UPLOAD_MAX_SIZE_THUMBNAIL = int(os.getenv("FILE_UPLOAD_MAX_SIZE_THUMBNAIL", 5 * 1024 * 1024))
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -173,6 +179,7 @@ INSTALLED_APPS = [
     "auth_api",  # 认证模块（login/token；暂时只做 login）
     "scenes",  # 场景管理模块（保存/加载项目包）
     "textures",  # 贴图资源管理模块（上传/分类/预览）
+    "models3d",  # 模型资源管理模块（上传/分类/列表）
 ]
 
 # 媒体文件根目录（FileField/ImageField 上传存储位置）。

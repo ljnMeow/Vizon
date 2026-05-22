@@ -127,7 +127,7 @@ export function TexturePicker({
       {open && typeof document !== 'undefined' ? createPortal(
         <div
           ref={panelRef}
-          className="fixed z-[9999] w-60 max-h-72 overflow-y-auto rounded-md border border-[var(--border-subtle)] shadow-[0_8px_24px_rgba(0,0,0,0.25)] backdrop-blur-sm"
+          className="fixed z-[999999] w-60 max-h-72 overflow-y-auto rounded-md border border-[var(--border-subtle)] shadow-[0_8px_24px_rgba(0,0,0,0.25)] backdrop-blur-sm"
           style={{
             top: position.top,
             left: position.left,

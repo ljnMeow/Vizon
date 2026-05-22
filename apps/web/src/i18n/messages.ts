@@ -84,6 +84,9 @@ export interface AppMessages {
     minePlaceholder: string;
     structurePlaceholder: string;
     structureEmpty: string;
+    structureSearchPlaceholder: string;
+    structureCollapseAll: string;
+    structureExpandAll: string;
     historyEmpty: string;
   };
   systemAssets: {
@@ -106,8 +109,6 @@ export interface AppMessages {
     };
     modelList: {
       basicHeader: string;
-      environmentHeader: string;
-      charactersHeader: string;
       emptyBasic: string;
       emptyEnvironment: string;
       emptyCharacters: string;
@@ -117,6 +118,8 @@ export interface AppMessages {
   userAssets: {
     /** 项目 Tab 标签 */
     projectTab: string;
+    /** 模型 Tab 标签 */
+    model3dTab: string;
     /** 贴图 Tab 标签 */
     textureTab: string;
     /** 场景名为空时的占位文案 */
@@ -179,6 +182,53 @@ export interface AppMessages {
       uploadProcessing: string;
       uploadSuccess: string;
       uploadFailedPrefix: string;
+      selectLabel: string;
+      selectModeActive: string;
+      selectAllLabel: string;
+      deselectAllLabel: string;
+      batchDeleteLabel: string;
+    };
+    /** 模型资源库相关文案 */
+    model3dLibrary: {
+      uploadLabel: string;
+      emptyModels: string;
+      emptyNoData: string;
+      emptyCategory: string;
+      loadFailed: string;
+      deleteConfirmPrefix: string;
+      deleteConfirmSuffix: string;
+      deleteSuccess: string;
+      deleteFailedPrefix: string;
+      renameSuccess: string;
+      renameFailedPrefix: string;
+      noThumbnail: string;
+      renamePlaceholder: string;
+      uploading: string;
+      uploadProcessing: string;
+      uploadSuccess: string;
+      uploadFailedPrefix: string;
+      selectLabel: string;
+      selectModeActive: string;
+      selectAllLabel: string;
+      deselectAllLabel: string;
+      batchDeleteLabel: string;
+      createCategoryLabel: string;
+      createCategoryPlaceholder: string;
+      deleteCategoryTitle: string;
+      deleteCategoryPrefix: string;
+      deleteCategorySuffix: string;
+      deleteCategoryFailed: string;
+      categoryHasModels: string;
+      categoryAlreadyExists: string;
+      renameCategorySuccess: string;
+      renameCategoryFailed: string;
+      defaultCategoryNoDelete: string;
+      renameCategoryLabel: string;
+      moveToCategory: string;
+      moveSuccess: string;
+      moveFailed: string;
+      categoryNameTooLong: string;
+      searchPlaceholder: string;
     };
   };
   modelNames: {
@@ -689,6 +739,9 @@ export const appMessages: Record<Locale, AppMessages> = {
       minePlaceholder: '用户上传的资源将在这里展示。',
       structurePlaceholder: '场景结构树将在这里展示。',
       structureEmpty: '场景树为空',
+      structureSearchPlaceholder: '搜索节点…',
+      structureCollapseAll: '全部折叠',
+      structureExpandAll: '全部展开',
       historyEmpty: '暂无操作历史'
     },
     systemAssets: {
@@ -711,8 +764,6 @@ export const appMessages: Record<Locale, AppMessages> = {
       },
       modelList: {
         basicHeader: '基础几何体',
-        environmentHeader: '环境',
-        charactersHeader: '角色',
         emptyBasic: '暂无模型数据',
         emptyEnvironment: '暂无环境模型',
         emptyCharacters: '暂无角色模型'
@@ -720,6 +771,7 @@ export const appMessages: Record<Locale, AppMessages> = {
     },
     userAssets: {
       projectTab: '项目',
+      model3dTab: '模型',
       textureTab: '贴图',
       noName: '未命名',
       loadScene: '载入',
@@ -764,6 +816,52 @@ export const appMessages: Record<Locale, AppMessages> = {
         uploadProcessing: '正在处理',
         uploadSuccess: '上传成功',
         uploadFailedPrefix: '上传失败：',
+        selectLabel: '选择',
+        selectModeActive: '取消选择',
+        selectAllLabel: '全选',
+        deselectAllLabel: '取消全选',
+        batchDeleteLabel: '删除',
+      },
+      model3dLibrary: {
+        uploadLabel: '上传',
+        emptyModels: '暂无模型资源，点击上传按钮添加 3D 模型文件。',
+        emptyNoData: '暂无分类和模型数据',
+        emptyCategory: '暂无模型数据',
+        loadFailed: '加载模型列表失败',
+        deleteConfirmPrefix: '确认删除模型「',
+        deleteConfirmSuffix: '」？',
+        deleteSuccess: '已删除',
+        deleteFailedPrefix: '删除失败：',
+        renameSuccess: '重命名成功',
+        renameFailedPrefix: '重命名失败：',
+        noThumbnail: '无预览',
+        renamePlaceholder: '输入名称',
+        uploading: '正在上传',
+        uploadProcessing: '正在处理',
+        uploadSuccess: '上传成功',
+        uploadFailedPrefix: '上传失败：',
+        selectLabel: '选择',
+        selectModeActive: '取消选择',
+        selectAllLabel: '全选',
+        deselectAllLabel: '取消全选',
+        batchDeleteLabel: '删除',
+        createCategoryLabel: '新建分类',
+        createCategoryPlaceholder: '输入分类名称',
+        deleteCategoryTitle: '删除分类',
+        deleteCategoryPrefix: '确认删除分类「',
+        deleteCategorySuffix: '」？',
+        deleteCategoryFailed: '删除分类失败',
+        categoryHasModels: '该分类下有模型，请先移动模型后再删除',
+        categoryAlreadyExists: '分类名称已存在',
+        renameCategorySuccess: '分类重命名成功',
+        renameCategoryFailed: '分类重命名失败',
+        defaultCategoryNoDelete: '默认分类不可删除',
+        renameCategoryLabel: '重命名分类',
+        moveToCategory: '移动到',
+        moveSuccess: '已移动',
+        moveFailed: '移动失败',
+        categoryNameTooLong: '分类名称不能超过 10 个字符',
+        searchPlaceholder: '搜索模型',
       }
     },
     modelNames: {
@@ -1260,6 +1358,9 @@ export const appMessages: Record<Locale, AppMessages> = {
       minePlaceholder: 'Your uploaded assets will be displayed here.',
       structurePlaceholder: 'Scene structure tree will be displayed here.',
       structureEmpty: 'Scene tree is empty',
+      structureSearchPlaceholder: 'Search nodes…',
+      structureCollapseAll: 'Collapse all',
+      structureExpandAll: 'Expand all',
       historyEmpty: 'No history records yet'
     },
     systemAssets: {
@@ -1282,8 +1383,6 @@ export const appMessages: Record<Locale, AppMessages> = {
       },
       modelList: {
         basicHeader: 'Basic Geometry',
-        environmentHeader: 'Environment',
-        charactersHeader: 'Characters',
         emptyBasic: 'No model data',
         emptyEnvironment: 'No environment models',
         emptyCharacters: 'No character models'
@@ -1291,6 +1390,7 @@ export const appMessages: Record<Locale, AppMessages> = {
     },
     userAssets: {
       projectTab: 'Projects',
+      model3dTab: 'Models',
       textureTab: 'Textures',
       noName: 'Untitled',
       loadScene: 'Load',
@@ -1335,6 +1435,52 @@ export const appMessages: Record<Locale, AppMessages> = {
         uploadProcessing: 'Processing',
         uploadSuccess: 'Uploaded',
         uploadFailedPrefix: 'Upload failed: ',
+        selectLabel: 'Select',
+        selectModeActive: 'Cancel',
+        selectAllLabel: 'Select all',
+        deselectAllLabel: 'Deselect all',
+        batchDeleteLabel: 'Batch delete',
+      },
+      model3dLibrary: {
+        uploadLabel: 'Upload',
+        emptyModels: 'No model resources yet. Click upload to add 3D model files.',
+        emptyNoData: 'No categories or models yet',
+        emptyCategory: 'No models yet',
+        loadFailed: 'Failed to load models',
+        deleteConfirmPrefix: 'Delete model "',
+        deleteConfirmSuffix: '"?',
+        deleteSuccess: 'Deleted',
+        deleteFailedPrefix: 'Delete failed: ',
+        renameSuccess: 'Renamed',
+        renameFailedPrefix: 'Rename failed: ',
+        noThumbnail: 'No preview',
+        renamePlaceholder: 'Enter name',
+        uploading: 'Uploading',
+        uploadProcessing: 'Processing',
+        uploadSuccess: 'Uploaded',
+        uploadFailedPrefix: 'Upload failed: ',
+        selectLabel: 'Select',
+        selectModeActive: 'Cancel',
+        selectAllLabel: 'Select all',
+        deselectAllLabel: 'Deselect all',
+        batchDeleteLabel: 'Batch delete',
+        createCategoryLabel: 'New Category',
+        createCategoryPlaceholder: 'Enter category name',
+        deleteCategoryTitle: 'Delete Category',
+        deleteCategoryPrefix: 'Delete category "',
+        deleteCategorySuffix: '"?',
+        deleteCategoryFailed: 'Failed to delete category',
+        categoryHasModels: 'This category has models. Move them first before deleting.',
+        categoryAlreadyExists: 'Category name already exists',
+        renameCategorySuccess: 'Category renamed',
+        renameCategoryFailed: 'Failed to rename category',
+        defaultCategoryNoDelete: 'Cannot delete default category',
+        renameCategoryLabel: 'Rename category',
+        moveToCategory: 'Move to',
+        moveSuccess: 'Moved',
+        moveFailed: 'Failed to move',
+        categoryNameTooLong: 'Category name cannot exceed 10 characters',
+        searchPlaceholder: 'Search models',
       }
     },
     modelNames: {

@@ -483,6 +483,22 @@ export function PropertiesSettings() {
     return off;
   }, [editor]);
 
+  // 当场景树变化时（如从结构树重命名），刷新选中对象的基础信息
+  useEffect(() => {
+    if (!editor) return;
+    const off = editor.on('sceneTreeChange', () => {
+      const selected = editor.getSelected();
+      if (!selected) return;
+      setSelectedInfo((prev) => {
+        if (!prev || prev.uuid !== selected.uuid) return prev;
+        const nextName = String(selected.name ?? '');
+        if (prev.name === nextName) return prev;
+        return { ...prev, name: nextName };
+      });
+    });
+    return off;
+  }, [editor]);
+
   // TransformControls 拖拽/旋转/缩放时，three 对象会持续变化；
   // 但本面板原先只在 `select` 变化时 setTransform，因此需要监听 gizmo 的 change/objectChange 事件做实时同步。
   useEffect(() => {

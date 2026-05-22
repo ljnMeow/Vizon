@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { SceneTreeNode } from 'vizon-3d-core';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { SceneTreeNode, ThreeEditor } from 'vizon-3d-core';
 import { useLocale } from '../../../../hooks/useLocale';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { appMessages } from '../../../../i18n/messages';
@@ -9,18 +9,11 @@ import { getAssetUrl } from '../../../../utils/utils';
 const TREE_DRAG_MIME = DATA_TRANSFER_KEYS.SCENE_NODE_UUID_MIME;
 type DropPlacement = 'before' | 'after' | 'inside';
 
-/**
- * 当前拖拽命中的落点预览。
- * 用于在树节点上高亮展示“插入到前 / 后 / 内部”的目标位置。
- */
 type DragPreview = {
   targetUuid: string;
   placement: DropPlacement;
 } | null;
 
-/**
- * 读取当前每一行节点的布局矩形，用于 FLIP 动画计算位移差。
- */
 function captureRects(map: Map<string, HTMLDivElement>) {
   const rects = new Map<string, DOMRect>();
   for (const [uuid, el] of map) {
@@ -29,9 +22,6 @@ function captureRects(map: Map<string, HTMLDivElement>) {
   return rects;
 }
 
-/**
- * 根据场景树节点类型返回对应图标资源。
- */
 function nodeIcon(kind: SceneTreeNode['kind']) {
   if (kind === 'scene') return getAssetUrl('../../../../assets/svg/scene.svg', import.meta.url);
   if (kind === 'group') return getAssetUrl('../../../../assets/svg/group.svg', import.meta.url);
@@ -39,13 +29,59 @@ function nodeIcon(kind: SceneTreeNode['kind']) {
   return getAssetUrl('../../../../assets/svg/mesh.svg', import.meta.url);
 }
 
-/**
- * 返回节点操作按钮图标：显隐切换或删除。
- */
 function actionIcon(kind: 'visible' | 'hidden' | 'delete') {
   if (kind === 'visible') return getAssetUrl('../../../../assets/svg/eye.svg', import.meta.url);
   if (kind === 'hidden') return getAssetUrl('../../../../assets/svg/close_eyes.svg', import.meta.url);
   return getAssetUrl('../../../../assets/svg/delete.svg', import.meta.url);
+}
+
+/**
+ * 从树中收集所有节点的 uuid 集合。
+ */
+function collectAllUuids(nodes: SceneTreeNode[]): Set<string> {
+  const ids = new Set<string>();
+  const walk = (list: SceneTreeNode[]) => {
+    for (const n of list) {
+      ids.add(n.uuid);
+      if (n.children.length > 0) walk(n.children);
+    }
+  };
+  walk(nodes);
+  return ids;
+}
+
+/**
+ * 根据搜索关键字过滤树：保留自身或子节点匹配的节点。
+ * 返回过滤后的新树（浅拷贝，不修改原节点）。
+ */
+function filterTree(nodes: SceneTreeNode[], keyword: string): SceneTreeNode[] {
+  if (!keyword) return nodes;
+  const lower = keyword.toLowerCase();
+  const result: SceneTreeNode[] = [];
+  for (const node of nodes) {
+    const nameMatch = node.name.toLowerCase().includes(lower);
+    const uuidMatch = node.uuid.toLowerCase().includes(lower);
+    const filteredChildren = filterTree(node.children, keyword);
+    if (nameMatch || uuidMatch || filteredChildren.length > 0) {
+      result.push({ ...node, children: filteredChildren });
+    }
+  }
+  return result;
+}
+
+/**
+ * 收集过滤树中所有有子节点的 uuid（搜索时自动展开用）。
+ */
+function collectExpandableUuids(nodes: SceneTreeNode[]): Set<string> {
+  const ids = new Set<string>();
+  const walk = (list: SceneTreeNode[]) => {
+    for (const n of list) {
+      if (n.children.length > 0) ids.add(n.uuid);
+      walk(n.children);
+    }
+  };
+  walk(nodes);
+  return ids;
 }
 
 /**
@@ -56,10 +92,13 @@ function SceneTreeItem({
   depth,
   expandedSet,
   selectedUuid,
+  renamingUuid,
   onToggle,
   onSelect,
   onToggleVisible,
   onDelete,
+  onRenameStart,
+  onRenameCommit,
   onMove,
   canMove,
   dragPreview,
@@ -71,11 +110,14 @@ function SceneTreeItem({
   node: SceneTreeNode;
   depth: number;
   expandedSet: Set<string>;
-  onToggle: (uuid: string) => void;
+  renamingUuid: string | null;
   selectedUuid: string | null;
+  onToggle: (uuid: string) => void;
   onSelect: (uuid: string) => void;
   onToggleVisible: (node: SceneTreeNode) => void;
   onDelete: (uuid: string) => void;
+  onRenameStart: (uuid: string | null) => void;
+  onRenameCommit: (uuid: string, newName: string) => void;
   onMove: (sourceUuid: string, targetUuid: string, placement: DropPlacement) => void;
   canMove: (sourceUuid: string, targetUuid: string, placement: DropPlacement) => boolean;
   dragPreview: DragPreview;
@@ -86,19 +128,33 @@ function SceneTreeItem({
 }) {
   const hasChildren = node.children.length > 0;
   const expanded = expandedSet.has(node.uuid);
-  // scene 节点本身不允许选中；相机（包括 scene 下新增的 camera 对象）允许选中
   const selectable = node.kind !== 'scene';
-  // 根部相机节点（ThreeEditor 主相机）不允许拖拽：避免误操作/无意义的移动。
   const isRootCamera = node.kind === 'camera' && depth === 0;
   const draggable = selectable && !isRootCamera;
   const selected = selectable && selectedUuid === node.uuid;
+  const isRenaming = renamingUuid === node.uuid;
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isRenaming && renameInputRef.current) {
+      renameInputRef.current.focus();
+      renameInputRef.current.select();
+    }
+  }, [isRenaming]);
+
+  const commitRename = () => {
+    const input = renameInputRef.current;
+    if (!input) return;
+    const trimmed = input.value.trim();
+    if (trimmed && trimmed !== node.name) {
+      onRenameCommit(node.uuid, trimmed);
+    }
+    onRenameStart(null);
+  };
   const isInsidePreview = dragPreview?.targetUuid === node.uuid && dragPreview.placement === 'inside';
   const isBeforePreview = dragPreview?.targetUuid === node.uuid && dragPreview.placement === 'before';
   const isAfterPreview = dragPreview?.targetUuid === node.uuid && dragPreview.placement === 'after';
 
-  /**
-   * 根据鼠标在当前行中的垂直相对位置，推导拖拽落点是前、后还是内部。
-   */
   const calcPlacement = (e: React.DragEvent<HTMLDivElement>): DropPlacement => {
     const rect = e.currentTarget.getBoundingClientRect();
     const ratio = (e.clientY - rect.top) / Math.max(1, rect.height);
@@ -113,7 +169,6 @@ function SceneTreeItem({
     preferred: DropPlacement
   ): DropPlacement | null => {
     if (canMove(sourceUuid, targetUuid, preferred)) return preferred;
-    // 边界节点（首/尾）更容易命中无效排序区，优先回退到 inside，确保挂载提示稳定出现。
     if (preferred !== 'inside' && canMove(sourceUuid, targetUuid, 'inside')) return 'inside';
     if (preferred !== 'before' && canMove(sourceUuid, targetUuid, 'before')) return 'before';
     if (preferred !== 'after' && canMove(sourceUuid, targetUuid, 'after')) return 'after';
@@ -149,9 +204,8 @@ function SceneTreeItem({
             clearDragPreview();
             return;
           }
-          e.preventDefault(); // 必须阻止默认行为，否则 drop 不会触发
+          e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
-          // 让 drop 使用“最后一次 onDragOver 的 placement”，避免首/尾节点时 onDrop 计算偏差。
           if (dragPreview?.targetUuid !== node.uuid || dragPreview.placement !== placement) {
             setDragPreview({ targetUuid: node.uuid, placement });
           }
@@ -169,13 +223,16 @@ function SceneTreeItem({
           clearDragPreview();
         }}
         onDragEnd={() => {
-          // 统一清理拖拽状态，避免后续 hover 误触发。
           draggingUuidRef.current = null;
           clearDragPreview();
         }}
         onClick={() => {
           if (!selectable) return;
           onSelect(node.uuid);
+        }}
+        onDoubleClick={() => {
+          if (!selectable) return;
+          onRenameStart(node.uuid);
         }}
         onKeyDown={(e) => {
           if (!selectable) return;
@@ -188,21 +245,49 @@ function SceneTreeItem({
         {hasChildren ? (
           <button
             type="button"
-            className="inline-flex h-4 w-4 items-center justify-center text-base leading-none text-[var(--text-muted)]"
+            className="inline-flex h-4 w-4 items-center justify-center text-base leading-none text-[var(--text-muted)] transition-transform duration-150"
             onClick={(e) => {
               e.stopPropagation();
               onToggle(node.uuid);
             }}
             aria-label={expanded ? 'collapse' : 'expand'}
           >
-            <span>{expanded ? '-' : '+'}</span>
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 10 10"
+              fill="none"
+              className={`transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+            >
+              <path d="M3 1L7 5L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
         ) : (
           <span className="inline-block h-4 w-4" />
         )}
         <img src={nodeIcon(node.kind)} alt="" className="h-4 w-4 self-center opacity-90" />
         <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate select-none leading-none">{node.name}</span>
+          {isRenaming ? (
+            <input
+              ref={renameInputRef}
+              type="text"
+              defaultValue={node.name}
+              className="min-w-0 flex-1 rounded border border-[var(--accent)] bg-[var(--bg-input)] px-1 py-0 text-xs leading-none text-[var(--text-primary)] outline-none"
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitRename();
+                }
+                if (e.key === 'Escape') {
+                  onRenameStart(null);
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <span className="truncate select-none leading-none">{node.name}</span>
+          )}
           {selectable && !isRootCamera ? (
             <div className="ml-auto flex items-center gap-1">
               <button
@@ -259,11 +344,14 @@ function SceneTreeItem({
                   node={child}
                   depth={depth + 1}
                   expandedSet={expandedSet}
+                  renamingUuid={renamingUuid}
                   selectedUuid={selectedUuid}
                   onToggle={onToggle}
                   onSelect={onSelect}
                   onToggleVisible={onToggleVisible}
                   onDelete={onDelete}
+                  onRenameStart={onRenameStart}
+                  onRenameCommit={onRenameCommit}
                   onMove={onMove}
                   canMove={canMove}
                   dragPreview={dragPreview}
@@ -292,10 +380,11 @@ export function Structure() {
   const tree = sceneSettings.sceneTree;
   const [expandedSet, setExpandedSet] = useState<Set<string>>(new Set());
   const [selectedUuid, setSelectedUuid] = useState<string | null>(null);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [renamingUuid, setRenamingUuid] = useState<string | null>(null);
   const draggingUuidRef = useRef<string | null>(null);
   const [dragPreview, setDragPreview] = useState<DragPreview>(null);
 
-  // FLIP 动画：记录上一次布局位置并对位移做过渡（仅在 tree 真实变化时触发）
   const rowElsRef = useRef(new Map<string, HTMLDivElement>());
   const lastRectsRef = useRef<Map<string, DOMRect> | null>(null);
 
@@ -308,20 +397,7 @@ export function Structure() {
     m.set(uuid, el);
   };
 
-  /**
-   * 展平整棵树的 uuid 集合，用于在树变化时补齐默认展开状态。
-   */
-  const allNodeIds = useMemo(() => {
-    const ids = new Set<string>();
-    const walk = (nodes: SceneTreeNode[]) => {
-      for (const node of nodes) {
-        ids.add(node.uuid);
-        if (node.children.length > 0) walk(node.children);
-      }
-    };
-    walk(tree);
-    return ids;
-  }, [tree]);
+  const allNodeIds = useMemo(() => collectAllUuids(tree), [tree]);
 
   // 默认全展开；树变化时自动补全新节点
   useEffect(() => {
@@ -342,7 +418,31 @@ export function Structure() {
     });
   }, [allNodeIds]);
 
-  // 位置变化动画（FLIP）：仅随 core 的 tree 变化触发
+  // 搜索过滤后的树
+  const filteredTree = useMemo(() => filterTree(tree, searchKeyword), [tree, searchKeyword]);
+
+  // 搜索时自动展开所有匹配路径上的节点
+  useEffect(() => {
+    if (!searchKeyword) return;
+    const expandable = collectExpandableUuids(filteredTree);
+    setExpandedSet((prev) => {
+      const next = new Set(prev);
+      for (const id of expandable) next.add(id);
+      if (next.size === prev.size) {
+        let same = true;
+        for (const id of next) {
+          if (!prev.has(id)) {
+            same = false;
+            break;
+          }
+        }
+        if (same) return prev;
+      }
+      return next;
+    });
+  }, [filteredTree, searchKeyword]);
+
+  // FLIP 动画
   useLayoutEffect(() => {
     const els = rowElsRef.current;
     const prev = lastRectsRef.current;
@@ -356,10 +456,8 @@ export function Structure() {
       if (!prevRect || !nextRect) continue;
       const dy = prevRect.top - nextRect.top;
       if (Math.abs(dy) < 0.5) continue;
-      // 只做一次过渡，不反复清空 transition，降低闪烁概率
       el.style.transform = `translateY(${dy}px)`;
       el.style.transition = 'transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1)';
-      // 下一帧回到 0，让 CSS 过渡生效
       requestAnimationFrame(() => {
         el.style.transform = '';
       });
@@ -375,6 +473,14 @@ export function Structure() {
     });
   };
 
+  const expandAll = () => {
+    setExpandedSet(new Set(allNodeIds));
+  };
+
+  const collapseAll = () => {
+    setExpandedSet(new Set());
+  };
+
   useEffect(() => {
     if (!editor) return;
     setSelectedUuid(editor.getSelected()?.uuid ?? null);
@@ -384,14 +490,9 @@ export function Structure() {
     return off;
   }, [editor]);
 
-  /**
-   * 根据 uuid 从编辑器中取回对象并设为当前选中项。
-   * 主相机不在 scene 树内，因此需要单独从 editor.camera 读取。
-   */
   const selectNode = (uuid: string) => {
     if (!editor) return;
     const obj = uuid === editor.camera.uuid ? editor.camera : (editor.scene.getObjectByProperty('uuid', uuid) ?? null);
-    // 从树单选时强制退出 Shift 多选遗留态（文件框等场景可能收不到 keyup），否则视口与 React 仍认为在增选模式、Gizmo 被关。
     editor.resetShiftMultiselectState();
     editor.select(obj);
   };
@@ -406,29 +507,26 @@ export function Structure() {
     editor.removeObjectByUuid(uuid);
   };
 
-  /**
-   * 执行节点移动。
-   * 真实树结构会在 core 侧变更后通过 sceneTreeChange 再同步回 React 状态。
-   */
+  const renameNode = useCallback((uuid: string, newName: string) => {
+    if (!editor) return;
+    void editor.setObjectPropertyByUuid(uuid, 'name', newName, {
+      recordHistory: true,
+      operationName: 'Rename',
+    });
+  }, [editor]);
+
   const moveNode = (sourceUuid: string, targetUuid: string, placement: DropPlacement) => {
     if (!editor) return;
     editor.moveObjectByUuid(sourceUuid, targetUuid, placement);
-    // drop 后立即清理预览，等待 core 的 sceneTreeChange 回写最终树
     draggingUuidRef.current = null;
     setDragPreview(null);
   };
 
-  /**
-   * 预判当前拖拽落点是否合法，避免向编辑器提交无效移动。
-   */
   const canMove = (sourceUuid: string, targetUuid: string, placement: DropPlacement) => {
     if (!editor) return false;
     return editor.canMoveObjectByUuid(sourceUuid, targetUuid, placement);
   };
 
-  /**
-   * 清除拖拽目标预览，避免拖拽结束后残留高亮样式。
-   */
   const clearDragPreview = () => {
     setDragPreview((prev) => {
       if (!prev) return prev;
@@ -437,34 +535,98 @@ export function Structure() {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-3">
-      {tree.length === 0 ? (
-        <div className="text-xs text-[var(--text-muted)]">{t.structureEmpty}</div>
-      ) : (
-        <ul>
-          {tree.map((node) => (
-            <SceneTreeItem
-              key={node.uuid}
-              node={node}
-              depth={0}
-              expandedSet={expandedSet}
-              selectedUuid={selectedUuid}
-              onToggle={toggleNode}
-              onSelect={selectNode}
-              onToggleVisible={toggleVisible}
-              onDelete={deleteNode}
-              onMove={moveNode}
-              canMove={canMove}
-              dragPreview={dragPreview}
-              setDragPreview={setDragPreview}
-              clearDragPreview={clearDragPreview}
-              draggingUuidRef={draggingUuidRef}
-              rowRef={rowRef}
-            />
-          ))}
-        </ul>
-      )}
+    <div className="flex h-full flex-col">
+      {/* 搜索框 + 展开折叠按钮 */}
+      <div className="flex shrink-0 items-center gap-1 px-3 pt-2 pb-1">
+        <div className="relative flex-1">
+          <svg
+            className="pointer-events-none absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+          >
+            <circle cx="5" cy="5" r="3.5" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M7.5 7.5L10.5 10.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+          <input
+            type="text"
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            placeholder={t.structureSearchPlaceholder}
+            className={`w-full rounded border border-[var(--border-subtle)] bg-[var(--bg-input)] py-1 pl-6 text-xs text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] ${searchKeyword ? 'pr-5' : 'pr-1.5'}`}
+          />
+          {searchKeyword ? (
+            <button
+              type="button"
+              className="absolute right-1 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              onClick={() => setSearchKeyword('')}
+              aria-label="clear search"
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M1 1L9 9M9 1L1 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]"
+          onClick={collapseAll}
+          title={t.structureCollapseAll}
+          aria-label={t.structureCollapseAll}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]"
+          onClick={expandAll}
+          title={t.structureExpandAll}
+          aria-label={t.structureExpandAll}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M4 2L8 6L4 10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
+
+      {/* 树列表 */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+        {tree.length === 0 ? (
+          <div className="text-xs text-[var(--text-muted)]">{t.structureEmpty}</div>
+        ) : filteredTree.length === 0 ? (
+          <div className="text-xs text-[var(--text-muted)]">{t.structureEmpty}</div>
+        ) : (
+          <ul>
+            {filteredTree.map((node) => (
+              <SceneTreeItem
+                key={node.uuid}
+                node={node}
+                depth={0}
+                expandedSet={expandedSet}
+                renamingUuid={renamingUuid}
+                selectedUuid={selectedUuid}
+                onToggle={toggleNode}
+                onSelect={selectNode}
+                onToggleVisible={toggleVisible}
+                onDelete={deleteNode}
+                onRenameStart={setRenamingUuid}
+                onRenameCommit={renameNode}
+                onMove={moveNode}
+                canMove={canMove}
+                dragPreview={dragPreview}
+                setDragPreview={setDragPreview}
+                clearDragPreview={clearDragPreview}
+                draggingUuidRef={draggingUuidRef}
+                rowRef={rowRef}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
-

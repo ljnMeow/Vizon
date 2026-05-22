@@ -37,6 +37,8 @@ urlpatterns = [
     path("api/", include("scenes.urls")),
     # 贴图资源管理接口
     path("api/", include("textures.urls")),
+    # 模型资源管理接口
+    path("api/", include("models3d.urls")),
 ]
 
 # 开发环境下由 Django 直接伺服媒体文件（上传的 bundle/thumbnail）；

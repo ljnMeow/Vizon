@@ -922,6 +922,7 @@ export class ThreeEditor {
     if (!obj) return false;
     const before = this.readNestedValue(obj, path);
     const after = cloneForHistory(nextValue);
+    const affectsTree = path === 'name';
 
     return runObjectPropertyHistoryStep({
       pending: this.pendingObjectPropHistoryBefore,
@@ -940,7 +941,10 @@ export class ThreeEditor {
           prop: path.split('.').filter(Boolean).slice(-1)[0] ?? path,
           valueText: formatHistoryValue(after) || undefined
         }),
-      writeValue: (value) => this.writeNestedValue(obj, path, value),
+      writeValue: (value) => {
+        this.writeNestedValue(obj, path, value);
+        if (affectsTree) this.syncSceneTreeState();
+      },
       executeHistoryOperation: (op) => this.executeHistoryOperation(op)
     });
   }
@@ -1742,6 +1746,21 @@ export class ThreeEditor {
    */
   async loadGLTF(url: string, opts?: { addToScene?: boolean }) {
     const out = await this.assetLoader.loadGLTF(url, opts);
+    if (opts?.addToScene ?? true) {
+      if (this.freezeStaticObjects) {
+        this.staticObjectFreezeController.freezeObjectTree(out);
+      }
+      this.syncSceneTreeState();
+    }
+    return out;
+  }
+
+  /**
+   * 通用模型加载：根据文件名/URL 扩展名自动选择对应 Loader。
+   * 支持 GLTF/GLB/FBX/OBJ/STL。
+   */
+  async loadModel(url: string, opts?: { addToScene?: boolean; fileName?: string }) {
+    const out = await this.assetLoader.loadModel(url, opts);
     if (opts?.addToScene ?? true) {
       if (this.freezeStaticObjects) {
         this.staticObjectFreezeController.freezeObjectTree(out);

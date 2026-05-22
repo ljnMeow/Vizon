@@ -10,6 +10,7 @@
 from rest_framework import serializers
 
 from utils.datetime import format_datetime
+from utils.file_validation import get_scene_bundle_validators, get_thumbnail_validators
 
 from .models import Scene
 
@@ -74,9 +75,9 @@ class SceneCreateSerializer(serializers.Serializer):
         max_length=255, required=False, allow_blank=True, default=""
     )
     # ZIP 项目包文件（必填）
-    bundle = serializers.FileField(required=True)
+    bundle = serializers.FileField(required=True, validators=get_scene_bundle_validators())
     # 截图缩略图（可选）
-    thumbnail = serializers.ImageField(required=False, allow_null=True)
+    thumbnail = serializers.ImageField(required=False, allow_null=True, validators=get_thumbnail_validators())
 
 
 class SceneUpdateSerializer(serializers.Serializer):
@@ -90,5 +91,5 @@ class SceneUpdateSerializer(serializers.Serializer):
     name = serializers.CharField(
         max_length=255, required=False, allow_blank=True, default=""
     )
-    bundle = serializers.FileField(required=True)
-    thumbnail = serializers.ImageField(required=False, allow_null=True)
+    bundle = serializers.FileField(required=True, validators=get_scene_bundle_validators())
+    thumbnail = serializers.ImageField(required=False, allow_null=True, validators=get_thumbnail_validators())

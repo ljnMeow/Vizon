@@ -84,16 +84,6 @@ export function ModelList() {
               </div>
             )
           )
-        },
-        {
-          key: 'environment',
-          header: t.systemAssets.modelList.environmentHeader,
-          content: <div className="text-xs text-[var(--text-muted)]">{t.systemAssets.modelList.emptyEnvironment}</div>,
-        },
-        {
-          key: 'characters',
-          header: t.systemAssets.modelList.charactersHeader,
-          content: <div className="text-xs text-[var(--text-muted)]">{t.systemAssets.modelList.emptyCharacters}</div>,
         }
       ]}
     />

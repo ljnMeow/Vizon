@@ -22,6 +22,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from customers.models import Customer
+from utils.file_validation import CACHE_PRIVATE_HOUR, CACHE_PUBLIC_DAY, set_cache_control
 
 from .models import Scene
 from .serializers import SceneCreateSerializer, SceneSerializer, SceneUpdateSerializer
@@ -187,11 +188,34 @@ class SceneViewSet(viewsets.ViewSet):
 
         # 以二进制模式打开文件，Django 会自动分块流式传输，避免内存峰值
         filename = f"{scene.name or 'bundle'}.zip"
-        return FileResponse(
+        response = FileResponse(
             scene.bundle.open("rb"),
             content_type="application/zip",
             as_attachment=True,
             filename=filename,
+        )
+        return set_cache_control(response, CACHE_PRIVATE_HOUR)
+
+    @action(detail=True, methods=["get"], url_path="thumbnail")
+    def thumbnail(self, request: Request, pk: str | None = None):
+        """
+        GET /api/scenes/{scene_id}/thumbnail/
+        内联显示缩略图（Cache-Control: public, max-age=86400）。
+        """
+        from django.http import FileResponse
+
+        scene = self._get_scene(request, pk)
+
+        if not scene.thumbnail or not scene.thumbnail.name:
+            raise SceneNotFoundError("缩略图不存在")
+
+        return set_cache_control(
+            FileResponse(
+                scene.thumbnail.open("rb"),
+                content_type="image/png",
+                as_attachment=False,
+            ),
+            CACHE_PUBLIC_DAY,
         )
 
     def _get_scene(self, request: Request, pk: str | None) -> Scene:

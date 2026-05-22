@@ -284,6 +284,19 @@ export function SceneSettingsEnvironmentItem({
                     {hdrFileName ?? '-'}
                   </div>
                 )}
+
+                {hdri.type === 'uploaded' && (
+                  <button
+                    type="button"
+                    onClick={() => setHdri({ type: 'none' })}
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--color-error,#ef4444)]"
+                    title={locale === 'zh-CN' ? '清除环境贴图' : 'Clear environment map'}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                )}
               </div>
             </div>
           </div>

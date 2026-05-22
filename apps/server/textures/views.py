@@ -26,6 +26,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from customers.models import Customer
+from utils.file_validation import CACHE_PRIVATE_HOUR, CACHE_PUBLIC_DAY, set_cache_control
 
 from .models import Texture
 from .serializers import (
@@ -262,11 +263,34 @@ class TextureViewSet(viewsets.ViewSet):
             raise TextureNotFoundError("贴图文件不存在")
 
         filename = texture.name or texture.file.name
-        return FileResponse(
+        response = FileResponse(
             texture.file.open("rb"),
             content_type="application/octet-stream",
             as_attachment=True,
             filename=filename,
+        )
+        return set_cache_control(response, CACHE_PRIVATE_HOUR)
+
+    @action(detail=True, methods=["get"], url_path="thumbnail")
+    def thumbnail(self, request: Request, pk: str | None = None):
+        """
+        GET /api/textures/{texture_id}/thumbnail/
+        内联显示缩略图（Cache-Control: public, max-age=86400）。
+        """
+        from django.http import FileResponse
+
+        texture = self._get_texture(request, pk)
+
+        if not texture.thumbnail or not texture.thumbnail.name:
+            raise TextureNotFoundError("缩略图不存在")
+
+        return set_cache_control(
+            FileResponse(
+                texture.thumbnail.open("rb"),
+                content_type="image/png",
+                as_attachment=False,
+            ),
+            CACHE_PUBLIC_DAY,
         )
 
     def _get_texture(self, request: Request, pk: str | None) -> Texture:

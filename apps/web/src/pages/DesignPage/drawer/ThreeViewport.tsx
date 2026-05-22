@@ -4,6 +4,7 @@ import {
   createDefaultCamera,
   createDefaultLight,
   createDefaultModel,
+  normalizeModelSize,
   type DefaultCameraKey,
   type DefaultLightKey,
   type DefaultModelKey,
@@ -13,6 +14,8 @@ import { TransformToolbar, type ViewportTool } from "./tools/TransformToolbar";
 import { ViewPresetToolbar } from "./tools/ViewPresetToolbar";
 import { DATA_TRANSFER_KEYS } from "../../../utils/keys";
 import { encodeHistoryI18nName } from "../../../utils/historyI18n";
+import { message } from "../../../components/GlobalMessage";
+import { useLocale } from "../../../hooks/useLocale";
 
 /**
  * 生成添加相机操作的国际化历史记录名称。
@@ -66,8 +69,10 @@ export function ThreeViewport({
   const toolRef = useRef<ViewportTool | null>("translate");
   const shiftSelectingRef = useRef(false);
   const MODEL_DRAG_MIME = DATA_TRANSFER_KEYS.MODEL_MIME;
+  const USER_MODEL_DRAG_MIME = DATA_TRANSFER_KEYS.USER_MODEL_MIME;
   const CAMERA_DRAG_MIME = DATA_TRANSFER_KEYS.CAMERA_MIME;
   const LIGHT_DRAG_MIME = DATA_TRANSFER_KEYS.LIGHT_MIME;
+  const { locale } = useLocale();
 
   const editor = useMemo(() => ({ current: null as ThreeEditor | null }), []);
   const [view, setView] = useState<ViewPreset>("default");
@@ -210,7 +215,7 @@ export function ThreeViewport({
     e.dataTransfer.dropEffect = "copy";
   };
 
-  const onDrop = (e: DragEvent<HTMLDivElement>) => {
+  const onDrop = async (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const inst = editor.current;
     if (!inst) return;
@@ -240,6 +245,36 @@ export function ThreeViewport({
       });
       inst.resetShiftMultiselectState();
       inst.select(obj);
+      return;
+    }
+
+    const userModelData = e.dataTransfer.getData(USER_MODEL_DRAG_MIME);
+    if (userModelData) {
+      const loadingHandle = message.loading(
+        locale === 'zh-CN' ? '正在加载模型…' : 'Loading model...'
+      );
+      try {
+        const { url, name } = JSON.parse(userModelData) as { url: string; name?: string };
+        const obj = await inst.loadModel(url, { addToScene: false, fileName: name });
+        normalizeModelSize(obj);
+        obj.name = name || obj.name || 'Model';
+        obj.position.copy(point);
+        inst.add(obj, {
+          operationName: encodeHistoryI18nName({
+            "zh-CN": `添加模型 - ${obj.uuid}`,
+            "en-US": `Add model - ${obj.uuid}`,
+          }),
+        });
+        inst.resetShiftMultiselectState();
+        inst.select(obj);
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        message.error(
+          locale === 'zh-CN' ? `模型加载失败：${errMsg}` : `Failed to load model: ${errMsg}`
+        );
+      } finally {
+        loadingHandle.hide();
+      }
       return;
     }
 

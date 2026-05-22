@@ -220,9 +220,15 @@ export function ProjectPanel({ isActive }: { isActive: boolean }) {
           type="button"
           onClick={() => { void fetchScenes(); }}
           disabled={loading}
-          className={btnBase + ' text-[var(--text-secondary)]'}
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40"
+          title={appMessages[locale].userAssets.refresh}
         >
-          {t.refresh}
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M1 6a5 5 0 0 1 9.3-2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            <path d="M11 6a5 5 0 0 1-9.3 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            <path d="M10 1v3h-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M2 11V8h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
       </div>
 

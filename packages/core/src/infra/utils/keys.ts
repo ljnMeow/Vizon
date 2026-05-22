@@ -79,5 +79,12 @@ export const VIZON_USER_DATA_KEYS = {
     EDIT_ENABLED: '__vizonConduitEditEnabled',
     NODE_META: '__vizonConduitNode',
   },
+
+  /** 模型自动缩放元数据 */
+  AUTOSCALE: {
+    ORIGINAL_MAX_DIM: '__vizonAutoscaleOriginalMaxDim',
+    SCALE_FACTOR: '__vizonAutoscaleScaleFactor',
+    APPLIED: '__vizonAutoscaleApplied',
+  },
 } as const;
 
