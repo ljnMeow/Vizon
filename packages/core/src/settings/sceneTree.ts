@@ -18,5 +18,6 @@ export type SceneTreeNode = {
   type: string;
   visible: boolean;
   kind: SceneTreeNodeKind;
+  nonDeletable?: boolean;
   children: SceneTreeNode[];
 };

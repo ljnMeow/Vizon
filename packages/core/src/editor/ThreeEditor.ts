@@ -39,7 +39,7 @@ import { ViewPresetController } from './controllers/ViewPresetController';
 import { SceneTreeController } from './controllers/SceneTreeController';
 import { StaticObjectFreezeController } from './controllers/StaticObjectFreezeController';
 import { ConduitEditController } from './controllers/ConduitEditController';
-import { isNonSelectableInHierarchy, isVisibleInHierarchy } from './picking/objectGuards';
+import { isNonDeletable, isNonSelectableInHierarchy, isVisibleInHierarchy } from './picking/objectGuards';
 import {
   cloneForHistory,
   createSingleSlotPending,
@@ -473,6 +473,14 @@ export class ThreeEditor {
     // 向 scene 挂上 Grid/Axes 并 emit 初始 sceneTree
     this.bootstrapScene();
 
+    // 默认环境光：保证 PBR 模型可见，不可删除/移动
+    const defaultAmbient = new THREE.AmbientLight(0xffffff, 1);
+    defaultAmbient.name = '环境光';
+    defaultAmbient.userData[VIZON_USER_DATA_KEYS.COMMON.NON_DELETABLE] = true;
+    defaultAmbient.userData[VIZON_USER_DATA_KEYS.DEFAULTS.DEFAULT_LIGHT] = true;
+    defaultAmbient.userData[VIZON_USER_DATA_KEYS.DEFAULTS.DEFAULT_LIGHT_KEY] = 'ambientLight';
+    this.scene.add(defaultAmbient);
+
     // 可选强制清屏色（例如与 App 顶栏色一致）
     if (options.clearColor != null) {
       this.renderer.setClearColor(options.clearColor as any, 1);
@@ -615,7 +623,7 @@ export class ThreeEditor {
    * @returns 是否有节点被删除
    */
   async deleteSelected() {
-    const targets = this.selectedObjects.filter((target) => target.parent && !isNonSelectableInHierarchy(target));
+    const targets = this.selectedObjects.filter((target) => target.parent && !isNonSelectableInHierarchy(target) && !isNonDeletable(target));
     if (targets.length === 0) return false;
     const snapshot = targets
       .map((node) => ({ node, parent: node.parent, index: node.parent ? node.parent.children.indexOf(node) : -1 }))
@@ -846,7 +854,7 @@ export class ThreeEditor {
    * 用于「清空画布」类操作，可整批撤销。
    */
   async clearSceneNodes() {
-    const roots = this.scene.children.filter((child) => !isNonSelectableInHierarchy(child));
+    const roots = this.scene.children.filter((child) => !isNonSelectableInHierarchy(child) && !isNonDeletable(child));
     if (roots.length === 0) return false;
     const snapshot = roots.map((node) => ({ node, parent: node.parent, index: node.parent ? node.parent.children.indexOf(node) : -1 }));
     await this.executeHistoryOperation({
@@ -877,7 +885,7 @@ export class ThreeEditor {
    * 与 `clearSceneNodes` 不同之处在于同时还原全局场景配置。
    */
   async resetWorkspace() {
-    const roots = this.scene.children.filter((child) => !isNonSelectableInHierarchy(child));
+    const roots = this.scene.children.filter((child) => !isNonSelectableInHierarchy(child) && !isNonDeletable(child));
     const snapshot = roots.map((node) => ({ node, parent: node.parent, index: node.parent ? node.parent.children.indexOf(node) : -1 }));
     const prevSettings = this.getSceneSettings();
     const nextSettings = createDefaultSceneSettings();
@@ -1289,8 +1297,8 @@ export class ThreeEditor {
    */
   private canAttachTransformTarget(object: THREE.Object3D | null): object is THREE.Object3D {
     if (!object) return false;
-    // 主相机作为根节点独立展示，不在 scene 子树中，不能 attach 到 TransformControls。
     if (object === this.camera) return false;
+    if (isNonDeletable(object)) return false;
     let cur: THREE.Object3D | null = object;
     while (cur) {
       if (cur === this.scene) return true;
@@ -1518,7 +1526,7 @@ export class ThreeEditor {
    */
   removeObjectByUuid(uuid: string): boolean {
     const obj = this.scene.getObjectByProperty('uuid', uuid);
-    if (!obj || !obj.parent || isNonSelectableInHierarchy(obj)) return false;
+    if (!obj || !obj.parent || isNonSelectableInHierarchy(obj) || isNonDeletable(obj)) return false;
     // 先做原有 helper 解绑/清理，再交由 service 执行结构移除与树同步。
     if (this.selectedObjects.includes(obj)) this.select(null);
     this.editorHelperManager.unbindHelpersForSubtree(obj);
@@ -1549,6 +1557,7 @@ export class ThreeEditor {
     const source = this.scene.getObjectByProperty('uuid', sourceUuid);
     if (!source || !source.parent) return null;
     if (isNonSelectableInHierarchy(source)) return null;
+    if (isNonDeletable(source)) return null;
     if (source.type === 'Scene') return null;
     if ((source as any).isTransformControls) return null;
 

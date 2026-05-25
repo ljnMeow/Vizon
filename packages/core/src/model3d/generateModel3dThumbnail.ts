@@ -42,6 +42,30 @@ export async function generateModel3dThumbnail(
   if (!loaderType) return null;
 
   const objectUrl = URL.createObjectURL(file);
+  try {
+    return await _renderThumbnail(objectUrl, loaderType, size);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+/** 从 URL 加载模型并生成缩略图 PNG（用于 ZIP 解压后的多文件 GLTF）。 */
+export async function generateModel3dThumbnailFromUrl(
+  url: string,
+  size = THUMBNAIL_SIZE
+): Promise<Blob | null> {
+  const ext = getExt(url);
+  const loaderType = EXT_LOADER_MAP[ext];
+  if (!loaderType) return null;
+
+  return _renderThumbnail(url, loaderType, size);
+}
+
+async function _renderThumbnail(
+  url: string,
+  loaderType: 'gltf' | 'fbx' | 'obj' | 'stl',
+  size: number
+): Promise<Blob | null> {
   let renderer: THREE.WebGLRenderer | null = null;
 
   try {
@@ -54,7 +78,7 @@ export async function generateModel3dThumbnail(
     dirLight.position.set(5, 10, 7);
     scene.add(dirLight);
 
-    const root = await loadModel(objectUrl, loaderType);
+    const root = await loadModel(url, loaderType);
     scene.add(root);
 
     const box = new THREE.Box3().setFromObject(root);
@@ -83,7 +107,6 @@ export async function generateModel3dThumbnail(
   } catch {
     return null;
   } finally {
-    URL.revokeObjectURL(objectUrl);
     if (renderer) {
       renderer.dispose();
       renderer.forceContextLoss();
@@ -95,6 +118,7 @@ async function loadModel(url: string, type: 'gltf' | 'fbx' | 'obj' | 'stl'): Pro
   switch (type) {
     case 'gltf': {
       const loader = new GLTFLoader();
+      loader.setCrossOrigin('anonymous');
       const gltf = await loader.loadAsync(url);
       return gltf.scene;
     }

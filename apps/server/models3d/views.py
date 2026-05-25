@@ -18,6 +18,13 @@
 
 from __future__ import annotations
 
+import os
+import shutil
+import re
+from pathlib import Path
+from uuid import uuid4
+
+from django.conf import settings
 from django.db.models import Count
 
 from rest_framework import status, viewsets
@@ -28,6 +35,7 @@ from rest_framework.response import Response
 
 from customers.models import Customer
 from utils.file_validation import CACHE_PRIVATE_HOUR, CACHE_PUBLIC_DAY, set_cache_control
+from utils.zip_extract import extract_model_zip, ZipExtractionError
 
 from .models import ModelAsset, ModelCategory
 from .serializers import (
@@ -103,8 +111,9 @@ class ModelCategoryViewSet(viewsets.ViewSet):
         """POST /api/models3d/categories/"""
         serializer = ModelCategoryCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        vdata: dict = serializer.validated_data  # type: ignore[assignment]
         customer = _get_customer(request)
-        name = serializer.validated_data["name"]
+        name = vdata["name"]
 
         if ModelCategory.objects.filter(customer=customer, name=name).exists():
             return Response({"detail": "分类名称已存在"}, status=409)
@@ -118,7 +127,8 @@ class ModelCategoryViewSet(viewsets.ViewSet):
         cat = self._get_category(request, pk)
         serializer = ModelCategoryUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        new_name = serializer.validated_data["name"]
+        vdata: dict = serializer.validated_data  # type: ignore[assignment]
+        new_name = vdata["name"]
 
         customer = _get_customer(request)
         if ModelCategory.objects.filter(customer=customer, name=new_name).exclude(pk=cat.pk).exists():
@@ -133,7 +143,7 @@ class ModelCategoryViewSet(viewsets.ViewSet):
         """DELETE /api/models3d/categories/{category_id}/"""
         cat = self._get_category(request, pk)
 
-        model_count = cat.models.count()
+        model_count = cat.models.count()  # type: ignore[attr-defined]
         if model_count > 0:
             return Response(
                 {"detail": f"该分类下有 {model_count} 个模型，请先移动模型后再删除"},
@@ -182,6 +192,7 @@ class ModelAssetViewSet(viewsets.ViewSet):
         POST /api/models3d/
         新建模型：接收 multipart 表单（name + file + 可选 thumbnail + 可选 category UUID）。
         若未传 category，则归入默认分类。
+        支持 ZIP 压缩包（含多文件 GLTF）自动解压。
         """
         serializer = ModelAssetCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -203,19 +214,51 @@ class ModelAssetViewSet(viewsets.ViewSet):
 
         file_size = file.size if hasattr(file, "size") else 0  # pyright: ignore[reportOptionalMemberAccess]
 
-        asset = ModelAsset(
-            customer=customer,
-            name=name,
-            category=category,
-            file_size=file_size,
-            mime_type=getattr(file, "content_type", "") or "",  # pyright: ignore[reportOptionalMemberAccess]
-        )
-        asset.file.save(file.name, file, save=False)  # pyright: ignore[reportOptionalMemberAccess, reportArgumentType]
+        is_zip = Path(name).suffix.lower() == ".zip"
 
-        if thumbnail_file:
-            asset.thumbnail.save(thumbnail_file.name, thumbnail_file, save=False)  # pyright: ignore[reportOptionalMemberAccess]
+        if is_zip:
+            public_id = uuid4()
+            target_dir = os.path.join(
+                settings.MEDIA_ROOT, "models3d", "files", str(public_id)
+            )
 
-        asset.save()
+            try:
+                entry_rel = extract_model_zip(file, target_dir)
+            except ZipExtractionError as exc:
+                shutil.rmtree(target_dir, ignore_errors=True)
+                return Response({"detail": str(exc.detail)}, status=400)
+
+            # 入口文件相对于 MEDIA_ROOT 的路径
+            entry_full_rel = f"models3d/files/{public_id}/{entry_rel}"
+
+            asset = ModelAsset(
+                public_id=public_id,
+                customer=customer,
+                name=name,
+                category=category,
+                file_size=file_size,
+                mime_type="application/zip",
+            )
+            asset.file.name = entry_full_rel
+
+            if thumbnail_file:
+                asset.thumbnail.save(thumbnail_file.name, thumbnail_file, save=False)  # pyright: ignore[reportOptionalMemberAccess]
+
+            asset.save()
+        else:
+            asset = ModelAsset(
+                customer=customer,
+                name=name,
+                category=category,
+                file_size=file_size,
+                mime_type=getattr(file, "content_type", "") or "",  # pyright: ignore[reportOptionalMemberAccess]
+            )
+            asset.file.save(file.name, file, save=False)  # pyright: ignore[reportOptionalMemberAccess, reportArgumentType]
+
+            if thumbnail_file:
+                asset.thumbnail.save(thumbnail_file.name, thumbnail_file, save=False)  # pyright: ignore[reportOptionalMemberAccess]
+
+            asset.save()
 
         out = ModelAssetSerializer(asset, context={"request": request})
         return Response(out.data, status=status.HTTP_201_CREATED)
@@ -232,7 +275,7 @@ class ModelAssetViewSet(viewsets.ViewSet):
     def update(self, request: Request, pk: str | None = None) -> Response:
         """
         PUT /api/models3d/{model_id}/
-        更新模型（重命名 + 移动分类）。
+        更新模型（重命名 + 移动分类 + 更新缩略图）。
         """
         asset = self._get_asset(request, pk)
         serializer = ModelAssetUpdateSerializer(data=request.data)
@@ -241,12 +284,13 @@ class ModelAssetViewSet(viewsets.ViewSet):
         customer = _get_customer(request)
         update_fields = ["updated_at"]
 
-        if "name" in serializer.validated_data:
-            asset.name = serializer.validated_data["name"]
+        vdata: dict = serializer.validated_data  # type: ignore[assignment]
+        if "name" in vdata:
+            asset.name = vdata["name"]
             update_fields.append("name")
 
-        if "category" in serializer.validated_data:
-            category_uuid = serializer.validated_data["category"]
+        if "category" in vdata:
+            category_uuid = vdata["category"]
             category = ModelCategory.objects.filter(
                 public_id=category_uuid, customer=customer
             ).first()
@@ -254,6 +298,14 @@ class ModelAssetViewSet(viewsets.ViewSet):
                 return Response({"detail": "分类不存在"}, status=400)
             asset.category = category
             update_fields.append("category_id")
+
+        if "thumbnail" in vdata:
+            thumbnail_file = vdata["thumbnail"]
+            if thumbnail_file:
+                asset.thumbnail.save(thumbnail_file.name, thumbnail_file, save=False)  # pyright: ignore[reportOptionalMemberAccess]
+            else:
+                asset.thumbnail = None
+            update_fields.append("thumbnail")
 
         asset.save(update_fields=update_fields)
 
@@ -264,15 +316,31 @@ class ModelAssetViewSet(viewsets.ViewSet):
         """
         DELETE /api/models3d/{model_id}/
         删除模型记录并同步删除磁盘上的文件和缩略图。
+        若模型来自 ZIP 解压，删除整个解压目录。
         """
         asset = self._get_asset(request, pk)
 
         file_field = asset.file
         thumbnail_field = asset.thumbnail
+        file_name = file_field.name if file_field and file_field.name else ""
 
         asset.delete()
 
-        _delete_file_field(file_field)
+        # 检测是否为 ZIP 解压目录（路径含 UUID 子目录）
+        _UUID_RE = re.compile(r"models3d/files/[0-9a-f-]{32,}/")
+        if _UUID_RE.search(file_name):
+            # 删除整个解压目录
+            dir_path = os.path.join(settings.MEDIA_ROOT, file_name.split("/")[-2], "")  # noqa
+            # 从完整路径中提取 UUID 子目录
+            parts = file_name.split("/")
+            # parts: ['models3d', 'files', '<uuid>', '...', 'entry.gltf']
+            if len(parts) >= 3:
+                uuid_dir = os.path.join(settings.MEDIA_ROOT, parts[0], parts[1], parts[2])
+                if os.path.isdir(uuid_dir):
+                    shutil.rmtree(uuid_dir, ignore_errors=True)
+        else:
+            _delete_file_field(file_field)
+
         _delete_file_field(thumbnail_field)
 
         return Response({"deleted": True}, status=status.HTTP_200_OK)

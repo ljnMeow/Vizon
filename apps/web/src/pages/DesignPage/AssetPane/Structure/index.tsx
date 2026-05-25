@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { SceneTreeNode, ThreeEditor } from 'vizon-3d-core';
+import type { SceneTreeNode } from 'vizon-3d-core';
 import { useLocale } from '../../../../hooks/useLocale';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { appMessages } from '../../../../i18n/messages';
@@ -306,6 +306,7 @@ function SceneTreeItem({
                   className="h-3.5 w-3.5 opacity-90"
                 />
               </button>
+              {!node.nonDeletable && (
               <button
                 type="button"
                 className="h-5 min-w-5 rounded px-1 text-[10px] leading-none text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
@@ -318,6 +319,7 @@ function SceneTreeItem({
               >
                 <img src={actionIcon('delete')} alt="" className="h-3.5 w-3.5 opacity-90" />
               </button>
+              )}
             </div>
           ) : null}
         </div>

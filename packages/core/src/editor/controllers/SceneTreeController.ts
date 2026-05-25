@@ -70,6 +70,7 @@ export class SceneTreeController {
       type: obj.type,
       visible: obj.visible,
       kind: this.getSceneNodeKind(obj),
+      nonDeletable: !!(obj.userData as Record<string, unknown>)[VIZON_USER_DATA_KEYS.COMMON.NON_DELETABLE],
       children
     };
   }

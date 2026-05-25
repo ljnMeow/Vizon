@@ -13,9 +13,17 @@
 from rest_framework import serializers
 
 from utils.datetime import format_datetime
-from utils.file_validation import get_model_file_validators, get_thumbnail_validators
+from utils.file_validation import get_model_file_validators, get_thumbnail_validators, THUMBNAIL_EXTENSIONS
 
 from .models import ModelAsset, ModelCategory
+
+
+def _thumbnail_validators():
+    from utils.file_validation import FileExtensionValidator, FileSizeValidator, DEFAULT_MAX_THUMBNAIL_SIZE
+    return [
+        FileExtensionValidator(THUMBNAIL_EXTENSIONS),
+        FileSizeValidator(DEFAULT_MAX_THUMBNAIL_SIZE),
+    ]
 
 
 class ModelCategorySerializer(serializers.ModelSerializer):
@@ -119,12 +127,16 @@ class ModelAssetCreateSerializer(serializers.Serializer):
 
 
 class ModelAssetUpdateSerializer(serializers.Serializer):
-    """更新模型的请求序列化器（重命名 + 移动分类）。"""
+    """更新模型的请求序列化器（重命名 + 移动分类 + 更新缩略图）。"""
 
     name = serializers.CharField(max_length=255, required=False)
     category = serializers.UUIDField(required=False)
+    thumbnail = serializers.ImageField(
+        required=False, allow_null=True,
+        validators=_thumbnail_validators(),
+    )
 
-    def validate(self, data):
-        if not data:
+    def validate(self, attrs):
+        if not attrs:
             raise serializers.ValidationError("至少需要提供一个字段。")
-        return data
+        return attrs

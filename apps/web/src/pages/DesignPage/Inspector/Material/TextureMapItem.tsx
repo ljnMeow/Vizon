@@ -85,16 +85,35 @@ export type TextureMapItemProps = {
 function tryGetPreviewUrl(texture: any | null): string | null {
   const assetRef = getTextureAssetRef(texture);
   if (assetRef) {
-    // 先从会话缓存里拿稳定预览地址；它比 three 内部的 blob URL 生命周期更可控。
     const cachedPreviewUrl = getCachedTextureAssetPreviewUrl(assetRef.id);
     if (cachedPreviewUrl) return cachedPreviewUrl;
   }
-  // 优先读取 three Texture.image 上可直接预览的地址
   const img = texture?.image;
   if (!img) return null;
   if (typeof img === 'string') return img;
-  if (typeof img?.src === 'string') return img.src;
+  if (typeof img?.src === 'string' && img.src) return img.src;
+  // ImageBitmap (from GLTFLoader) has no .src — render to a tiny canvas as preview
+  if (typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap) {
+    return renderBitmapPreview(img);
+  }
   return null;
+}
+
+const _bitmapPreviewCache = new WeakMap<ImageBitmap, string>();
+
+function renderBitmapPreview(bitmap: ImageBitmap): string {
+  const cached = _bitmapPreviewCache.get(bitmap);
+  if (cached) return cached;
+  const canvas = document.createElement('canvas');
+  const size = 64;
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+  ctx.drawImage(bitmap, 0, 0, size, size);
+  const url = canvas.toDataURL('image/png');
+  _bitmapPreviewCache.set(bitmap, url);
+  return url;
 }
 
 /**

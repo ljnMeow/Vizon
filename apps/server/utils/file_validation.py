@@ -14,8 +14,7 @@ from rest_framework import serializers
 
 TEXTURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".hdr", ".exr"}
 MODEL_EXTENSIONS = {
-    ".gltf", ".glb", ".fbx", ".obj", ".stl",
-    ".ply", ".dae", ".3ds", ".wrl", ".pcd",
+    ".gltf", ".glb", ".fbx", ".obj", ".stl", ".zip",
 }
 SCENE_BUNDLE_EXTENSIONS = {".zip"}
 THUMBNAIL_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}

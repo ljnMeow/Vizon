@@ -14,7 +14,6 @@ URL 路由入口（全局 URLConf）。
 """
 
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
@@ -43,5 +42,20 @@ urlpatterns = [
 
 # 开发环境下由 Django 直接伺服媒体文件（上传的 bundle/thumbnail）；
 # 生产环境应由 Nginx/对象存储处理，不依赖 Django 提供静态文件。
+# 使用自定义 serve 替代 django.conf.urls.static.static，
+# 以便为媒体响应添加 CORS 头（WebGL 纹理加载需要跨域支持）。
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    from django.views.static import serve as _django_serve
+    from django.http import HttpResponse
+
+    def _cors_media_serve(request, path, **kwargs):
+        response = _django_serve(request, path, **kwargs)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+
+    # Catch-all for /media/ — must be last
+    urlpatterns.append(
+        path("media/<path:path>", _cors_media_serve, {
+            "document_root": settings.MEDIA_ROOT,
+        })
+    )

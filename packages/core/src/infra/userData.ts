@@ -11,6 +11,7 @@ import type { DefaultModelKey } from '../defaults/defaultModels';
 export type VizonUserData = {
   [VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE]?: boolean;
   [VIZON_USER_DATA_KEYS.COMMON.NON_PICKABLE]?: boolean;
+  [VIZON_USER_DATA_KEYS.COMMON.NON_DELETABLE]?: boolean;
   [VIZON_USER_DATA_KEYS.COMMON.DYNAMIC]?: boolean;
   [VIZON_USER_DATA_KEYS.COMMON.PICK_TARGET]?: THREE.Object3D;
   [VIZON_USER_DATA_KEYS.COMMON.HIDE_IN_EDITOR]?: boolean;

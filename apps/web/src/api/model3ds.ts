@@ -167,6 +167,16 @@ export function updateModel3d(
   return api.put<Model3dMeta>(`/api/models3d/${modelId}/`, params);
 }
 
+/** 更新模型缩略图。 */
+export function updateModel3dThumbnail(
+  modelId: string,
+  thumbnail: Blob
+): Promise<Model3dMeta> {
+  const form = new FormData();
+  form.append('thumbnail', thumbnail, 'thumbnail.png');
+  return api.put<Model3dMeta>(`/api/models3d/${modelId}/`, form);
+}
+
 /** 删除模型。 */
 export function deleteModel3d(modelId: string): Promise<void> {
   return api.delete<void>(`/api/models3d/${modelId}/`);

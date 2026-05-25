@@ -121,7 +121,7 @@ export {
 export { switchMaterialType, switchMaterialTypeOnObject } from './material/switchMaterialType';
 
 /** 3D 模型缩略图生成（避免 apps 直接依赖 three.js API） */
-export { generateModel3dThumbnail, isModel3dThumbnailSupported } from './model3d/generateModel3dThumbnail';
+export { generateModel3dThumbnail, generateModel3dThumbnailFromUrl, isModel3dThumbnailSupported } from './model3d/generateModel3dThumbnail';
 
 /** 模型自动缩放（拖拽添加到场景时归一化尺寸） */
 export { normalizeModelSize } from './model3d/normalizeModelSize';

@@ -31,10 +31,11 @@ import {
   listModel3ds,
   updateModel3d,
   updateModel3dCategory,
+  updateModel3dThumbnail,
   uploadModel3dWithProgress,
 } from '../../../../api/model3ds';
 import { ApiError } from '../../../../api/request';
-import { generateModel3dThumbnail } from 'vizon-3d-core';
+import { generateModel3dThumbnail, generateModel3dThumbnailFromUrl } from 'vizon-3d-core';
 
 /** 将字节数格式化为人类可读的文件大小字符串。 */
 function formatSize(bytes: number): string {
@@ -48,7 +49,7 @@ const btnBase =
   'rounded border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40';
 
 /** 允许上传的模型文件扩展名。 */
-const MODEL_ACCEPT = '.gltf,.glb,.fbx,.obj,.stl,.ply,.dae,.3ds,.wrl,.pcd';
+const MODEL_ACCEPT = '.gltf,.glb,.fbx,.obj,.stl,.zip';
 
 /** 分类名称最大长度。 */
 const CATEGORY_NAME_MAX_LENGTH = 10;
@@ -311,32 +312,54 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
     const loadingHandle = message.loading(`${t.uploading} (1/${total}) 0%`);
     loadingHandle.update({ progress: 0 });
 
-    let succeeded = 0;
     const failed: string[] = [];
 
     for (let i = 0; i < total; i++) {
       const file = files[i];
+      const isZip = file.name.toLowerCase().endsWith('.zip');
       const baseProgress = (i / total) * 100;
       try {
         loadingHandle.update({ text: `${t.uploadProcessing} (${i + 1}/${total})`, progress: baseProgress });
-        const thumbnail = await generateModel3dThumbnail(file);
 
-        await uploadModel3dWithProgress(
-          {
-            name: file.name,
-            file,
-            thumbnail: thumbnail ?? undefined,
-          },
-          (percent) => {
-            const overall = baseProgress + (percent / total);
-            if (percent >= 100) {
-              loadingHandle.update({ text: `${t.uploadProcessing} (${i + 1}/${total})`, progress: Math.min(overall, 100) });
-            } else {
-              loadingHandle.update({ text: `${t.uploading} (${i + 1}/${total}) ${percent}%`, progress: overall });
+        if (isZip) {
+          // ZIP 文件：先上传（不带缩略图），上传成功后从 URL 生成缩略图再回填
+          const result = await uploadModel3dWithProgress(
+            { name: file.name, file },
+            (percent) => {
+              const overall = baseProgress + (percent / total);
+              if (percent >= 100) {
+                loadingHandle.update({ text: `${t.uploadProcessing} (${i + 1}/${total})`, progress: Math.min(overall, 100) });
+              } else {
+                loadingHandle.update({ text: `${t.uploading} (${i + 1}/${total}) ${percent}%`, progress: overall });
+              }
+            }
+          );
+          // 从服务端返回的 file_url 生成缩略图
+          if (result.file_url) {
+            const thumb = await generateModel3dThumbnailFromUrl(result.file_url);
+            if (thumb) {
+              try { await updateModel3dThumbnail(result.model_id, thumb); } catch { /* ignore */ }
             }
           }
-        );
-        succeeded++;
+        } else {
+          // 单文件：先本地生成缩略图，随上传一起提交
+          const thumbnail = await generateModel3dThumbnail(file);
+          await uploadModel3dWithProgress(
+            {
+              name: file.name,
+              file,
+              thumbnail: thumbnail ?? undefined,
+            },
+            (percent) => {
+              const overall = baseProgress + (percent / total);
+              if (percent >= 100) {
+                loadingHandle.update({ text: `${t.uploadProcessing} (${i + 1}/${total})`, progress: Math.min(overall, 100) });
+              } else {
+                loadingHandle.update({ text: `${t.uploading} (${i + 1}/${total}) ${percent}%`, progress: overall });
+              }
+            }
+          );
+        }
       } catch {
         failed.push(file.name);
       }
@@ -735,7 +758,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
     if (initialOpenSetRef.current) return;
     initialOpenSetRef.current = true;
     setOpenCategoryKey(categories[0].category_id);
-  }, [categories]);
+  }, [categories, openCategoryKey]);
 
   // 展开切换后，等 Accordion 过渡完成再滚动到新展开的分类
   useEffect(() => {

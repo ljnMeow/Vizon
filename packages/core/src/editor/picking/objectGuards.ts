@@ -54,3 +54,12 @@ export function isVisibleInHierarchy(obj: THREE.Object3D) {
   }
   return true;
 }
+
+/**
+ * 判断对象是否标记为不可删除。
+ * 不沿父链继承——仅检查对象自身的 `__vizonNonDeletable` 标记。
+ * 用于保护默认环境光等必须始终存在的对象。
+ */
+export function isNonDeletable(obj: THREE.Object3D): boolean {
+  return !!(obj.userData as Record<string, unknown>)[VIZON_USER_DATA_KEYS.COMMON.NON_DELETABLE];
+}

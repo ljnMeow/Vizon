@@ -33,6 +33,7 @@ export class AssetLoader {
    */
   async loadGLTF(url: string, opts?: { addToScene?: boolean }) {
     const loader = new GLTFLoader();
+    loader.setCrossOrigin('anonymous');
     const gltf = await loader.loadAsync(url);
     const root = gltf.scene ?? gltf.scenes?.[0];
     if (!root) throw new Error('GLTF 没有 scene');
@@ -48,13 +49,15 @@ export class AssetLoader {
    * @param opts.fileName 文件名（用于格式推断，优先于 url 扩展名）
    */
   async loadModel(url: string, opts?: { addToScene?: boolean; fileName?: string }) {
-    const format = detectModelFormat(opts?.fileName ?? url);
+    const format = detectModelFormat(opts?.fileName ?? '') || detectModelFormat(url);
     let root: THREE.Object3D;
 
     switch (format) {
       case 'gltf':
       case 'glb': {
-        const gltf = await new GLTFLoader().loadAsync(url);
+        const loader = new GLTFLoader();
+        loader.setCrossOrigin('anonymous');
+        const gltf = await loader.loadAsync(url);
         root = gltf.scene ?? gltf.scenes?.[0];
         if (!root) throw new Error('GLTF 没有 scene');
         break;
