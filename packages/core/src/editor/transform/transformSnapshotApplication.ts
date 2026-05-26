@@ -33,6 +33,8 @@ export function applyObjectTransformSnapshot(options: ApplyObjectTransformSnapsh
   object.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
   object.rotation.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z);
   object.scale.set(snapshot.scale.x, snapshot.scale.y, snapshot.scale.z);
+  // matrixAutoUpdate=false（静态冻结）时 updateMatrixWorld 不会重算本地矩阵，必须先 updateMatrix。
+  object.updateMatrix();
   object.updateMatrixWorld(true);
 
   // 回放对象本身的 transform 后，还要补上与编辑器 helper 相关的连带状态。

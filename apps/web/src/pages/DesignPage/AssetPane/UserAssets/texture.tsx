@@ -11,7 +11,7 @@
  * - 材质面板上传贴图时自动同步到此处
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Accordion } from '../../../../components/Accordion';
 import { Tooltip } from '../../../../components/Tooltip';
@@ -29,6 +29,11 @@ import {
   updateTexture,
   uploadTextureWithProgress,
 } from '../../../../api/textures';
+import { getApiErrorMessage, mergeUploadErrorMessages } from '../../../../utils/apiError';
+import {
+  getTextureCategoryUploadConfig,
+  type TextureUploadFormatHintKey,
+} from '../../../../utils/textureCategoryUpload';
 import { generateThumbnail } from '../../../../utils/textureThumbnail';
 
 /** 分类 key 类型，含 '' 表示"全部"。 */
@@ -44,6 +49,16 @@ function formatSize(bytes: number): string {
 /** 按钮通用样式。 */
 const btnBase =
   'rounded border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40';
+
+const UPLOAD_FORMAT_HINT_I18N: Record<
+  TextureUploadFormatHintKey,
+  'uploadFormatHintColor' | 'uploadFormatHintData' | 'uploadFormatHintHdri' | 'uploadFormatHintAll'
+> = {
+  color: 'uploadFormatHintColor',
+  data: 'uploadFormatHintData',
+  hdri: 'uploadFormatHintHdri',
+  all: 'uploadFormatHintAll',
+};
 
 /**
  * 贴图资源面板。
@@ -101,6 +116,18 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
     setSelectedIds(new Set());
   };
 
+  /** 当前选中分类对应的上传 accept 与 Tooltip 文案。 */
+  const categoryUploadConfig = useMemo(
+    () => (categoryFilter ? getTextureCategoryUploadConfig(categoryFilter) : null),
+    [categoryFilter]
+  );
+
+  const uploadFormatsTooltip = useMemo(() => {
+    if (!categoryUploadConfig) return '';
+    const hintKey = UPLOAD_FORMAT_HINT_I18N[categoryUploadConfig.hintKey];
+    return `${t.uploadSupportedFormatsPrefix}${t[hintKey]}`;
+  }, [categoryUploadConfig, t]);
+
   /** 拉取贴图列表。 */
   const fetchTextures = useCallback(async () => {
     setLoading(true);
@@ -141,8 +168,7 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
     const loadingHandle = message.loading(`${t.uploading} (1/${total}) 0%`);
     loadingHandle.update({ progress: 0 });
 
-    let succeeded = 0;
-    const failed: string[] = [];
+    const failedMessages: string[] = [];
 
     for (let i = 0; i < total; i++) {
       const file = files[i];
@@ -167,21 +193,18 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
             }
           }
         );
-        succeeded++;
-      } catch {
-        failed.push(file.name);
+      } catch (err) {
+        failedMessages.push(getApiErrorMessage(err, t.uploadFailed));
       }
     }
 
     await fetchTextures();
     loadingHandle.hide();
 
-    if (failed.length === 0) {
+    if (failedMessages.length === 0) {
       void message.success(t.uploadSuccess);
-    } else if (succeeded > 0) {
-      void message.error(`${t.uploadFailedPrefix}${failed.join(', ')}`);
     } else {
-      void message.error(`${t.uploadFailedPrefix}${failed.join(', ')}`);
+      void message.error(`${t.uploadFailedPrefix}${mergeUploadErrorMessages(failedMessages)}`);
     }
     setUploading(false);
   };
@@ -376,24 +399,32 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
         {categoryFilter && (
           <>
             <input
+              key={categoryFilter}
               ref={fileInputRef}
               type="file"
-              accept="image/png,image/jpeg,image/webp,.hdr,.exr"
+              accept={categoryUploadConfig?.accept}
               multiple
               onChange={(e) => { void onUpload(e); }}
               className="hidden"
             />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
+            <Tooltip
+              content={uploadFormatsTooltip}
               disabled={uploading}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40"
-              title={uploading ? '' : t.uploadLabel}
+              placement="bottom"
+              triggerClassName="shrink-0"
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M6 10V2M3 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                aria-label={t.uploadLabel}
+                className="flex h-5 w-5 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M6 10V2M3 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </Tooltip>
           </>
         )}
         <button

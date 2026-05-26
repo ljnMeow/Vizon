@@ -192,7 +192,7 @@ class ModelAssetViewSet(viewsets.ViewSet):
         POST /api/models3d/
         新建模型：接收 multipart 表单（name + file + 可选 thumbnail + 可选 category UUID）。
         若未传 category，则归入默认分类。
-        支持 ZIP 压缩包（含多文件 GLTF）自动解压。
+        支持 ZIP 压缩包（含多文件 GLTF / FBX）自动解压。
         """
         serializer = ModelAssetCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

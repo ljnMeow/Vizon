@@ -4,6 +4,10 @@ import path from 'node:path';
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    // ImagePreviewContext 中按需动态加载该库，开发环境下显式预构建避免运行时 404。
+    include: ['react-photo-view']
+  },
   resolve: {
     alias: {
       'vizon-3d-core': path.resolve(__dirname, '../../packages/core/src'),
@@ -51,6 +55,12 @@ export default defineConfig({
      */
     proxy: {
       '/api': {
+        target: 'http://127.0.0.1:5018',
+        changeOrigin: true,
+        secure: false
+      },
+      // 模型/贴图静态资源：与页面同域，避免 WebGL 跨域加载 /media 贴图失败
+      '/media': {
         target: 'http://127.0.0.1:5018',
         changeOrigin: true,
         secure: false

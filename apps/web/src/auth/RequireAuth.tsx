@@ -19,8 +19,15 @@ type Props = { children: JSX.Element };
 export function RequireAuth({ children }: Props) {
   const location = useLocation();
   const { locale } = useLocale();
-  const checkingText = appMessages[locale].common.requireAuthChecking;
-  const hasToken = useMemo(() => Boolean(getAccessToken()), []);
+  const messages = appMessages[locale] ?? appMessages['zh-CN'] ?? appMessages['en-US'];
+  const checkingText = messages?.common?.requireAuthChecking ?? 'Checking...';
+  const hasToken = useMemo(() => {
+    try {
+      return Boolean(getAccessToken());
+    } catch {
+      return false;
+    }
+  }, []);
   const [verified, setVerified] = useState<boolean | null>(hasToken ? null : false);
 
   useEffect(() => {

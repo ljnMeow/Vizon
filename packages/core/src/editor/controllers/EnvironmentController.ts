@@ -31,6 +31,11 @@ export type EnvironmentApplyParams = {
  */
 export class EnvironmentController {
   private activeHdriTexture: THREE.Texture | null = null;
+  private defaultEnvironmentTexture: THREE.Texture | null = null;
+
+  setDefaultEnvironment(texture: THREE.Texture) {
+    this.defaultEnvironmentTexture = texture;
+  }
 
   /**
    * 应用环境设置。
@@ -44,9 +49,9 @@ export class EnvironmentController {
     renderer.setClearColor(bgColor, 1);
 
     if (next.backgroundMode === 'solid') {
-      // 清空纹理环境，转为纯色背景
+      // 纯色背景：保留默认 IBL 环境贴图，确保 PBR 模型有反射和质感
       scene.background = bgColor;
-      scene.environment = null;
+      scene.environment = this.defaultEnvironmentTexture;
       scene.environmentIntensity = 1;
       if (this.activeHdriTexture) {
         this.activeHdriTexture.dispose();
@@ -55,10 +60,10 @@ export class EnvironmentController {
       return true;
     }
 
-    // skybox mode: if hdri is none => fallback to solid background
+    // skybox mode: if hdri is none => fallback to solid background with default IBL
     if (next.hdri.type === 'none') {
       scene.background = bgColor;
-      scene.environment = null;
+      scene.environment = this.defaultEnvironmentTexture;
       scene.environmentIntensity = 1;
       if (this.activeHdriTexture) {
         this.activeHdriTexture.dispose();

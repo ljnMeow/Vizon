@@ -88,6 +88,13 @@ export interface AppMessages {
     structureCollapseAll: string;
     structureExpandAll: string;
     historyEmpty: string;
+    structureFocusTitle: string;
+    structureExitFocusTitle: string;
+    structureHideTitle: string;
+    structureShowTitle: string;
+    structureDeleteTitle: string;
+    structureCollapseLabel: string;
+    structureExpandLabel: string;
   };
   systemAssets: {
     modelsTab: string;
@@ -167,6 +174,13 @@ export interface AppMessages {
       categoryPhysicalMap: string;
       categorySceneEnvironment: string;
       uploadLabel: string;
+      /** 上传按钮 Tooltip 前缀 */
+      uploadSupportedFormatsPrefix: string;
+      /** 按分类展示的格式提示（与 textureCategoryUpload 的 hintKey 对应） */
+      uploadFormatHintColor: string;
+      uploadFormatHintData: string;
+      uploadFormatHintHdri: string;
+      uploadFormatHintAll: string;
       emptyTextures: string;
       loadFailed: string;
       deleteConfirmPrefix: string;
@@ -182,6 +196,8 @@ export interface AppMessages {
       uploadProcessing: string;
       uploadSuccess: string;
       uploadFailedPrefix: string;
+      /** 上传失败且无接口 message 时的兜底文案 */
+      uploadFailed: string;
       selectLabel: string;
       selectModeActive: string;
       selectAllLabel: string;
@@ -191,6 +207,8 @@ export interface AppMessages {
     /** 模型资源库相关文案 */
     model3dLibrary: {
       uploadLabel: string;
+      /** 上传按钮 Tooltip：所支持格式 */
+      uploadSupportedFormatsTooltip: string;
       emptyModels: string;
       emptyNoData: string;
       emptyCategory: string;
@@ -207,6 +225,8 @@ export interface AppMessages {
       uploadProcessing: string;
       uploadSuccess: string;
       uploadFailedPrefix: string;
+      /** 上传失败且无接口 message 时的兜底文案 */
+      uploadFailed: string;
       selectLabel: string;
       selectModeActive: string;
       selectAllLabel: string;
@@ -313,6 +333,7 @@ export interface AppMessages {
         materials: string;
         effects: string;
       };
+      focusModeEmptyHint: string;
       effectsSettings: {
         noMeshSelection: string;
         borderTitle: string;
@@ -742,7 +763,14 @@ export const appMessages: Record<Locale, AppMessages> = {
       structureSearchPlaceholder: '搜索节点…',
       structureCollapseAll: '全部折叠',
       structureExpandAll: '全部展开',
-      historyEmpty: '暂无操作历史'
+      historyEmpty: '暂无操作历史',
+      structureFocusTitle: '专注',
+      structureExitFocusTitle: '退出专注',
+      structureHideTitle: '隐藏',
+      structureShowTitle: '显示',
+      structureDeleteTitle: '删除',
+      structureCollapseLabel: '折叠',
+      structureExpandLabel: '展开'
     },
     systemAssets: {
       modelsTab: '模型',
@@ -801,6 +829,11 @@ export const appMessages: Record<Locale, AppMessages> = {
         categoryPhysicalMap: '物理贴图',
         categorySceneEnvironment: '场景环境贴图',
         uploadLabel: '上传',
+        uploadSupportedFormatsPrefix: '支持格式：',
+        uploadFormatHintColor: 'PNG、JPEG、WebP',
+        uploadFormatHintData: 'PNG',
+        uploadFormatHintHdri: 'HDR、EXR、PNG、JPEG、WebP',
+        uploadFormatHintAll: 'PNG、JPEG、WebP、HDR、EXR',
         emptyTextures: '暂无贴图资源，上传贴图或在使用材质贴图时自动保存。',
         loadFailed: '加载贴图列表失败',
         deleteConfirmPrefix: '确认删除贴图「',
@@ -816,6 +849,7 @@ export const appMessages: Record<Locale, AppMessages> = {
         uploadProcessing: '正在处理',
         uploadSuccess: '上传成功',
         uploadFailedPrefix: '上传失败：',
+        uploadFailed: '上传失败，请稍后重试',
         selectLabel: '选择',
         selectModeActive: '取消选择',
         selectAllLabel: '全选',
@@ -824,6 +858,7 @@ export const appMessages: Record<Locale, AppMessages> = {
       },
       model3dLibrary: {
         uploadLabel: '上传',
+        uploadSupportedFormatsTooltip: '支持格式：glTF、GLB、FBX、OBJ、STL、ZIP',
         emptyModels: '暂无模型资源，点击上传按钮添加 3D 模型文件。',
         emptyNoData: '暂无分类和模型数据',
         emptyCategory: '暂无模型数据',
@@ -840,6 +875,7 @@ export const appMessages: Record<Locale, AppMessages> = {
         uploadProcessing: '正在处理',
         uploadSuccess: '上传成功',
         uploadFailedPrefix: '上传失败：',
+        uploadFailed: '上传失败，请稍后重试',
         selectLabel: '选择',
         selectModeActive: '取消选择',
         selectAllLabel: '全选',
@@ -940,6 +976,7 @@ export const appMessages: Record<Locale, AppMessages> = {
           materials: '这里将来是材质（Materials）',
           effects: '这里将来是特效（Effects）'
         },
+        focusModeEmptyHint: '请选择需要配置的内容',
         effectsSettings: {
           noMeshSelection: '当前选中对象没有可配置特效的 Mesh。',
           borderTitle: '边框',
@@ -1361,7 +1398,14 @@ export const appMessages: Record<Locale, AppMessages> = {
       structureSearchPlaceholder: 'Search nodes…',
       structureCollapseAll: 'Collapse all',
       structureExpandAll: 'Expand all',
-      historyEmpty: 'No history records yet'
+      historyEmpty: 'No history records yet',
+      structureFocusTitle: 'Focus',
+      structureExitFocusTitle: 'Exit Focus',
+      structureHideTitle: 'Hide',
+      structureShowTitle: 'Show',
+      structureDeleteTitle: 'Delete',
+      structureCollapseLabel: 'Collapse',
+      structureExpandLabel: 'Expand'
     },
     systemAssets: {
       modelsTab: 'Models',
@@ -1420,6 +1464,11 @@ export const appMessages: Record<Locale, AppMessages> = {
         categoryPhysicalMap: 'Physical Map',
         categorySceneEnvironment: 'Scene Environment',
         uploadLabel: 'Upload Texture',
+        uploadSupportedFormatsPrefix: 'Supported formats: ',
+        uploadFormatHintColor: 'PNG, JPEG, WebP',
+        uploadFormatHintData: 'PNG',
+        uploadFormatHintHdri: 'HDR, EXR, PNG, JPEG, WebP',
+        uploadFormatHintAll: 'PNG, JPEG, WebP, HDR, EXR',
         emptyTextures: 'No texture resources yet. Upload textures or they will be auto-saved when used in materials.',
         loadFailed: 'Failed to load textures',
         deleteConfirmPrefix: 'Delete texture "',
@@ -1435,6 +1484,7 @@ export const appMessages: Record<Locale, AppMessages> = {
         uploadProcessing: 'Processing',
         uploadSuccess: 'Uploaded',
         uploadFailedPrefix: 'Upload failed: ',
+        uploadFailed: 'Upload failed, please try again later',
         selectLabel: 'Select',
         selectModeActive: 'Cancel',
         selectAllLabel: 'Select all',
@@ -1443,6 +1493,7 @@ export const appMessages: Record<Locale, AppMessages> = {
       },
       model3dLibrary: {
         uploadLabel: 'Upload',
+        uploadSupportedFormatsTooltip: 'Supported formats: glTF, GLB, FBX, OBJ, STL, ZIP',
         emptyModels: 'No model resources yet. Click upload to add 3D model files.',
         emptyNoData: 'No categories or models yet',
         emptyCategory: 'No models yet',
@@ -1459,6 +1510,7 @@ export const appMessages: Record<Locale, AppMessages> = {
         uploadProcessing: 'Processing',
         uploadSuccess: 'Uploaded',
         uploadFailedPrefix: 'Upload failed: ',
+        uploadFailed: 'Upload failed, please try again later',
         selectLabel: 'Select',
         selectModeActive: 'Cancel',
         selectAllLabel: 'Select all',
@@ -1559,6 +1611,7 @@ export const appMessages: Record<Locale, AppMessages> = {
           materials: 'Materials will appear here.',
           effects: 'Effects will appear here.'
         },
+        focusModeEmptyHint: 'Please select an object to configure',
         effectsSettings: {
           noMeshSelection: 'The selected object has no mesh with configurable effects.',
           borderTitle: 'Border',

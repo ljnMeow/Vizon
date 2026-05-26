@@ -14,6 +14,7 @@
  */
 import * as THREE from 'three';
 import type { OrbitControls, TransformControls } from 'three-stdlib';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { Emitter } from '../infra/events';
 import {
   encodeHistoryI18nName,
@@ -114,6 +115,8 @@ export type ThreeEditorEvents = {
   sceneSettingsChange: { settings: SceneSettings; renderer: RendererSettings };
   /** 通知上层同步清理 Shift 多选相关的 React 状态（与 resetShiftMultiselectState 成对使用） */
   shiftMultiselectUiReset: Record<string, never>;
+  /** 专注模式切换：uuid 非 null 表示进入专注，null 表示退出 */
+  focusModeChange: { uuid: string | null };
 };
 
 /** 构造 `ThreeEditor` 时的选项：画布、初值、可选场景配置与实验开关 */
@@ -228,6 +231,15 @@ export class ThreeEditor {
   private staticObjectFreezeController: StaticObjectFreezeController;
   private selectionOrchestrator: SelectionOrchestrator;
   private assetLoader: AssetLoader;
+  private defaultEnvironmentTexture: THREE.Texture | null = null;
+
+  // —— 专注模式 ——
+  /** 当前专注的物体 uuid；null 表示未进入专注模式 */
+  private focusModeUuid: string | null = null;
+  /** 进入专注模式时的可见性快照：uuid -> visible，退出时用于还原 */
+  private focusModeVisibilitySnapshot: Map<string, boolean> = new Map();
+  /** 进入专注模式前的相机状态快照，退出时用于恢复 */
+  private focusModePreCamera: SceneSettings['camera'] | null = null;
 
   // —— 场景内额外相机/灯光的辅助器（独立于光/相机节点，避免矩阵双计）——
   /** 相机/灯光 helper 与 target handle 的生命周期、同步与 dirty 标记 */
@@ -443,7 +455,12 @@ export class ThreeEditor {
     this.sceneGraph = new SceneGraphService({
       getScene: () => this.scene,
       getCameraRoot: () => this.camera,
-      getSceneTree: () => this.sceneTreeController.getSceneTree(this.scene, this.camera),
+      getSceneTree: () => {
+        const focusRoot = this.focusModeUuid
+          ? this.scene.getObjectByProperty('uuid', this.focusModeUuid)
+          : null;
+        return this.sceneTreeController.getSceneTree(this.scene, this.camera, focusRoot);
+      },
       updateSceneSettingsSceneTree: (tree) => {
         this.sceneSettings = {
           ...this.sceneSettings,
@@ -473,13 +490,13 @@ export class ThreeEditor {
     // 向 scene 挂上 Grid/Axes 并 emit 初始 sceneTree
     this.bootstrapScene();
 
-    // 默认环境光：保证 PBR 模型可见，不可删除/移动
-    const defaultAmbient = new THREE.AmbientLight(0xffffff, 1);
-    defaultAmbient.name = '环境光';
-    defaultAmbient.userData[VIZON_USER_DATA_KEYS.COMMON.NON_DELETABLE] = true;
-    defaultAmbient.userData[VIZON_USER_DATA_KEYS.DEFAULTS.DEFAULT_LIGHT] = true;
-    defaultAmbient.userData[VIZON_USER_DATA_KEYS.DEFAULTS.DEFAULT_LIGHT_KEY] = 'ambientLight';
-    this.scene.add(defaultAmbient);
+    // 默认 IBL 环境贴图：使用 RoomEnvironment 生成摄影棚级光照，
+    // 为 PBR 材质提供漫反射辐照度和镜面反射，效果远优于单纯 AmbientLight
+    const pmremGenerator = new THREE.PMREMGenerator(this.renderer);
+    this.defaultEnvironmentTexture = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environment = this.defaultEnvironmentTexture;
+    this.environmentController.setDefaultEnvironment(this.defaultEnvironmentTexture);
+    pmremGenerator.dispose();
 
     // 可选强制清屏色（例如与 App 顶栏色一致）
     if (options.clearColor != null) {
@@ -549,8 +566,7 @@ export class ThreeEditor {
     const ok = await this.history.undo();
     if (!ok) return false;
     this.emitHistoryChange();
-    this.syncSceneTreeState();
-    this.render();
+    this.afterHistoryMutation();
     return true;
   }
 
@@ -559,8 +575,7 @@ export class ThreeEditor {
     const ok = await this.history.redo();
     if (!ok) return false;
     this.emitHistoryChange();
-    this.syncSceneTreeState();
-    this.render();
+    this.afterHistoryMutation();
     return true;
   }
 
@@ -644,6 +659,9 @@ export class ThreeEditor {
             }
       ),
       do: () => {
+        if (this.focusModeUuid && snapshot.some((item) => item.node.uuid === this.focusModeUuid)) {
+          this.exitFocusMode();
+        }
         for (const item of snapshot) this.detachObjectFromParent(item.node);
         this.select(null);
         this.syncSceneTreeState();
@@ -854,6 +872,7 @@ export class ThreeEditor {
    * 用于「清空画布」类操作，可整批撤销。
    */
   async clearSceneNodes() {
+    if (this.focusModeUuid) this.exitFocusMode();
     const roots = this.scene.children.filter((child) => !isNonSelectableInHierarchy(child) && !isNonDeletable(child));
     if (roots.length === 0) return false;
     const snapshot = roots.map((node) => ({ node, parent: node.parent, index: node.parent ? node.parent.children.indexOf(node) : -1 }));
@@ -885,6 +904,7 @@ export class ThreeEditor {
    * 与 `clearSceneNodes` 不同之处在于同时还原全局场景配置。
    */
   async resetWorkspace() {
+    if (this.focusModeUuid) this.exitFocusMode();
     const roots = this.scene.children.filter((child) => !isNonSelectableInHierarchy(child) && !isNonDeletable(child));
     const snapshot = roots.map((node) => ({ node, parent: node.parent, index: node.parent ? node.parent.children.indexOf(node) : -1 }));
     const prevSettings = this.getSceneSettings();
@@ -1136,6 +1156,8 @@ export class ThreeEditor {
       return;
     }
     const normalized = normalizeSceneSettings(next);
+    // sceneTree 为运行时派生状态，始终以当前场景图为准，避免 UI 携带专注模式等过期快照写回。
+    normalized.sceneTree = this.getSceneTree();
     const prev = this.sceneSettings;
     const diff = calcSceneSettingsDiff(normalized, prev);
     const mapped = mapSceneDiffToDirtyFlags(diff);
@@ -1454,8 +1476,11 @@ export class ThreeEditor {
       }
       return;
     }
-    // 把外部创建的对象挂载到 three.Scene（不做额外校验）。
-    this.scene.add(object);
+    // 把外部创建的对象挂载到场景；专注模式下挂载为专注对象的子级
+    const focusParent = this.focusModeUuid
+      ? this.scene.getObjectByProperty('uuid', this.focusModeUuid)
+      : null;
+    (focusParent ?? this.scene).add(object);
     if (((object as any).isDirectionalLight || (object as any).isSpotLight) && (object as any).target) {
       const lightTarget = (object as any).target as THREE.Object3D;
       if (!lightTarget.parent) this.scene.add(lightTarget);
@@ -1520,11 +1545,163 @@ export class ThreeEditor {
     return true;
   }
 
+  // —— 专注模式 API ——
+
+  /** 是否处于专注模式 */
+  isInFocusMode(): boolean {
+    return this.focusModeUuid !== null;
+  }
+
+  /** 当前专注的物体 uuid；null 表示未进入专注模式 */
+  getFocusModeUuid(): string | null {
+    return this.focusModeUuid;
+  }
+
+  /**
+   * 进入专注模式：隐藏除目标外的所有物体，相机平滑移动到适应范围。
+   * 专注模式下拖拽进场景的新物体会挂载为专注对象的子级。
+   */
+  enterFocusMode(uuid: string) {
+    // 已专注同一对象 → 退出（toggle 语义）
+    if (this.focusModeUuid === uuid) {
+      this.exitFocusMode();
+      return;
+    }
+    // 专注不同对象 → 内联清理，避免双重 syncSceneTreeState/render
+    if (this.focusModeUuid !== null) {
+      this.restoreVisibilityFromSnapshot();
+    }
+
+    const obj = this.scene.getObjectByProperty('uuid', uuid);
+    if (!obj) return;
+
+    // 取消进行中的相机动画，避免动画堆叠
+    this.viewPresetController.cancel();
+
+    // 拍摄可见性快照
+    this.focusModeVisibilitySnapshot.clear();
+    this.scene.traverse((child) => {
+      if (this.sceneTreeController.isIgnoredInSceneTree(child)) return;
+      this.focusModeVisibilitySnapshot.set(child.uuid, child.visible);
+    });
+
+    // 收集目标祖先链与子孙链
+    const ancestorUuids = this.collectAncestorUuids(obj);
+    const descendantUuids = this.collectDescendantUuids(obj);
+
+    // 隐藏非目标及非祖先/子孙的对象
+    this.scene.traverse((child) => {
+      if (child === this.scene) return; // 不修改 scene 根节点，否则整棵渲染树跳过
+      if (this.sceneTreeController.isIgnoredInSceneTree(child)) return;
+      if (child === obj || ancestorUuids.has(child.uuid) || descendantUuids.has(child.uuid)) {
+        child.visible = true;
+      } else {
+        child.visible = false;
+      }
+    });
+
+    this.focusModeUuid = uuid;
+
+    // 快照当前相机状态，退出时恢复
+    this.focusModePreCamera = {
+      fov: this.camera.fov,
+      near: this.camera.near,
+      far: this.camera.far,
+      position: { x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z },
+      target: { x: this.orbit.target.x, y: this.orbit.target.y, z: this.orbit.target.z }
+    };
+
+    // 计算包围盒并移动相机
+    const fitCamera = this.computeFitViewCamera(obj);
+    this.animateCameraTo(fitCamera, { durationMs: 420 });
+
+    this.events.emit('focusModeChange', { uuid });
+    this.requestShadowMapUpdate();
+    this.syncSceneTreeState();
+    this.render();
+  }
+
+  /** 退出专注模式：还原所有物体的可见性状态 */
+  exitFocusMode() {
+    if (this.focusModeUuid === null) return;
+
+    this.restoreVisibilityFromSnapshot();
+
+    this.focusModeVisibilitySnapshot.clear();
+    this.focusModeUuid = null;
+    this.focusModePreCamera = null;
+
+    // 取消进行中的相机动画，避免动画堆叠
+    this.viewPresetController.cancel();
+
+    this.events.emit('focusModeChange', { uuid: null });
+    this.requestShadowMapUpdate();
+    this.syncSceneTreeState();
+    this.render();
+  }
+
+  /** 从快照恢复所有物体的可见性状态 */
+  private restoreVisibilityFromSnapshot() {
+    for (const [uuid, visible] of this.focusModeVisibilitySnapshot) {
+      const obj = this.scene.getObjectByProperty('uuid', uuid);
+      if (obj) obj.visible = visible;
+    }
+    this.focusModeVisibilitySnapshot.clear();
+  }
+
+  /** 收集对象的所有子孙 uuid 集合 */
+  private collectDescendantUuids(object: THREE.Object3D): Set<string> {
+    const uuids = new Set<string>();
+    object.traverse((child) => {
+      if (child !== object) uuids.add(child.uuid);
+    });
+    return uuids;
+  }
+
+  /** 收集对象到 scene 根之间的祖先链 uuid 集合 */
+  private collectAncestorUuids(object: THREE.Object3D): Set<string> {
+    const uuids = new Set<string>();
+    let cur = object.parent;
+    while (cur && cur !== this.scene) {
+      uuids.add(cur.uuid);
+      cur = cur.parent;
+    }
+    return uuids;
+  }
+
+  /** 计算让相机完整看到目标物体的相机参数 */
+  private computeFitViewCamera(obj: THREE.Object3D): SceneSettings['camera'] {
+    const box = new THREE.Box3().setFromObject(obj);
+    const center = box.getCenter(new THREE.Vector3());
+    const sizeVec = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z);
+    const safeDim = maxDim > 0 ? maxDim : 1;
+
+    const fovRad = THREE.MathUtils.degToRad(this.camera.fov);
+    const dist = (safeDim / 2) / Math.tan(fovRad / 2) * 1.5;
+
+    const position = new THREE.Vector3(
+      center.x + dist * 0.7,
+      center.y + dist * 0.5,
+      center.z + dist * 0.7
+    );
+
+    return {
+      fov: this.camera.fov,
+      near: this.camera.near,
+      far: this.camera.far,
+      position: { x: position.x, y: position.y, z: position.z },
+      target: { x: center.x, y: center.y, z: center.z }
+    };
+  }
+
   /**
    * 从父节点移除对象（不记历史，适合已由外层包装撤销的调用）。
    * 同步移除关联的 CameraHelper / LightHelper 映射。
    */
   removeObjectByUuid(uuid: string): boolean {
+    // 专注模式下删除专注对象时自动退出
+    if (this.focusModeUuid === uuid) this.exitFocusMode();
     const obj = this.scene.getObjectByProperty('uuid', uuid);
     if (!obj || !obj.parent || isNonSelectableInHierarchy(obj) || isNonDeletable(obj)) return false;
     // 先做原有 helper 解绑/清理，再交由 service 执行结构移除与树同步。
@@ -1834,11 +2011,16 @@ export class ThreeEditor {
    * 释放内部资源与事件绑定。React 组件卸载时必须调用。
    */
   dispose() {
+    if (this.focusModeUuid) this.exitFocusMode();
     this.stop();
     this.events.clear();
     this.viewPresetController.cancel();
     this.interactionController.dispose();
     this.environmentController.dispose();
+    if (this.defaultEnvironmentTexture) {
+      this.defaultEnvironmentTexture.dispose();
+      this.defaultEnvironmentTexture = null;
+    }
     this.effectsController.dispose();
     this.helperController.dispose();
     // pointer events are bound to renderer.domElement; disposing editor should abort them
@@ -2079,6 +2261,21 @@ export class ThreeEditor {
       canUndo: this.history.canUndo(),
       canRedo: this.history.canRedo()
     });
+  }
+
+  /** 撤销/重做后统一刷新：场景树、阴影、变换把手与视口渲染。 */
+  private afterHistoryMutation() {
+    this.syncSceneTreeState();
+    this.requestShadowMapUpdate();
+    if (
+      this.transformToolEnabled &&
+      this.transformHandleVisible &&
+      this.selectedObjects.length === 1 &&
+      this.canAttachTransformTarget(this.selected)
+    ) {
+      this.transform.attach(this.selected!);
+    }
+    this.render();
   }
 
   private emitSceneSettingsChange() {

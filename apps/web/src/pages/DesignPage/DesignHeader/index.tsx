@@ -100,7 +100,7 @@ export function DesignHeader() {
         </div>
       </div>
 
-      <div ref={menuContainerRef} className="relative z-[2147483647] flex items-center gap-3">
+      <div ref={menuContainerRef} className="relative z-40 flex items-center gap-3">
         <ActionBar />
 
         {/* 头像 + 昵称按钮：放在头部导航中 */}

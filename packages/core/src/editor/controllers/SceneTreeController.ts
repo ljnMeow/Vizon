@@ -26,7 +26,13 @@ export class SceneTreeController {
     'SpotLightHelper'
   ]);
 
-  getSceneTree(scene: THREE.Scene, camera: THREE.PerspectiveCamera): SceneTreeNode[] {
+  getSceneTree(scene: THREE.Scene, camera: THREE.PerspectiveCamera, focusRoot?: THREE.Object3D | null): SceneTreeNode[] {
+    // 专注模式下：以专注物体为唯一根节点，不展示 Scene/Camera
+    if (focusRoot) {
+      const focusNode = this.toSceneTreeNode(focusRoot);
+      return focusNode ? [focusNode] : [];
+    }
+
     const cameraNode: SceneTreeNode = {
       uuid: camera.uuid,
       name: camera.name || 'Camera',

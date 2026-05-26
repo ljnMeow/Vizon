@@ -54,9 +54,10 @@ class ModelAsset(models.Model):
         related_name="models3d",
     )
     name = models.CharField(max_length=255, blank=True, default="")
-    file = models.FileField(upload_to="models3d/files/")
+    # ZIP 解压后入口路径含 uuid 与子目录，需大于默认 100
+    file = models.FileField(upload_to="models3d/files/", max_length=512)
     thumbnail = models.ImageField(
-        upload_to="models3d/thumbnails/", null=True, blank=True
+        upload_to="models3d/thumbnails/", null=True, blank=True, max_length=512
     )
     category = models.ForeignKey(
         ModelCategory,

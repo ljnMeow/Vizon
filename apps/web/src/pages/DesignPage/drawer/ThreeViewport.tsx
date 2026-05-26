@@ -16,6 +16,7 @@ import { DATA_TRANSFER_KEYS } from "../../../utils/keys";
 import { encodeHistoryI18nName } from "../../../utils/historyI18n";
 import { message } from "../../../components/GlobalMessage";
 import { useLocale } from "../../../hooks/useLocale";
+import { useSceneSettings } from "../../../hooks/useSceneSettings";
 
 /**
  * 生成添加相机操作的国际化历史记录名称。
@@ -73,6 +74,11 @@ export function ThreeViewport({
   const CAMERA_DRAG_MIME = DATA_TRANSFER_KEYS.CAMERA_MIME;
   const LIGHT_DRAG_MIME = DATA_TRANSFER_KEYS.LIGHT_MIME;
   const { locale } = useLocale();
+  const { resetCamera } = useSceneSettings();
+  // 避免把 resetCamera 放进 editor 初始化 effect 的 deps：其引用随 context.editor 变化，
+  // 会导致 effect 反复销毁/重建 ThreeEditor，并触发 registerEditor 连续同步相机（像不断复位）。
+  const resetCameraRef = useRef(resetCamera);
+  resetCameraRef.current = resetCamera;
 
   const editor = useMemo(() => ({ current: null as ThreeEditor | null }), []);
   const [view, setView] = useState<ViewPreset>("default");
@@ -119,6 +125,11 @@ export function ThreeViewport({
     });
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && inst.isInFocusMode()) {
+        inst.exitFocusMode();
+        resetCameraRef.current();
+        return;
+      }
       if (event.key !== "Shift") return;
       if (shiftSelectingRef.current) return;
       shiftSelectingRef.current = true;
@@ -258,7 +269,9 @@ export function ThreeViewport({
         const obj = await inst.loadModel(url, { addToScene: false, fileName: name });
         normalizeModelSize(obj);
         obj.name = name || obj.name || 'Model';
-        obj.position.copy(point);
+        obj.position.x += point.x;
+        obj.position.y += point.y;
+        obj.position.z += point.z;
         inst.add(obj, {
           operationName: encodeHistoryI18nName({
             "zh-CN": `添加模型 - ${obj.uuid}`,

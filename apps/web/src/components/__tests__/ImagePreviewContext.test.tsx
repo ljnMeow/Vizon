@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ImagePreviewProvider, useImagePreview } from '../ImagePreviewContext';
 
@@ -33,17 +33,16 @@ describe('ImagePreviewContext', () => {
     expect(() => fireEvent.click(screen.getByRole('button', { name: 'open' }))).not.toThrow();
   });
 
-  it('Lightbox is not visible before openPreview is called', () => {
+  it('preview is not visible before openPreview is called', () => {
     render(
       <ImagePreviewProvider>
         <Trigger src="blob:mock" />
       </ImagePreviewProvider>
     );
-    // Lightbox 关闭时不渲染 dialog
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(document.querySelector('.PhotoView-Slider__Backdrop')).toBeNull();
   });
 
-  it('opens Lightbox when openPreview is called', () => {
+  it('opens preview when openPreview is called', async () => {
     render(
       <ImagePreviewProvider>
         <Trigger src="blob:mock" />
@@ -52,11 +51,12 @@ describe('ImagePreviewContext', () => {
     act(() => {
       fireEvent.click(screen.getByRole('button', { name: 'open' }));
     });
-    // Lightbox 挂载后以 dialog role 呈现
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(document.querySelector('.PhotoView-Slider__Backdrop')).not.toBeNull();
+    });
   });
 
-  it('renders the img with the given src inside the Lightbox', () => {
+  it('renders the img with the given src inside the preview', async () => {
     render(
       <ImagePreviewProvider>
         <Trigger src="blob:preview-url" />
@@ -65,11 +65,12 @@ describe('ImagePreviewContext', () => {
     act(() => {
       fireEvent.click(screen.getByRole('button', { name: 'open' }));
     });
-    // Lightbox 渲染的 img 有 alt=""，ARIA role 为 presentation，通过 src 属性断言
-    expect(document.querySelector('img[src="blob:preview-url"]')).not.toBeNull();
+    await waitFor(() => {
+      expect(document.querySelector('img[src="blob:preview-url"]')).not.toBeNull();
+    });
   });
 
-  it('closes Lightbox when the close button is clicked', async () => {
+  it('closes preview when Escape is pressed', async () => {
     render(
       <ImagePreviewProvider>
         <Trigger src="blob:mock" />
@@ -78,16 +79,13 @@ describe('ImagePreviewContext', () => {
     act(() => {
       fireEvent.click(screen.getByRole('button', { name: 'open' }));
     });
-    const dialog = screen.getByRole('dialog');
-    expect(dialog).toHaveClass('yarl__portal_open');
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toBeInTheDocument();
 
-    const closeBtn = screen.getByLabelText(/close/i);
     await act(async () => {
-      fireEvent.click(closeBtn);
+      fireEvent.keyDown(window, { key: 'Escape' });
     });
-    // JSDOM 无 CSS 动画，portal 元素不立即卸载；
-    // 断言 open 状态已响应：yarl__portal_open class 被移除
-    expect(dialog).not.toHaveClass('yarl__portal_open');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('can be re-opened with a different src after closing', async () => {
@@ -108,16 +106,30 @@ describe('ImagePreviewContext', () => {
     );
 
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'first' })); });
-    expect(document.querySelector('img[src="blob:first"]')).not.toBeNull();
+    await waitFor(() => {
+      expect(document.querySelector('img[src="blob:first"]')).not.toBeNull();
+    });
 
-    // 关闭：断言 portal open class 移除
     const dialog = screen.getByRole('dialog');
-    await act(async () => { fireEvent.click(screen.getByLabelText(/close/i)); });
-    expect(dialog).not.toHaveClass('yarl__portal_open');
+    await act(async () => { fireEvent.keyDown(window, { key: 'Escape' }); });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-    // 用不同 src 重新打开
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'second' })); });
-    expect(document.querySelector('img[src="blob:second"]')).not.toBeNull();
+    await waitFor(() => {
+      expect(document.querySelector('img[src="blob:second"]')).not.toBeNull();
+    });
+  });
+
+  it('shows title overlay when provided', async () => {
+    render(
+      <ImagePreviewProvider>
+        <Trigger src="blob:mock" title="测试标题" />
+      </ImagePreviewProvider>
+    );
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'open' }));
+    });
+    expect(await screen.findByText('测试标题')).toBeInTheDocument();
   });
 
   it('openPreview is referentially stable across re-renders', () => {

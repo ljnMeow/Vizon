@@ -8,20 +8,12 @@
  */
 import * as THREE from 'three';
 import { GLTFLoader, FBXLoader, OBJLoader, STLLoader } from 'three-stdlib';
-
-/** 根据文件扩展名推断的模型格式。 */
-type ModelFormat = 'gltf' | 'glb' | 'fbx' | 'obj' | 'stl';
-
-/** 从 URL/文件名推断模型格式。 */
-function detectModelFormat(url: string): ModelFormat | null {
-  const path = url.split('?')[0].split('#')[0].toLowerCase();
-  if (path.endsWith('.glb')) return 'glb';
-  if (path.endsWith('.gltf')) return 'gltf';
-  if (path.endsWith('.fbx')) return 'fbx';
-  if (path.endsWith('.obj')) return 'obj';
-  if (path.endsWith('.stl')) return 'stl';
-  return null;
-}
+import {
+  detectModelFormat,
+  getModelEntryFileName,
+  prepareImportedModelRoot,
+  resolveMediaUrl,
+} from '../../model3d/modelLoadUtils';
 
 export class AssetLoader {
   constructor(private readonly scene: THREE.Scene) {}
@@ -49,7 +41,9 @@ export class AssetLoader {
    * @param opts.fileName 文件名（用于格式推断，优先于 url 扩展名）
    */
   async loadModel(url: string, opts?: { addToScene?: boolean; fileName?: string }) {
-    const format = detectModelFormat(opts?.fileName ?? '') || detectModelFormat(url);
+    const resolvedUrl = resolveMediaUrl(url);
+    const entryFileName = getModelEntryFileName(resolvedUrl, opts?.fileName);
+    const format = detectModelFormat(resolvedUrl, entryFileName);
     let root: THREE.Object3D;
 
     switch (format) {
@@ -57,21 +51,22 @@ export class AssetLoader {
       case 'glb': {
         const loader = new GLTFLoader();
         loader.setCrossOrigin('anonymous');
-        const gltf = await loader.loadAsync(url);
+        const gltf = await loader.loadAsync(resolvedUrl);
         root = gltf.scene ?? gltf.scenes?.[0];
         if (!root) throw new Error('GLTF 没有 scene');
         break;
       }
       case 'fbx': {
-        root = await new FBXLoader().loadAsync(url);
+        root = await new FBXLoader().loadAsync(resolvedUrl);
         break;
       }
       case 'obj': {
-        root = await new OBJLoader().loadAsync(url);
+        root = await new OBJLoader().loadAsync(resolvedUrl);
         break;
       }
       case 'stl': {
-        const geometry = await new STLLoader().loadAsync(url);
+        const geometry = await new STLLoader().loadAsync(resolvedUrl);
+        geometry.computeVertexNormals();
         root = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
         root.name = 'STL Model';
         break;
@@ -79,6 +74,8 @@ export class AssetLoader {
       default:
         throw new Error(`不支持的模型格式: ${url}`);
     }
+
+    await prepareImportedModelRoot(root);
 
     if (opts?.addToScene ?? true) this.scene.add(root);
     return root;

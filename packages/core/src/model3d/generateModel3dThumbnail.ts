@@ -3,16 +3,22 @@
  *
  * 原理：在离屏 WebGLRenderer 中加载模型文件 → 自动定位相机 → 渲染一帧 → canvas.toBlob()
  * 支持 glTF/GLB、FBX、OBJ、STL 格式。
+ *
+ * 光照与主编辑器视口对齐：RoomEnvironment IBL + 浅色背景，确保 PBR 材质有足够对比度。
  */
 
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three-stdlib';
 import { FBXLoader } from 'three-stdlib';
 import { OBJLoader } from 'three-stdlib';
 import { STLLoader } from 'three-stdlib';
+import { DEFAULT_MESH_COLOR } from '../defaults/registry';
+import { prepareImportedModelRoot, resolveMediaUrl } from './modelLoadUtils';
 
 const THUMBNAIL_SIZE = 256;
-const BG_COLOR = 0x2a2a2e;
+/** 与 DEFAULT_SCENE_SETTINGS.environment.backgroundColor 一致 */
+const BG_COLOR = 0xf3f4f6;
 
 const EXT_LOADER_MAP: Record<string, 'gltf' | 'fbx' | 'obj' | 'stl'> = {
   '.gltf': 'gltf',
@@ -54,11 +60,20 @@ export async function generateModel3dThumbnailFromUrl(
   url: string,
   size = THUMBNAIL_SIZE
 ): Promise<Blob | null> {
-  const ext = getExt(url);
+  const resolvedUrl = resolveMediaUrl(url);
+  const ext = getExt(resolvedUrl);
   const loaderType = EXT_LOADER_MAP[ext];
   if (!loaderType) return null;
 
-  return _renderThumbnail(url, loaderType, size);
+  return _renderThumbnail(resolvedUrl, loaderType, size);
+}
+
+/** 与 ThreeEditor 一致的默认 IBL 环境贴图（摄影棚级 PBR 光照）。 */
+function createDefaultEnvironmentTexture(renderer: THREE.WebGLRenderer): THREE.Texture {
+  const pmremGenerator = new THREE.PMREMGenerator(renderer);
+  const texture = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+  pmremGenerator.dispose();
+  return texture;
 }
 
 async function _renderThumbnail(
@@ -67,18 +82,30 @@ async function _renderThumbnail(
   size: number
 ): Promise<Blob | null> {
   let renderer: THREE.WebGLRenderer | null = null;
+  let environmentTexture: THREE.Texture | null = null;
 
   try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setSize(size, size);
+    renderer.setPixelRatio(1);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(BG_COLOR);
+    environmentTexture = createDefaultEnvironmentTexture(renderer);
+    scene.environment = environmentTexture;
+    scene.environmentIntensity = 1;
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambient);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    // 主光勾勒形体；IBL 负责 PBR 漫反射与镜面反射
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.45);
     dirLight.position.set(5, 10, 7);
     scene.add(dirLight);
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.2);
+    fillLight.position.set(-4, 2, -6);
+    scene.add(fillLight);
 
     const root = await loadModel(url, loaderType);
+    await prepareImportedModelRoot(root);
     scene.add(root);
 
     const box = new THREE.Box3().setFromObject(root);
@@ -94,9 +121,6 @@ async function _renderThumbnail(
     camera.position.set(dist * 0.7, dist * 0.5, dist * 0.7);
     camera.lookAt(0, 0, 0);
 
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    renderer.setSize(size, size);
-    renderer.setPixelRatio(1);
     renderer.render(scene, camera);
 
     const blob = await new Promise<Blob | null>((resolve) =>
@@ -107,6 +131,7 @@ async function _renderThumbnail(
   } catch {
     return null;
   } finally {
+    environmentTexture?.dispose();
     if (renderer) {
       renderer.dispose();
       renderer.forceContextLoss();
@@ -134,7 +159,11 @@ async function loadModel(url: string, type: 'gltf' | 'fbx' | 'obj' | 'stl'): Pro
       const loader = new STLLoader();
       const geometry = await loader.loadAsync(url);
       geometry.computeVertexNormals();
-      const material = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.2, roughness: 0.6 });
+      const material = new THREE.MeshStandardMaterial({
+        color: DEFAULT_MESH_COLOR,
+        metalness: 0.15,
+        roughness: 0.55,
+      });
       return new THREE.Mesh(geometry, material);
     }
   }

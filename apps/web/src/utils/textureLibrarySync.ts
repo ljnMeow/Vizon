@@ -10,6 +10,7 @@ import type { TextureFieldKey } from '../pages/DesignPage/Inspector/Material/mat
 import { uploadTextureWithProgress } from '../api/textures';
 import { message } from '../components/GlobalMessage';
 import { appMessages } from '../i18n/messages';
+import { getApiErrorMessage } from './apiError';
 import { STORAGE_KEYS } from './keys';
 import { inferCategory } from './textureCategoryMap';
 import { generateThumbnail } from './textureThumbnail';
@@ -57,7 +58,6 @@ export function syncTextureToLibrary(
     .catch((err) => {
       loadingHandle.hide();
       console.warn('[textureLibrarySync] Failed to sync texture to library:', err);
-      const raw = err instanceof Error ? err.message : String(err);
-      void message.error(`${t.uploadFailedPrefix}${raw}`);
+      void message.error(`${t.uploadFailedPrefix}${getApiErrorMessage(err, t.uploadFailed)}`);
     });
 }

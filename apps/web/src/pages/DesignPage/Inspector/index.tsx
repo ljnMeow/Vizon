@@ -38,6 +38,7 @@ export function InspectorPanel({ visible }: { visible: boolean }) {
   const { editor } = useSceneSettings();
   const [activeTab, setActiveTab] = useState<InspectorTab>('scene');
   const [mode, setMode] = useState<InspectorMode>('none');
+  const [focusMode, setFocusMode] = useState(false);
 
   useEffect(() => {
     if (!editor) return;
@@ -52,14 +53,25 @@ export function InspectorPanel({ visible }: { visible: boolean }) {
 
     syncFromSelected(editor.getSelected());
 
-    const off = editor.on('select', ({ object }) => {
+    const offSelect = editor.on('select', ({ object }) => {
       syncFromSelected(object);
     });
 
-    return off;
+    const offFocus = editor.on('focusModeChange', ({ uuid }) => {
+      setFocusMode(uuid !== null);
+    });
+
+    return () => {
+      offSelect();
+      offFocus();
+    };
   }, [editor]);
 
   const tabs = useMemo<TabItem<InspectorTab>[]>(() => {
+    if (focusMode && mode === 'none') {
+      return [{ key: 'focus-empty', label: t.tabs.properties }];
+    }
+
     if (mode === 'none') {
       return [
         { key: 'scene', label: t.tabs.scene },
@@ -78,7 +90,7 @@ export function InspectorPanel({ visible }: { visible: boolean }) {
 
     // other：只展示属性
     return [{ key: 'properties', label: t.tabs.properties }];
-  }, [mode, t.tabs.data, t.tabs.effects, t.tabs.interaction, t.tabs.materials, t.tabs.properties, t.tabs.scene]);
+  }, [focusMode, mode, t.tabs.data, t.tabs.effects, t.tabs.interaction, t.tabs.materials, t.tabs.properties, t.tabs.scene]);
 
   // 切换模式时，始终默认展示第一个 tab
   useEffect(() => {
@@ -106,7 +118,11 @@ export function InspectorPanel({ visible }: { visible: boolean }) {
       >
         {(key) => (
           <div className="h-full overflow-y-auto p-3 text-xs text-[var(--text-muted)]">
-            {key === 'scene' ? (
+            {key === 'focus-empty' ? (
+              <div className="flex h-full items-center justify-center text-sm">
+                {t.focusModeEmptyHint}
+              </div>
+            ) : key === 'scene' ? (
               <SceneSettings />
             ) : key === 'materials' ? (
               <MaterialSettings />

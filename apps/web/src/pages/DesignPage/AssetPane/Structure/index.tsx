@@ -29,9 +29,11 @@ function nodeIcon(kind: SceneTreeNode['kind']) {
   return getAssetUrl('../../../../assets/svg/mesh.svg', import.meta.url);
 }
 
-function actionIcon(kind: 'visible' | 'hidden' | 'delete') {
+function actionIcon(kind: 'visible' | 'hidden' | 'delete' | 'focus' | 'unfocus') {
   if (kind === 'visible') return getAssetUrl('../../../../assets/svg/eye.svg', import.meta.url);
   if (kind === 'hidden') return getAssetUrl('../../../../assets/svg/close_eyes.svg', import.meta.url);
+  if (kind === 'focus') return getAssetUrl('../../../../assets/svg/focus.svg', import.meta.url);
+  if (kind === 'unfocus') return getAssetUrl('../../../../assets/svg/unfocus.svg', import.meta.url);
   return getAssetUrl('../../../../assets/svg/delete.svg', import.meta.url);
 }
 
@@ -84,6 +86,43 @@ function collectExpandableUuids(nodes: SceneTreeNode[]): Set<string> {
   return ids;
 }
 
+/** 查找目标节点在树中的祖先 uuid 链（不含目标自身）。 */
+function findAncestorUuids(nodes: SceneTreeNode[], targetUuid: string): string[] {
+  const walk = (list: SceneTreeNode[], path: string[]): string[] | null => {
+    for (const n of list) {
+      if (n.uuid === targetUuid) return path;
+      const found = walk(n.children, [...path, n.uuid]);
+      if (found) return found;
+    }
+    return null;
+  };
+  return walk(nodes, []) ?? [];
+}
+
+/** 判断 uuid 是否存在于树中（含子节点）。 */
+function treeContainsUuid(nodes: SceneTreeNode[], uuid: string): boolean {
+  for (const n of nodes) {
+    if (n.uuid === uuid) return true;
+    if (treeContainsUuid(n.children, uuid)) return true;
+  }
+  return false;
+}
+
+/** 在指定滚动容器内将行滚入可视区域。 */
+function scrollRowIntoContainer(container: HTMLElement, row: HTMLElement) {
+  const containerRect = container.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+  const padding = 4;
+  let delta = 0;
+  if (rowRect.top < containerRect.top + padding) {
+    delta = rowRect.top - containerRect.top - padding;
+  } else if (rowRect.bottom > containerRect.bottom - padding) {
+    delta = rowRect.bottom - containerRect.bottom + padding;
+  }
+  if (delta === 0) return;
+  container.scrollTo({ top: container.scrollTop + delta, behavior: 'smooth' });
+}
+
 /**
  * 递归渲染单个场景树节点，并处理展开、选择、显隐、删除与拖拽排序。
  */
@@ -93,9 +132,12 @@ function SceneTreeItem({
   expandedSet,
   selectedUuid,
   renamingUuid,
+  focusModeUuid,
+  labels,
   onToggle,
   onSelect,
   onToggleVisible,
+  onFocusMode,
   onDelete,
   onRenameStart,
   onRenameCommit,
@@ -112,9 +154,20 @@ function SceneTreeItem({
   expandedSet: Set<string>;
   renamingUuid: string | null;
   selectedUuid: string | null;
+  focusModeUuid: string | null;
+  labels: {
+    focusTitle: string;
+    exitFocusTitle: string;
+    hideTitle: string;
+    showTitle: string;
+    deleteTitle: string;
+    collapseLabel: string;
+    expandLabel: string;
+  };
   onToggle: (uuid: string) => void;
   onSelect: (uuid: string) => void;
   onToggleVisible: (node: SceneTreeNode) => void;
+  onFocusMode: (uuid: string) => void;
   onDelete: (uuid: string) => void;
   onRenameStart: (uuid: string | null) => void;
   onRenameCommit: (uuid: string, newName: string) => void;
@@ -250,7 +303,8 @@ function SceneTreeItem({
               e.stopPropagation();
               onToggle(node.uuid);
             }}
-            aria-label={expanded ? 'collapse' : 'expand'}
+            onDoubleClick={(e) => e.stopPropagation()}
+            aria-label={expanded ? labels.collapseLabel : labels.expandLabel}
           >
             <svg
               width="10"
@@ -289,7 +343,33 @@ function SceneTreeItem({
             <span className="truncate select-none leading-none">{node.name}</span>
           )}
           {selectable && !isRootCamera ? (
-            <div className="ml-auto flex items-center gap-1">
+            <div
+              className="ml-auto flex items-center gap-1"
+              onDoubleClick={(e) => e.stopPropagation()}
+            >
+              {node.kind !== 'camera' && (
+              <button
+                type="button"
+                className={`h-5 min-w-5 rounded px-1 text-[10px] leading-none ${
+                  focusModeUuid === node.uuid
+                    ? 'text-[var(--accent-strong)]'
+                    : 'text-[var(--text-muted)]'
+                } hover:bg-[var(--surface-hover)]`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onFocusMode(node.uuid);
+                }}
+                onDoubleClick={(e) => e.stopPropagation()}
+                aria-label={focusModeUuid === node.uuid ? labels.exitFocusTitle : labels.focusTitle}
+                title={focusModeUuid === node.uuid ? labels.exitFocusTitle : labels.focusTitle}
+              >
+                <img
+                  src={actionIcon(focusModeUuid === node.uuid ? 'unfocus' : 'focus')}
+                  alt=""
+                  className={`h-3.5 w-3.5 ${focusModeUuid === node.uuid ? 'opacity-100' : 'opacity-90'}`}
+                />
+              </button>
+              )}
               <button
                 type="button"
                 className="h-5 min-w-5 rounded px-1 text-[10px] leading-none text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
@@ -297,8 +377,9 @@ function SceneTreeItem({
                   e.stopPropagation();
                   onToggleVisible(node);
                 }}
-                aria-label={node.visible ? 'hide node' : 'show node'}
-                title={node.visible ? 'hide' : 'show'}
+                onDoubleClick={(e) => e.stopPropagation()}
+                aria-label={node.visible ? labels.hideTitle : labels.showTitle}
+                title={node.visible ? labels.hideTitle : labels.showTitle}
               >
                 <img
                   src={actionIcon(node.visible ? 'visible' : 'hidden')}
@@ -314,8 +395,9 @@ function SceneTreeItem({
                   e.stopPropagation();
                   onDelete(node.uuid);
                 }}
-                aria-label="delete node"
-                title="delete"
+                onDoubleClick={(e) => e.stopPropagation()}
+                aria-label={labels.deleteTitle}
+                title={labels.deleteTitle}
               >
                 <img src={actionIcon('delete')} alt="" className="h-3.5 w-3.5 opacity-90" />
               </button>
@@ -348,9 +430,12 @@ function SceneTreeItem({
                   expandedSet={expandedSet}
                   renamingUuid={renamingUuid}
                   selectedUuid={selectedUuid}
+                  focusModeUuid={focusModeUuid}
+                  labels={labels}
                   onToggle={onToggle}
                   onSelect={onSelect}
                   onToggleVisible={onToggleVisible}
+                  onFocusMode={onFocusMode}
                   onDelete={onDelete}
                   onRenameStart={onRenameStart}
                   onRenameCommit={onRenameCommit}
@@ -375,19 +460,21 @@ function SceneTreeItem({
  * 场景结构树面板。
  * 负责展示节点层级、同步编辑器选中状态，并支持拖拽重排与基础节点操作。
  */
-export function Structure() {
+export function Structure({ isActive = true }: { isActive?: boolean }) {
   const { locale } = useLocale();
   const t = appMessages[locale].assetPane;
-  const { sceneSettings, editor } = useSceneSettings();
+  const { sceneSettings, editor, resetCamera } = useSceneSettings();
   const tree = sceneSettings.sceneTree;
   const [expandedSet, setExpandedSet] = useState<Set<string>>(new Set());
   const [selectedUuid, setSelectedUuid] = useState<string | null>(null);
+  const [focusModeUuid, setFocusModeUuid] = useState<string | null>(null);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [renamingUuid, setRenamingUuid] = useState<string | null>(null);
   const draggingUuidRef = useRef<string | null>(null);
   const [dragPreview, setDragPreview] = useState<DragPreview>(null);
 
   const rowElsRef = useRef(new Map<string, HTMLDivElement>());
+  const scrollListRef = useRef<HTMLDivElement | null>(null);
   const lastRectsRef = useRef<Map<string, DOMRect> | null>(null);
 
   const rowRef = (uuid: string, el: HTMLDivElement | null) => {
@@ -491,6 +578,63 @@ export function Structure() {
     });
     return off;
   }, [editor]);
+
+  // 视口选中时：先展开祖先，再将行滚入结构树列表可视区（须在 useLayoutEffect 内同步处理）
+  useLayoutEffect(() => {
+    if (!isActive || !selectedUuid) return;
+    if (!treeContainsUuid(filteredTree, selectedUuid)) return;
+
+    const ancestors = findAncestorUuids(tree, selectedUuid);
+    const needsExpand = ancestors.some((id) => !expandedSet.has(id));
+    if (needsExpand) {
+      setExpandedSet((prev) => {
+        const next = new Set(prev);
+        let changed = false;
+        for (const id of ancestors) {
+          if (!next.has(id)) {
+            next.add(id);
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+      return;
+    }
+
+    const container = scrollListRef.current;
+    const row = rowElsRef.current.get(selectedUuid);
+    if (!container) return;
+    if (row) {
+      scrollRowIntoContainer(container, row);
+      return;
+    }
+    // 展开后首帧 ref 可能尚未挂载，延后一帧再试
+    requestAnimationFrame(() => {
+      const c = scrollListRef.current;
+      const r = rowElsRef.current.get(selectedUuid);
+      if (c && r) scrollRowIntoContainer(c, r);
+    });
+  }, [isActive, selectedUuid, tree, filteredTree, expandedSet]);
+
+  useEffect(() => {
+    if (!editor) return;
+    setFocusModeUuid(editor.getFocusModeUuid());
+    const off = editor.on('focusModeChange', ({ uuid }) => {
+      setFocusModeUuid(uuid);
+    });
+    return off;
+  }, [editor]);
+
+  const toggleFocusMode = (uuid: string) => {
+    if (!editor) return;
+    if (editor.getFocusModeUuid() === uuid) {
+      editor.exitFocusMode();
+      resetCamera();
+    } else {
+      selectNode(uuid);
+      editor.enterFocusMode(uuid);
+    }
+  };
 
   const selectNode = (uuid: string) => {
     if (!editor) return;
@@ -596,7 +740,7 @@ export function Structure() {
       </div>
 
       {/* 树列表 */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+      <div ref={scrollListRef} className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         {tree.length === 0 ? (
           <div className="text-xs text-[var(--text-muted)]">{t.structureEmpty}</div>
         ) : filteredTree.length === 0 ? (
@@ -611,9 +755,20 @@ export function Structure() {
                 expandedSet={expandedSet}
                 renamingUuid={renamingUuid}
                 selectedUuid={selectedUuid}
+                focusModeUuid={focusModeUuid}
+                labels={{
+                  focusTitle: t.structureFocusTitle,
+                  exitFocusTitle: t.structureExitFocusTitle,
+                  hideTitle: t.structureHideTitle,
+                  showTitle: t.structureShowTitle,
+                  deleteTitle: t.structureDeleteTitle,
+                  collapseLabel: t.structureCollapseLabel,
+                  expandLabel: t.structureExpandLabel,
+                }}
                 onToggle={toggleNode}
                 onSelect={selectNode}
                 onToggleVisible={toggleVisible}
+                onFocusMode={toggleFocusMode}
                 onDelete={deleteNode}
                 onRenameStart={setRenamingUuid}
                 onRenameCommit={renameNode}

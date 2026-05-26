@@ -34,7 +34,7 @@ import {
   updateModel3dThumbnail,
   uploadModel3dWithProgress,
 } from '../../../../api/model3ds';
-import { ApiError } from '../../../../api/request';
+import { getApiErrorMessage, mergeUploadErrorMessages } from '../../../../utils/apiError';
 import { generateModel3dThumbnail, generateModel3dThumbnailFromUrl } from 'vizon-3d-core';
 
 /** 将字节数格式化为人类可读的文件大小字符串。 */
@@ -53,14 +53,6 @@ const MODEL_ACCEPT = '.gltf,.glb,.fbx,.obj,.stl,.zip';
 
 /** 分类名称最大长度。 */
 const CATEGORY_NAME_MAX_LENGTH = 10;
-
-/** 从 API 错误中提取可读的错误消息，优先使用接口返回的 message。 */
-function getErrorMessage(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) return err.message || fallback;
-  if (err instanceof Error) return err.message || fallback;
-  if (typeof err === 'string') return err || fallback;
-  return fallback;
-}
 
 /** 分类选择器（弹窗内使用）。 */
 function CategoryPicker({
@@ -189,7 +181,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
       const data = await listModel3ds();
       setModels(data);
     } catch (err) {
-      setError(getErrorMessage(err, t.loadFailed));
+      setError(getApiErrorMessage(err, t.loadFailed));
     } finally {
       setLoading(false);
     }
@@ -220,7 +212,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
       await fetchCategories();
       void message.success(t.renameCategorySuccess);
     } catch (err) {
-      const msg = getErrorMessage(err, t.renameCategoryFailed);
+      const msg = getApiErrorMessage(err, t.renameCategoryFailed);
       if (msg.includes('已存在') || msg.includes('already')) {
         void message.error(t.categoryAlreadyExists);
       } else {
@@ -252,7 +244,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
       await fetchModels();
       void message.success(t.renameCategorySuccess);
     } catch (err) {
-      const msg = getErrorMessage(err, t.renameCategoryFailed);
+      const msg = getApiErrorMessage(err, t.renameCategoryFailed);
       if (msg.includes('已存在') || msg.includes('already')) {
         void message.error(t.categoryAlreadyExists);
       } else {
@@ -280,7 +272,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
       await deleteModel3dCategory(cat.category_id);
       await fetchCategories();
     } catch (err) {
-      const msg = getErrorMessage(err, t.deleteCategoryFailed);
+      const msg = getApiErrorMessage(err, t.deleteCategoryFailed);
       if (msg.includes('模型') || msg.includes('model')) {
         void message.error(t.categoryHasModels);
       } else {
@@ -312,7 +304,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
     const loadingHandle = message.loading(`${t.uploading} (1/${total}) 0%`);
     loadingHandle.update({ progress: 0 });
 
-    const failed: string[] = [];
+    const failedMessages: string[] = [];
 
     for (let i = 0; i < total; i++) {
       const file = files[i];
@@ -360,18 +352,18 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
             }
           );
         }
-      } catch {
-        failed.push(file.name);
+      } catch (err) {
+        failedMessages.push(getApiErrorMessage(err, t.uploadFailed));
       }
     }
 
     await Promise.all([fetchCategories(), fetchModels()]);
     loadingHandle.hide();
 
-    if (failed.length === 0) {
+    if (failedMessages.length === 0) {
       void message.success(t.uploadSuccess);
     } else {
-      void message.error(`${t.uploadFailedPrefix}${failed.join(', ')}`);
+      void message.error(`${t.uploadFailedPrefix}${mergeUploadErrorMessages(failedMessages)}`);
     }
     setUploading(false);
   };
@@ -393,7 +385,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
       setModels((prev) => prev.map((m) => (m.model_id === editingId ? updated : m)));
       void message.success(t.renameSuccess);
     } catch (err) {
-      void message.error(`${t.renameFailedPrefix}${getErrorMessage(err, '')}`);
+      void message.error(`${t.renameFailedPrefix}${getApiErrorMessage(err, '')}`);
     } finally {
       setEditingId(null);
     }
@@ -672,17 +664,24 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
           onChange={(e) => { void onUpload(e); }}
           className="hidden"
         />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
+        <Tooltip
+          content={t.uploadSupportedFormatsTooltip}
           disabled={uploading}
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40"
-          title={uploading ? '' : t.uploadLabel}
+          placement="bottom"
+          triggerClassName="shrink-0"
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M6 10V2M3 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            aria-label={t.uploadLabel}
+            className="flex h-5 w-5 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 10V2M3 5l3-3 3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </Tooltip>
         <button
           type="button"
           onClick={() => { void Promise.all([fetchCategories(), fetchModels()]); }}

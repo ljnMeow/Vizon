@@ -54,7 +54,7 @@ export function AssetPane({ visible }: { visible: boolean }) {
             return <UserAssets isActive={activeTab === 'mine'} />;
           }
           if (key === 'structure') {
-            return <Structure />;
+            return <Structure isActive={visible && activeTab === 'structure'} />;
           }
           if (key === 'history') {
             return <History />;

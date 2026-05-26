@@ -48,6 +48,17 @@ body {
     'Segoe UI', sans-serif;
   background-color: var(--bg-page);
   color: var(--text-primary);
+  /* 按钮、标签等 UI 文案不可拖选；输入控件见下方覆盖规则 */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+select,
+[contenteditable='true'] {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* Custom scrollbar styles - subtle and theme-aware */
@@ -82,4 +93,9 @@ body {
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* 全局图片预览：高于设计页侧栏等浮层（库默认 z-index 为 2000） */
+.PhotoView-Portal.vizon-image-preview {
+  z-index: 99999;
 }

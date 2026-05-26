@@ -370,13 +370,17 @@ export function SceneSettingsProvider({ children }: { children: React.ReactNode 
   const update = useCallback(
     (updater: (prev: SceneSettings) => SceneSettings, options?: { recordHistory?: boolean; operationName?: string }) => {
       const next = updater(sceneSettingsRef.current);
+      // sceneTree 由 core 派生；写入 React 前对齐当前场景图，避免专注模式等过期快照残留。
+      if (editor) {
+        next.sceneTree = editor.getSceneTree();
+      }
       if (options?.recordHistory === false) {
         if (!sceneSettingsChanged(next, sceneSettingsRef.current)) return;
       }
       setSceneSettings(next);
       if (!syncFromCoreRef.current) void applyToCore(next, options);
     },
-    [applyToCore]
+    [applyToCore, editor]
   );
 
   const updateRenderer = useCallback(

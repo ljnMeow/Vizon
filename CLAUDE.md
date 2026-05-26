@@ -76,3 +76,7 @@ Default to surfacing uncertainty, not hiding it.
 ## Rule 13 - Answer the text
 
 The response text is entirely in Simplified Chinese
+
+## Rule 14 -  Do not lint
+
+Don't execute lint every time

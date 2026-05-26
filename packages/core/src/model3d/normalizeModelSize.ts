@@ -43,6 +43,16 @@ export function normalizeModelSize(
   root.position.z -= scaledCenter.z;
   root.position.y -= scaledBox.min.y;
 
+  // 缩放后子 mesh 的 geometry.boundingSphere 可能过期，
+  // 导致视锥剔除误删（frustum culling 依赖 boundingSphere）。
+  root.traverse((child) => {
+    if ((child as any).isMesh) {
+      const geo = (child as THREE.Mesh).geometry;
+      geo?.computeBoundingSphere();
+      geo?.computeBoundingBox();
+    }
+  });
+
   // Store metadata
   const ud = root.userData as Record<string, unknown>;
   ud[VIZON_USER_DATA_KEYS.AUTOSCALE.ORIGINAL_MAX_DIM] = maxDim;
