@@ -2,13 +2,13 @@
  * 项目面板：展示并管理用户在服务端保存的场景列表。
  *
  * 功能：
- * - 挂载时自动拉取当前用户的场景列表
+ * - 首次进入 Tab 时自动拉取当前用户的场景列表
  * - 展示场景卡片（缩略图 / 名称 / 更新时间 / 文件大小）
  * - 支持「载入」（下载 bundle 并导入编辑器）和「删除」操作
  * - 支持手动「刷新」列表
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { importDocument } from 'vizon-3d-core';
 
 import { dialog } from '../../../../components/GlobalDialog';
@@ -20,6 +20,7 @@ import { appMessages } from '../../../../i18n/messages';
 import { type SceneMeta, deleteScene, downloadSceneBundle, listScenes } from '../../../../api/scenes';
 import { importProjectBundle } from '../../../../utils/documentBundle';
 import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
+import { useFetchOnFirstActive } from '../../../../hooks/useFetchOnFirstActive';
 
 /** 将字节数格式化为人类可读的文件大小字符串。 */
 function formatSize(bytes: number): string {
@@ -58,7 +59,7 @@ export function ProjectPanel({ isActive }: { isActive: boolean }) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   /** 拉取场景列表。 */
-  const fetchScenes = async () => {
+  const fetchScenes = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -70,15 +71,9 @@ export function ProjectPanel({ isActive }: { isActive: boolean }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t.loadFailed]);
 
-  // Tab 激活时加载列表；isActive 从 false→true 触发一次，切走后不重复请求
-  useEffect(() => {
-    if (!isActive) return;
-    void fetchScenes();
-    // fetchScenes 依赖稳定，不需要加入 deps
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive]);
+  useFetchOnFirstActive(isActive, fetchScenes);
 
   /**
    * 载入场景：下载 bundle ZIP → 包装成 File → 通过编辑器历史机制导入。

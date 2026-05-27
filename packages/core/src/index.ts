@@ -126,3 +126,4 @@ export { generateModel3dThumbnail, generateModel3dThumbnailFromUrl, isModel3dThu
 /** 模型自动缩放（拖拽添加到场景时归一化尺寸） */
 export { normalizeModelSize } from './model3d/normalizeModelSize';
 export type { NormalizeModelSizeOptions, NormalizeModelSizeResult } from './model3d/normalizeModelSize';
+export { ensureLockedModelGroupRoot } from './model3d/modelLoadUtils';

@@ -200,6 +200,7 @@ export function BaseSetting({
   setVisible,
   setPickable,
   setFrozen,
+  setLocked,
   previewOpacity,
   commitOpacity,
   previewRenderOrder,
@@ -270,6 +271,7 @@ export function BaseSetting({
   setVisible: (nextVisible: boolean) => void;
   setPickable: (nextPickable: boolean) => void;
   setFrozen: (nextFrozen: boolean) => void;
+  setLocked: (nextLocked: boolean) => void;
   previewOpacity: (nextOpacity: number) => void;
   commitOpacity: (nextOpacity: number) => void;
   previewRenderOrder: (nextRenderOrder: number) => void;
@@ -400,6 +402,7 @@ export function BaseSetting({
   const canShowShadow = isLightObject ? isShadowCapableLight && baseShadowAvailability : baseShadowAvailability;
   const canShowPickable = Boolean(visibilityPickFreeze?.canPickable);
   const canShowFreeze = Boolean(visibilityPickFreeze?.canFreeze);
+  const canShowLock = Boolean(visibilityPickFreeze?.canLock);
   const canShowOpacity = Boolean(opacityState?.canOpacity);
   const canShowLightColor = Boolean(lightColorState?.canColor);
   const canShowLightIntensity = Boolean(lightIntensityState?.canIntensity);
@@ -1394,6 +1397,19 @@ export function BaseSetting({
                 checked={visibilityPickFreeze?.frozen ?? false}
                 disabled={isDisabled}
                 onChange={(e) => setFrozen(e.target.checked)}
+                className="h-4 w-4"
+              />
+            </label>
+          ) : null}
+
+          {canShowLock ? (
+            <label className="flex cursor-pointer items-center justify-between gap-2">
+              <span className="text-[10px] font-semibold tracking-wide text-[var(--text-muted)]">{labels.lockedLabel}</span>
+              <input
+                type="checkbox"
+                checked={visibilityPickFreeze?.locked ?? false}
+                disabled={isDisabled}
+                onChange={(e) => setLocked(e.target.checked)}
                 className="h-4 w-4"
               />
             </label>

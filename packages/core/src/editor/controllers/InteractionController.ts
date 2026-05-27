@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { OrbitControls, TransformControls } from 'three-stdlib';
 import type { TransformMode } from '../ThreeEditor';
 import { VIZON_USER_DATA_KEYS } from '../../infra/utils';
-import { isNonPickableInHierarchy, isNonSelectableInHierarchy, isVisibleInHierarchy } from '../picking/objectGuards';
+import { findLockedGroupAncestor, isNonPickableInHierarchy, isNonSelectableInHierarchy, isVisibleInHierarchy } from '../picking/objectGuards';
 import {
   applyEditorOverlayLayer,
   configureRaycasterForScenePicking,
@@ -268,6 +268,14 @@ export class InteractionController {
         const pickedHandle = hit?.object != null ? this.findTargetHandle(hit.object) : undefined;
         const pickTarget = hit?.object != null ? this.findPickTarget(hit.object) : undefined;
         const next = pickTarget ?? hit?.object ?? null; // 优先落到「真实」灯/相机
+        // 锁定 Group 重定向：如果命中对象处于锁定 Group 内，选中该 Group
+        if (next) {
+          const lockedAncestor = findLockedGroupAncestor(next);
+          if (lockedAncestor) {
+            this.init.select(lockedAncestor, { toggle: this.isShiftPressed, targetHandle: null });
+            return;
+          }
+        }
         if (next && !isVisibleInHierarchy(next)) {
           this.init.select(null); // 理论防御：映射目标被隐藏则清空选中
           return;

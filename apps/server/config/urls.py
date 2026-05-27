@@ -46,7 +46,6 @@ urlpatterns = [
 # 以便为媒体响应添加 CORS 头（WebGL 纹理加载需要跨域支持）。
 if settings.DEBUG:
     from django.views.static import serve as _django_serve
-    from django.http import HttpResponse
 
     def _cors_media_serve(request, path, **kwargs):
         response = _django_serve(request, path, **kwargs)

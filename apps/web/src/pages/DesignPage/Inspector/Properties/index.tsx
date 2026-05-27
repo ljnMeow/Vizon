@@ -154,6 +154,11 @@ function computeFreezeCapability(obj: any): boolean {
   return true;
 }
 
+/** 判断对象是否允许锁定（仅 Group 类型） */
+function computeLockCapability(obj: any): boolean {
+  return obj?.type === 'Group';
+}
+
 /** 读取可见、可拾取与冻结相关状态 */
 function readSelectedVisibilityPickFreeze(obj: any): VisibilityPickFreezeState | null {
   if (!obj) return null;
@@ -161,15 +166,19 @@ function readSelectedVisibilityPickFreeze(obj: any): VisibilityPickFreezeState |
   const visible = Boolean(obj.visible);
   const pickable = !computeIsNonPickableInHierarchy(obj);
   const frozen = !Boolean(obj?.userData?.[VIZON_USER_DATA_KEYS.COMMON.DYNAMIC]) && obj?.matrixAutoUpdate === false;
+  const locked = Boolean(obj?.userData?.[VIZON_USER_DATA_KEYS.COMMON.LOCKED]);
   const canPickable = !hasNonSelectableAncestor(obj);
   const canFreeze = computeFreezeCapability(obj);
+  const canLock = computeLockCapability(obj);
 
   return {
     visible,
     pickable,
     frozen,
+    locked,
     canPickable,
-    canFreeze
+    canFreeze,
+    canLock
   };
 }
 
@@ -741,6 +750,40 @@ export function PropertiesSettings() {
           item.node.matrixAutoUpdate = item.matrixAutoUpdate;
           item.node.updateMatrixWorld?.(true);
         }
+        setVisibilityPickFreeze(readSelectedVisibilityPickFreeze(obj));
+        editor.render();
+      }
+    });
+  };
+
+  const setLocked = (nextLocked: boolean) => {
+    if (!editor || !selectedInfo) return;
+    const obj = editor.scene.getObjectByProperty('uuid', selectedInfo.uuid);
+    if (!obj) return;
+    if (!computeLockCapability(obj)) return;
+
+    const v = boolTextI18n(nextLocked);
+    const prevUserData = { ...(obj.userData ?? {}) };
+    const applyLocked = (next: boolean) => {
+      if (next) {
+        obj.userData = obj.userData ?? {};
+        obj.userData[VIZON_USER_DATA_KEYS.COMMON.LOCKED] = true;
+      } else {
+        if (obj.userData) {
+          delete obj.userData[VIZON_USER_DATA_KEYS.COMMON.LOCKED];
+        }
+      }
+      setVisibilityPickFreeze(readSelectedVisibilityPickFreeze(obj));
+      editor.render();
+    };
+    void editor.executeHistoryOperation({
+      name: historyName(
+        `${historyCategory.zh} - ${selectedInfo.uuid} - ${LABELS_ZH.lockedLabel} = ${v.zh}`,
+        `${historyCategory.en} - ${selectedInfo.uuid} - ${LABELS_EN.lockedLabel} = ${v.en}`
+      ),
+      do: () => applyLocked(nextLocked),
+      undo: () => {
+        obj.userData = { ...prevUserData };
         setVisibilityPickFreeze(readSelectedVisibilityPickFreeze(obj));
         editor.render();
       }
@@ -1544,6 +1587,7 @@ export function PropertiesSettings() {
               setVisible={setVisible}
               setPickable={setPickable}
               setFrozen={setFrozen}
+              setLocked={setLocked}
               previewOpacity={previewOpacity}
               commitOpacity={commitOpacity}
               previewRenderOrder={previewRenderOrder}

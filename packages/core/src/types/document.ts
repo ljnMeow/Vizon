@@ -99,6 +99,7 @@ export type VizonNode = {
     nonSelectable?: boolean;
     nonPickable?: boolean;
     dynamic?: boolean;
+    locked?: boolean;
   };
 
   components?: VizonNodeComponents;

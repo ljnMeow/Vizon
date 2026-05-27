@@ -7,30 +7,27 @@
  * 光照与主编辑器视口对齐：RoomEnvironment IBL + 浅色背景，确保 PBR 材质有足够对比度。
  */
 
-import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { GLTFLoader } from 'three-stdlib';
-import { FBXLoader } from 'three-stdlib';
-import { OBJLoader } from 'three-stdlib';
-import { STLLoader } from 'three-stdlib';
-import { DEFAULT_MESH_COLOR } from '../defaults/registry';
-import { prepareImportedModelRoot, resolveMediaUrl } from './modelLoadUtils';
+import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { GLTFLoader, FBXLoader, OBJLoader, STLLoader } from "three-stdlib";
+import { DEFAULT_MESH_COLOR } from "../defaults/registry";
+import { prepareImportedModelRoot, resolveMediaUrl } from "./modelLoadUtils";
 
 const THUMBNAIL_SIZE = 256;
 /** 与 DEFAULT_SCENE_SETTINGS.environment.backgroundColor 一致 */
 const BG_COLOR = 0xf3f4f6;
 
-const EXT_LOADER_MAP: Record<string, 'gltf' | 'fbx' | 'obj' | 'stl'> = {
-  '.gltf': 'gltf',
-  '.glb': 'gltf',
-  '.fbx': 'fbx',
-  '.obj': 'obj',
-  '.stl': 'stl',
+const EXT_LOADER_MAP: Record<string, "gltf" | "fbx" | "obj" | "stl"> = {
+  ".gltf": "gltf",
+  ".glb": "gltf",
+  ".fbx": "fbx",
+  ".obj": "obj",
+  ".stl": "stl",
 };
 
 function getExt(filename: string): string {
-  const dot = filename.lastIndexOf('.');
-  return dot >= 0 ? filename.slice(dot).toLowerCase() : '';
+  const dot = filename.lastIndexOf(".");
+  return dot >= 0 ? filename.slice(dot).toLowerCase() : "";
 }
 
 /** 是否支持生成缩略图的模型格式。 */
@@ -41,7 +38,7 @@ export function isModel3dThumbnailSupported(filename: string): boolean {
 /** 为 3D 模型文件生成缩略图 PNG。不支持的格式返回 null。 */
 export async function generateModel3dThumbnail(
   file: File,
-  size = THUMBNAIL_SIZE
+  size = THUMBNAIL_SIZE,
 ): Promise<Blob | null> {
   const ext = getExt(file.name);
   const loaderType = EXT_LOADER_MAP[ext];
@@ -58,7 +55,7 @@ export async function generateModel3dThumbnail(
 /** 从 URL 加载模型并生成缩略图 PNG（用于 ZIP 解压后的多文件 GLTF）。 */
 export async function generateModel3dThumbnailFromUrl(
   url: string,
-  size = THUMBNAIL_SIZE
+  size = THUMBNAIL_SIZE,
 ): Promise<Blob | null> {
   const resolvedUrl = resolveMediaUrl(url);
   const ext = getExt(resolvedUrl);
@@ -69,7 +66,9 @@ export async function generateModel3dThumbnailFromUrl(
 }
 
 /** 与 ThreeEditor 一致的默认 IBL 环境贴图（摄影棚级 PBR 光照）。 */
-function createDefaultEnvironmentTexture(renderer: THREE.WebGLRenderer): THREE.Texture {
+function createDefaultEnvironmentTexture(
+  renderer: THREE.WebGLRenderer,
+): THREE.Texture {
   const pmremGenerator = new THREE.PMREMGenerator(renderer);
   const texture = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
   pmremGenerator.dispose();
@@ -78,8 +77,8 @@ function createDefaultEnvironmentTexture(renderer: THREE.WebGLRenderer): THREE.T
 
 async function _renderThumbnail(
   url: string,
-  loaderType: 'gltf' | 'fbx' | 'obj' | 'stl',
-  size: number
+  loaderType: "gltf" | "fbx" | "obj" | "stl",
+  size: number,
 ): Promise<Blob | null> {
   let renderer: THREE.WebGLRenderer | null = null;
   let environmentTexture: THREE.Texture | null = null;
@@ -116,7 +115,12 @@ async function _renderThumbnail(
 
     root.position.sub(center);
 
-    const camera = new THREE.PerspectiveCamera(45, 1, safeDim * 0.01, safeDim * 100);
+    const camera = new THREE.PerspectiveCamera(
+      45,
+      1,
+      safeDim * 0.01,
+      safeDim * 100,
+    );
     const dist = safeDim * 2.0;
     camera.position.set(dist * 0.7, dist * 0.5, dist * 0.7);
     camera.lookAt(0, 0, 0);
@@ -124,7 +128,7 @@ async function _renderThumbnail(
     renderer.render(scene, camera);
 
     const blob = await new Promise<Blob | null>((resolve) =>
-      renderer!.domElement.toBlob(resolve, 'image/png')
+      renderer!.domElement.toBlob(resolve, "image/png"),
     );
 
     return blob;
@@ -139,23 +143,26 @@ async function _renderThumbnail(
   }
 }
 
-async function loadModel(url: string, type: 'gltf' | 'fbx' | 'obj' | 'stl'): Promise<THREE.Object3D> {
+async function loadModel(
+  url: string,
+  type: "gltf" | "fbx" | "obj" | "stl",
+): Promise<THREE.Object3D> {
   switch (type) {
-    case 'gltf': {
+    case "gltf": {
       const loader = new GLTFLoader();
-      loader.setCrossOrigin('anonymous');
+      loader.setCrossOrigin("anonymous");
       const gltf = await loader.loadAsync(url);
       return gltf.scene;
     }
-    case 'fbx': {
+    case "fbx": {
       const loader = new FBXLoader();
       return await loader.loadAsync(url);
     }
-    case 'obj': {
+    case "obj": {
       const loader = new OBJLoader();
       return await loader.loadAsync(url);
     }
-    case 'stl': {
+    case "stl": {
       const loader = new STLLoader();
       const geometry = await loader.loadAsync(url);
       geometry.computeVertexNormals();

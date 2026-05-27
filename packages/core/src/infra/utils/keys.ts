@@ -29,6 +29,7 @@ export const VIZON_USER_DATA_KEYS = {
     NON_SELECTABLE: '__vizonNonSelectable',
     NON_PICKABLE: '__vizonNonPickable',
     NON_DELETABLE: '__vizonNonDeletable',
+    LOCKED: '__vizonLocked',
     DYNAMIC: '__vizonDynamic',
     PICK_TARGET: '__vizonPickTarget',
     HIDE_IN_EDITOR: 'hideInEditor',

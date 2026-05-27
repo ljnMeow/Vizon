@@ -2,7 +2,7 @@
  * 模型资源面板：展示并管理用户上传的 3D 模型资源。
  *
  * 功能：
- * - 挂载时自动拉取分类列表和模型列表
+ * - 首次进入 Tab 时自动拉取分类列表和模型列表
  * - Accordion 按分类分组展示模型
  * - 分类 CRUD：新建、重命名（编辑图标）、删除（有模型时 warning）
  * - 模型卡片：缩略图预览、双击重命名
@@ -12,6 +12,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { useFetchOnFirstActive } from '../../../../hooks/useFetchOnFirstActive';
 
 import { Accordion } from '../../../../components/Accordion';
 import { Tooltip } from '../../../../components/Tooltip';
@@ -187,10 +189,11 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
     }
   }, [t.loadFailed]);
 
-  useEffect(() => {
-    if (!isActive) return;
-    void Promise.all([fetchCategories(), fetchModels()]);
-  }, [isActive, fetchCategories, fetchModels]);
+  const fetchAll = useCallback(async () => {
+    await Promise.all([fetchCategories(), fetchModels()]);
+  }, [fetchCategories, fetchModels]);
+
+  useFetchOnFirstActive(isActive, fetchAll);
 
   // ---- 分类 CRUD ----
 

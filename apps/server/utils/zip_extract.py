@@ -8,7 +8,6 @@ ZIP 压缩包解压工具。
 
 import os
 import zipfile
-from pathlib import Path
 
 from rest_framework import serializers
 

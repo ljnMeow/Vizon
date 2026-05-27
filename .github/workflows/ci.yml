@@ -21,6 +21,13 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install server Python dependencies
+        run: pnpm server:install
+
       - name: Lint
         run: pnpm lint
 

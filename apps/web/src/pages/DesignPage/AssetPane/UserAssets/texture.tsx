@@ -2,7 +2,7 @@
  * 贴图资源面板：展示并管理用户上传的贴图资源。
  *
  * 功能：
- * - 挂载时自动拉取当前用户的贴图列表
+ * - 首次进入 Tab 时自动拉取当前用户的贴图列表（全量，分类在本地筛选）
  * - 按分类筛选（8 种贴图类型），可切回"全部"
  * - 全部分类时按 Accordion 分组展示，单一分类时扁平列表
  * - 点击缩略图预览（复用 ImagePreviewContext）
@@ -12,6 +12,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { useFetchOnFirstActive } from '../../../../hooks/useFetchOnFirstActive';
 
 import { Accordion } from '../../../../components/Accordion';
 import { Tooltip } from '../../../../components/Tooltip';
@@ -128,12 +130,12 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
     return `${t.uploadSupportedFormatsPrefix}${t[hintKey]}`;
   }, [categoryUploadConfig, t]);
 
-  /** 拉取贴图列表。 */
+  /** 拉取贴图列表（全量；分类筛选在本地完成）。 */
   const fetchTextures = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await listTextures(categoryFilter || undefined);
+      const data = await listTextures();
       setTextures(data);
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
@@ -141,21 +143,23 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
     } finally {
       setLoading(false);
     }
-  }, [categoryFilter, t.loadFailed]);
+  }, [t.loadFailed]);
 
-  // Tab 激活或分类筛选变化时加载列表
-  useEffect(() => {
-    if (!isActive) return;
-    void fetchTextures();
-  }, [isActive, fetchTextures]);
+  useFetchOnFirstActive(isActive, fetchTextures);
+
+  /** 按当前分类筛选后的展示列表。 */
+  const displayTextures = useMemo(
+    () => (categoryFilter ? textures.filter((tex) => tex.category === categoryFilter) : textures),
+    [textures, categoryFilter]
+  );
 
   // 列表为空时退出选择模式，避免隐藏按钮后状态残留
   useEffect(() => {
-    if (textures.length === 0 && selectMode) {
+    if (displayTextures.length === 0 && selectMode) {
       setSelectMode(false);
       setSelectedIds(new Set());
     }
-  }, [textures.length, selectMode]);
+  }, [displayTextures.length, selectMode]);
 
   /** 上传贴图（需先选中分类，支持多选）。 */
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -251,8 +255,8 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
 
   const toggleSelectAll = () => {
     setSelectedIds((prev) => {
-      if (prev.size === textures.length) return new Set();
-      return new Set(textures.map((t2) => t2.texture_id));
+      if (prev.size === displayTextures.length) return new Set();
+      return new Set(displayTextures.map((t2) => t2.texture_id));
     });
   };
 
@@ -443,7 +447,7 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
         </button>
       </div>
       {/* Row 2: 操作按钮（选择相关，无贴图时隐藏） */}
-      {textures.length > 0 && (
+      {displayTextures.length > 0 && (
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -458,7 +462,7 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
               onClick={toggleSelectAll}
               className={btnBase + ' text-[var(--text-secondary)]'}
             >
-              {selectedIds.size === textures.length ? t.deselectAllLabel : t.selectAllLabel}
+              {selectedIds.size === displayTextures.length ? t.deselectAllLabel : t.selectAllLabel}
             </button>
           )}
           {selectMode && selectedIds.size > 0 && (
@@ -479,7 +483,7 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
   const grouped = categoryFilter
     ? null
     : Object.entries(
-        textures.reduce<Record<string, TextureMeta[]>>((acc, tex) => {
+        displayTextures.reduce<Record<string, TextureMeta[]>>((acc, tex) => {
           const cat = tex.category;
           if (!acc[cat]) acc[cat] = [];
           acc[cat].push(tex);
@@ -585,11 +589,11 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
         ) : (
           // 单一分类 → 扁平列表
           <div className="grid grid-cols-2 gap-2">
-            {textures.map(renderCard)}
+            {displayTextures.map(renderCard)}
           </div>
         )}
 
-        {textures.length === 0 && categoryFilter && (
+        {displayTextures.length === 0 && categoryFilter && (
           <div className="py-8 text-center text-xs text-[var(--text-muted)]">
             {t.emptyTextures}
           </div>

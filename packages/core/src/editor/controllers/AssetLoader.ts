@@ -57,11 +57,15 @@ export class AssetLoader {
         break;
       }
       case 'fbx': {
-        root = await new FBXLoader().loadAsync(resolvedUrl);
+        const fbxLoader = new FBXLoader();
+        fbxLoader.setCrossOrigin('anonymous');
+        root = await fbxLoader.loadAsync(resolvedUrl);
         break;
       }
       case 'obj': {
-        root = await new OBJLoader().loadAsync(resolvedUrl);
+        const objLoader = new OBJLoader();
+        objLoader.setCrossOrigin('anonymous');
+        root = await objLoader.loadAsync(resolvedUrl);
         break;
       }
       case 'stl': {

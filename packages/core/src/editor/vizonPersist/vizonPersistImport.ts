@@ -576,6 +576,7 @@ export async function importParsedDocument(
       if (n.flags.nonSelectable != null) ud[VIZON_USER_DATA_KEYS.COMMON.NON_SELECTABLE] = Boolean(n.flags.nonSelectable); // 是否禁止被选中
       if (n.flags.nonPickable != null) ud[VIZON_USER_DATA_KEYS.COMMON.NON_PICKABLE] = Boolean(n.flags.nonPickable);       // 是否禁止被射线拾取
       if (n.flags.dynamic != null) ud[VIZON_USER_DATA_KEYS.COMMON.DYNAMIC] = Boolean(n.flags.dynamic);                   // 是否为动态对象（影响更新频率）
+      if (n.flags.locked != null) ud[VIZON_USER_DATA_KEYS.COMMON.LOCKED] = Boolean(n.flags.locked);                       // 是否锁定 Group（点击子对象重定向选中 Group）
     }
 
     // 恢复视觉特效配置（边框发光等）

@@ -4,6 +4,7 @@ import {
   createDefaultCamera,
   createDefaultLight,
   createDefaultModel,
+  ensureLockedModelGroupRoot,
   normalizeModelSize,
   type DefaultCameraKey,
   type DefaultLightKey,
@@ -266,8 +267,9 @@ export function ThreeViewport({
       );
       try {
         const { url, name } = JSON.parse(userModelData) as { url: string; name?: string };
-        const obj = await inst.loadModel(url, { addToScene: false, fileName: name });
-        normalizeModelSize(obj);
+        const loaded = await inst.loadModel(url, { addToScene: false, fileName: name });
+        normalizeModelSize(loaded);
+        const obj = ensureLockedModelGroupRoot(loaded);
         obj.name = name || obj.name || 'Model';
         obj.position.x += point.x;
         obj.position.y += point.y;

@@ -11,6 +11,7 @@
  */
 
 import * as THREE from 'three';
+import { VIZON_USER_DATA_KEYS } from '../infra/utils/keys';
 
 /** 根据文件扩展名推断的模型格式。 */
 export type ModelFormat = 'gltf' | 'glb' | 'fbx' | 'obj' | 'stl';
@@ -138,4 +139,30 @@ export async function awaitModelTexturesLoaded(root: THREE.Object3D): Promise<vo
 /** 导入模型后的统一后处理（异步贴图就绪）。 */
 export async function prepareImportedModelRoot(root: THREE.Object3D): Promise<void> {
   await awaitModelTexturesLoaded(root);
+}
+
+/**
+ * 拖拽导入模型时确保根为可锁定的 Group：
+ * - 根已是 Group：直接设置 locked；
+ * - 否则外包一层 Group 并设置 locked。
+ *
+ * 返回应加入场景的对象（可能是原根或新建的外层 Group）。
+ */
+export function ensureLockedModelGroupRoot(root: THREE.Object3D): THREE.Object3D {
+  const applyLocked = (group: THREE.Object3D) => {
+    const ud = (group.userData ?? {}) as Record<string, unknown>;
+    group.userData = ud;
+    ud[VIZON_USER_DATA_KEYS.COMMON.LOCKED] = true;
+  };
+
+  if (root.type === 'Group') {
+    applyLocked(root);
+    return root;
+  }
+
+  const wrapper = new THREE.Group();
+  wrapper.name = root.name || 'Model';
+  applyLocked(wrapper);
+  wrapper.add(root);
+  return wrapper;
 }

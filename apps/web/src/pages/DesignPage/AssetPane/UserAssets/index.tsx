@@ -6,6 +6,7 @@
  * - 模型（model3d）：用户上传的 3D 模型资源库
  * - 贴图（texture）：用户上传的贴图资源库
  *
+ * 子 Tab 使用 keepAlive，各面板仅在首次进入时自动请求接口，切换回 Tab 不重复拉取。
  * 结构参照 SystemAssets/index.tsx，保持一致的纵向布局风格。
  */
 
@@ -38,6 +39,7 @@ export function UserAssets({ isActive }: { isActive: boolean }) {
       activeKey={activeTab}
       onChange={setActiveTab}
       orientation="vertical"
+      keepAlive
       className="flex-1 min-h-0"
       contentClassName="p-1 min-h-0 overflow-hidden"
     >
@@ -45,7 +47,7 @@ export function UserAssets({ isActive }: { isActive: boolean }) {
         if (key === 'project') {
           return (
             <div className="flex min-h-0 flex-col h-full">
-              <ProjectPanel isActive={isActive} />
+              <ProjectPanel isActive={isActive && activeTab === 'project'} />
             </div>
           );
         }

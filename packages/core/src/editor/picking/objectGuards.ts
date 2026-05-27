@@ -63,3 +63,23 @@ export function isVisibleInHierarchy(obj: THREE.Object3D) {
 export function isNonDeletable(obj: THREE.Object3D): boolean {
   return !!(obj.userData as Record<string, unknown>)[VIZON_USER_DATA_KEYS.COMMON.NON_DELETABLE];
 }
+
+/**
+ * 自当前节点的父级向上遍历，查找最近的锁定 Group 祖先。
+ * 锁定 Group：`type === 'Group'` 且 `userData.__vizonLocked === true`。
+ * 嵌套锁定场景取最内层（最近）的锁定 Group。
+ * 用于视口拾取时将选中重定向到锁定的 Group。
+ */
+export function findLockedGroupAncestor(obj: THREE.Object3D): THREE.Group | null {
+  let cur: THREE.Object3D | null = obj.parent;
+  while (cur) {
+    if (
+      cur.type === 'Group' &&
+      (cur.userData as any)?.[VIZON_USER_DATA_KEYS.COMMON.LOCKED]
+    ) {
+      return cur as THREE.Group;
+    }
+    cur = cur.parent;
+  }
+  return null;
+}

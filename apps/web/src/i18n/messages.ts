@@ -523,6 +523,7 @@ export interface AppMessages {
         visibleLabel: string;
         pickableLabel: string;
         freezeLabel: string;
+        lockedLabel: string;
         colorLabel: string;
         opacityLabel: string;
         renderOrderLabel: string;
@@ -1165,6 +1166,7 @@ export const appMessages: Record<Locale, AppMessages> = {
           visibleLabel: '显示',
           pickableLabel: '可拾取',
           freezeLabel: '冻结',
+          lockedLabel: '锁定',
           colorLabel: '颜色',
           opacityLabel: '透明度',
           renderOrderLabel: '渲染层级',
@@ -1800,6 +1802,7 @@ export const appMessages: Record<Locale, AppMessages> = {
           visibleLabel: 'Visible',
           pickableLabel: 'Pickable',
           freezeLabel: 'Freeze',
+          lockedLabel: 'Lock',
           colorLabel: 'Color',
           opacityLabel: 'Opacity',
           renderOrderLabel: 'Render Order',

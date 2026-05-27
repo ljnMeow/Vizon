@@ -30,8 +30,10 @@ export type VisibilityPickFreezeState = {
   visible: boolean;
   pickable: boolean;
   frozen: boolean;
+  locked: boolean;
   canPickable: boolean;
   canFreeze: boolean;
+  canLock: boolean;
 };
 
 /** 透明度编辑状态 */

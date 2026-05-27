@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
+import { VIZON_USER_DATA_KEYS } from '../../infra/utils/keys';
 import {
   awaitModelTexturesLoaded,
   detectModelFormat,
+  ensureLockedModelGroupRoot,
   getModelEntryFileName,
   resolveMediaUrl,
 } from '../modelLoadUtils';
@@ -41,6 +43,32 @@ describe('resolveMediaUrl', () => {
     expect(resolveMediaUrl('http://127.0.0.1:5018/media/a.fbx')).toBe(
       'http://127.0.0.1:5018/media/a.fbx'
     );
+  });
+});
+
+describe('ensureLockedModelGroupRoot', () => {
+  it('根为 Group 时直接锁定原节点', () => {
+    const root = new THREE.Group();
+    root.name = 'GLTF Scene';
+
+    const out = ensureLockedModelGroupRoot(root);
+
+    expect(out).toBe(root);
+    expect(out.userData[VIZON_USER_DATA_KEYS.COMMON.LOCKED]).toBe(true);
+    expect(out.children).toHaveLength(0);
+  });
+
+  it('根非 Group 时外包 Group 并锁定外层', () => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+    mesh.name = 'Body';
+
+    const out = ensureLockedModelGroupRoot(mesh);
+
+    expect(out.type).toBe('Group');
+    expect(out.userData[VIZON_USER_DATA_KEYS.COMMON.LOCKED]).toBe(true);
+    expect(out.children).toHaveLength(1);
+    expect(out.children[0]).toBe(mesh);
+    expect(mesh.userData[VIZON_USER_DATA_KEYS.COMMON.LOCKED]).toBeUndefined();
   });
 });
 

@@ -110,7 +110,7 @@ describe('ImagePreviewContext', () => {
       expect(document.querySelector('img[src="blob:first"]')).not.toBeNull();
     });
 
-    const dialog = screen.getByRole('dialog');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
     await act(async () => { fireEvent.keyDown(window, { key: 'Escape' }); });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
