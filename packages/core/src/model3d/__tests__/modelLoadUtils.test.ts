@@ -13,16 +13,16 @@ describe('detectModelFormat', () => {
   it('以 URL 扩展名为准，不被 ZIP 展示名误导', () => {
     expect(
       detectModelFormat(
-        'http://127.0.0.1:5018/media/models3d/files/uuid/sub/model.fbx',
+        'http://127.0.0.1:5018/media/models3d/files/uuid/sub/model.glb',
         'factory.zip'
       )
-    ).toBe('fbx');
+    ).toBe('glb');
   });
 
-  it('用户重命名为 .gltf 时仍以 URL 中的 .fbx 为准', () => {
+  it('用户重命名为 .obj 时仍以 URL 中的 .glb 为准', () => {
     expect(
-      detectModelFormat('/media/models3d/files/uuid/model.fbx', '角色.gltf')
-    ).toBe('fbx');
+      detectModelFormat('/media/models3d/files/uuid/model.glb', '角色.obj')
+    ).toBe('glb');
   });
 
   it('无 URL 扩展名时回退展示名', () => {
@@ -33,15 +33,15 @@ describe('detectModelFormat', () => {
 describe('getModelEntryFileName', () => {
   it('从 URL 路径取入口文件名', () => {
     expect(
-      getModelEntryFileName('/media/models3d/files/uuid/nested/model.fbx', 'factory.zip')
-    ).toBe('model.fbx');
+      getModelEntryFileName('/media/models3d/files/uuid/nested/model.glb', 'factory.zip')
+    ).toBe('model.glb');
   });
 });
 
 describe('resolveMediaUrl', () => {
   it('非浏览器环境原样返回', () => {
-    expect(resolveMediaUrl('http://127.0.0.1:5018/media/a.fbx')).toBe(
-      'http://127.0.0.1:5018/media/a.fbx'
+    expect(resolveMediaUrl('http://127.0.0.1:5018/media/a.glb')).toBe(
+      'http://127.0.0.1:5018/media/a.glb'
     );
   });
 });

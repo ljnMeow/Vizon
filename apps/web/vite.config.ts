@@ -64,6 +64,13 @@ export default defineConfig({
         target: 'http://127.0.0.1:5018',
         changeOrigin: true,
         secure: false
+      },
+      // WebSocket 代理：压缩进度实时推送
+      '/ws': {
+        target: 'ws://127.0.0.1:5018',
+        ws: true,
+        changeOrigin: true,
+        secure: false,
       }
     }
   }

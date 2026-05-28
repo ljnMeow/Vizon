@@ -2,25 +2,25 @@
  * 3D 模型缩略图生成（客户端离屏渲染）。
  *
  * 原理：在离屏 WebGLRenderer 中加载模型文件 → 自动定位相机 → 渲染一帧 → canvas.toBlob()
- * 支持 glTF/GLB、FBX、OBJ、STL 格式。
+ * 支持 glTF/GLB、OBJ、STL 格式。
  *
  * 光照与主编辑器视口对齐：RoomEnvironment IBL + 浅色背景，确保 PBR 材质有足够对比度。
  */
 
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { GLTFLoader, FBXLoader, OBJLoader, STLLoader } from "three-stdlib";
+import { GLTFLoader, OBJLoader, STLLoader } from "three-stdlib";
 import { DEFAULT_MESH_COLOR } from "../defaults/registry";
 import { prepareImportedModelRoot, resolveMediaUrl } from "./modelLoadUtils";
+import { getDRACOLoader } from "./decoderConfig";
 
 const THUMBNAIL_SIZE = 256;
 /** 与 DEFAULT_SCENE_SETTINGS.environment.backgroundColor 一致 */
 const BG_COLOR = 0xf3f4f6;
 
-const EXT_LOADER_MAP: Record<string, "gltf" | "fbx" | "obj" | "stl"> = {
+const EXT_LOADER_MAP: Record<string, "gltf" | "obj" | "stl"> = {
   ".gltf": "gltf",
   ".glb": "gltf",
-  ".fbx": "fbx",
   ".obj": "obj",
   ".stl": "stl",
 };
@@ -77,7 +77,7 @@ function createDefaultEnvironmentTexture(
 
 async function _renderThumbnail(
   url: string,
-  loaderType: "gltf" | "fbx" | "obj" | "stl",
+  loaderType: "gltf" | "obj" | "stl",
   size: number,
 ): Promise<Blob | null> {
   let renderer: THREE.WebGLRenderer | null = null;
@@ -145,18 +145,15 @@ async function _renderThumbnail(
 
 async function loadModel(
   url: string,
-  type: "gltf" | "fbx" | "obj" | "stl",
+  type: "gltf" | "obj" | "stl",
 ): Promise<THREE.Object3D> {
   switch (type) {
     case "gltf": {
       const loader = new GLTFLoader();
       loader.setCrossOrigin("anonymous");
+      loader.setDRACOLoader(getDRACOLoader());
       const gltf = await loader.loadAsync(url);
       return gltf.scene;
-    }
-    case "fbx": {
-      const loader = new FBXLoader();
-      return await loader.loadAsync(url);
     }
     case "obj": {
       const loader = new OBJLoader();

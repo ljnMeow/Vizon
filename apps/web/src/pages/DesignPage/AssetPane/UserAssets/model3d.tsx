@@ -26,6 +26,7 @@ import { DATA_TRANSFER_KEYS } from '../../../../utils/keys';
 import {
   type Model3dCategory,
   type Model3dMeta,
+  type CompressionProgress,
   createModel3dCategory,
   deleteModel3d,
   deleteModel3dCategory,
@@ -35,8 +36,9 @@ import {
   updateModel3dCategory,
   updateModel3dThumbnail,
   uploadModel3dWithProgress,
+  watchCompressionProgress,
 } from '../../../../api/model3ds';
-import { getApiErrorMessage, mergeUploadErrorMessages } from '../../../../utils/apiError';
+import { getApiErrorMessage } from '../../../../utils/apiError';
 import { generateModel3dThumbnail, generateModel3dThumbnailFromUrl } from 'vizon-3d-core';
 
 /** 将字节数格式化为人类可读的文件大小字符串。 */
@@ -46,12 +48,30 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** 压缩阶段对应的中文提示文本（含百分比）。 */
+function _getStageText(
+  progress: CompressionProgress,
+  _t: Record<string, string>,
+): string {
+  const pct = progress.percent ?? 0;
+  switch (progress.stage) {
+    case 'converting':
+      return `转换格式中 ${pct}%`;
+    case 'draco':
+      return `压缩几何数据 ${pct}%`;
+    case 'saving':
+      return '保存中';
+    default:
+      return `处理中 ${pct}%`;
+  }
+}
+
 /** 按钮通用样式。 */
 const btnBase =
   'rounded border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] transition-colors hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40';
 
 /** 允许上传的模型文件扩展名。 */
-const MODEL_ACCEPT = '.gltf,.glb,.fbx,.obj,.stl,.zip';
+const MODEL_ACCEPT = '.gltf,.glb,.obj,.stl,.zip';
 
 /** 分类名称最大长度。 */
 const CATEGORY_NAME_MAX_LENGTH = 10;
@@ -286,7 +306,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
 
   // ---- 模型操作 ----
 
-  /** 上传模型（支持多选）。 */
+  /** 上传模型（支持多选），并发上传 + 每文件独立进度消息。 */
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
@@ -303,71 +323,93 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
     }
 
     setUploading(true);
-    const total = files.length;
-    const loadingHandle = message.loading(`${t.uploading} (1/${total}) 0%`);
-    loadingHandle.update({ progress: 0 });
 
-    const failedMessages: string[] = [];
+    await Promise.allSettled(
+      files.map(async (file) => {
+        const fileName = file.name;
+        const loadingHandle = message.loading(`${fileName} — ${t.uploading} 0%`);
+        loadingHandle.update({ progress: 0 });
 
-    for (let i = 0; i < total; i++) {
-      const file = files[i];
-      const isZip = file.name.toLowerCase().endsWith('.zip');
-      const baseProgress = (i / total) * 100;
-      try {
-        loadingHandle.update({ text: `${t.uploadProcessing} (${i + 1}/${total})`, progress: baseProgress });
+        try {
+          // 阶段 1：上传
+          let uploadResult: Model3dMeta | null = null;
+          const isZip = fileName.toLowerCase().endsWith('.zip');
 
-        if (isZip) {
-          // ZIP 文件：先上传（不带缩略图），上传成功后从 URL 生成缩略图再回填
-          const result = await uploadModel3dWithProgress(
-            { name: file.name, file },
-            (percent) => {
-              const overall = baseProgress + (percent / total);
-              if (percent >= 100) {
-                loadingHandle.update({ text: `${t.uploadProcessing} (${i + 1}/${total})`, progress: Math.min(overall, 100) });
-              } else {
-                loadingHandle.update({ text: `${t.uploading} (${i + 1}/${total}) ${percent}%`, progress: overall });
+          if (isZip) {
+            const result = await uploadModel3dWithProgress(
+              { name: fileName, file },
+              (percent) => {
+                loadingHandle.update({
+                  text: percent >= 100
+                    ? `${fileName} — 处理中...`
+                    : `${fileName} — ${t.uploading} ${percent}%`,
+                  progress: percent,
+                });
+              },
+            );
+            uploadResult = result;
+            // 从服务端返回的 file_url 生成缩略图
+            if (result.file_url) {
+              loadingHandle.update({ text: `${fileName} — 生成缩略图...` });
+              const thumb = await generateModel3dThumbnailFromUrl(result.file_url);
+              if (thumb) {
+                try { await updateModel3dThumbnail(result.model_id, thumb); } catch { /* ignore */ }
               }
             }
-          );
-          // 从服务端返回的 file_url 生成缩略图
-          if (result.file_url) {
-            const thumb = await generateModel3dThumbnailFromUrl(result.file_url);
-            if (thumb) {
-              try { await updateModel3dThumbnail(result.model_id, thumb); } catch { /* ignore */ }
+          } else {
+            const thumbnail = await generateModel3dThumbnail(file);
+            const result = await uploadModel3dWithProgress(
+              { name: fileName, file, thumbnail: thumbnail ?? undefined },
+              (percent) => {
+                loadingHandle.update({
+                  text: percent >= 100
+                    ? `${fileName} — 处理中...`
+                    : `${fileName} — ${t.uploading} ${percent}%`,
+                  progress: percent,
+                });
+              },
+            );
+            uploadResult = result;
+          }
+
+          // 阶段 2：轮询压缩进度
+          if (uploadResult) {
+            loadingHandle.update({
+              text: `${fileName} — 等待压缩...`,
+              progress: 0,
+            });
+
+            const finalStatus = await watchCompressionProgress(
+              uploadResult.model_id,
+              (progress: CompressionProgress) => {
+                if (progress.status === 'processing') {
+                  const stageText = _getStageText(progress, t);
+                  const pct = progress.percent ?? 0;
+                  loadingHandle.update({
+                    text: `${fileName} — ${stageText}`,
+                    progress: pct,
+                  });
+                }
+              },
+            );
+
+            if (finalStatus.status === 'failed') {
+              loadingHandle.hide();
+              void message.warning(`${fileName} 压缩失败，原始文件仍可使用`);
+              return;
             }
           }
-        } else {
-          // 单文件：先本地生成缩略图，随上传一起提交
-          const thumbnail = await generateModel3dThumbnail(file);
-          await uploadModel3dWithProgress(
-            {
-              name: file.name,
-              file,
-              thumbnail: thumbnail ?? undefined,
-            },
-            (percent) => {
-              const overall = baseProgress + (percent / total);
-              if (percent >= 100) {
-                loadingHandle.update({ text: `${t.uploadProcessing} (${i + 1}/${total})`, progress: Math.min(overall, 100) });
-              } else {
-                loadingHandle.update({ text: `${t.uploading} (${i + 1}/${total}) ${percent}%`, progress: overall });
-              }
-            }
-          );
+
+          loadingHandle.hide();
+          void message.success(`${fileName} ${t.uploadSuccess}`);
+        } catch (err) {
+          loadingHandle.hide();
+          void message.error(`${fileName} ${getApiErrorMessage(err, t.uploadFailed)}`);
         }
-      } catch (err) {
-        failedMessages.push(getApiErrorMessage(err, t.uploadFailed));
-      }
-    }
+      }),
+    );
 
     await Promise.all([fetchCategories(), fetchModels()]);
-    loadingHandle.hide();
-
-    if (failedMessages.length === 0) {
-      void message.success(t.uploadSuccess);
-    } else {
-      void message.error(`${t.uploadFailedPrefix}${mergeUploadErrorMessages(failedMessages)}`);
-    }
     setUploading(false);
   };
 
@@ -458,7 +500,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
     const name = model.name || appMessages[locale].userAssets.noName;
     const isEditing = editingId === model.model_id;
     const isSelected = selectedIds.has(model.model_id);
-    const canDrag = !selectMode && !!model.file_url;
+    const canDrag = !selectMode && (!!model.file_url || !!model.compressed_file_url);
 
     return (
       <div
@@ -470,7 +512,9 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
         <div
           draggable={canDrag}
           onDragStart={(e) => {
-            e.dataTransfer.setData(USER_MODEL_DRAG_MIME, JSON.stringify({ url: model.file_url, name: model.name }));
+            // 优先使用压缩文件 URL
+            const url = model.compressed_file_url || model.file_url;
+            e.dataTransfer.setData(USER_MODEL_DRAG_MIME, JSON.stringify({ url, name: model.name }));
             e.dataTransfer.effectAllowed = 'copy';
           }}
           className="relative w-full bg-[var(--bg-base)] cursor-pointer"
@@ -544,7 +588,9 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
 
           {/* 大小 */}
           <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">
-            {formatSize(model.file_size)}
+            {model.compressed_file_size > 0 && model.compression_status === 'completed'
+              ? `${formatSize(model.compressed_file_size)}`
+              : formatSize(model.file_size)}
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@
  * 3D 模型加载工具（格式推断、URL 解析、导入后处理）。
  *
  * 职责：
- * - 从 URL/展示名推断 glTF/GLB/FBX/OBJ/STL 格式，避免 ZIP 包名误导 Loader 选择
+ * - 从 URL/展示名推断 glTF/GLB/OBJ/STL 格式，避免 ZIP 包名误导 Loader 选择
  * - 将后端绝对 `/media/` URL 转为同域相对路径，便于 Vite 代理与 WebGL 贴图加载
  * - 导入后统一修正贴图色彩空间，并等待尚未解码完成的 HTMLImageElement 贴图就绪
  *
@@ -14,12 +14,11 @@ import * as THREE from 'three';
 import { VIZON_USER_DATA_KEYS } from '../infra/utils/keys';
 
 /** 根据文件扩展名推断的模型格式。 */
-export type ModelFormat = 'gltf' | 'glb' | 'fbx' | 'obj' | 'stl';
+export type ModelFormat = 'gltf' | 'glb' | 'obj' | 'stl';
 
 const FORMAT_SUFFIXES: readonly { ext: string; format: ModelFormat }[] = [
   { ext: '.glb', format: 'glb' },
   { ext: '.gltf', format: 'gltf' },
-  { ext: '.fbx', format: 'fbx' },
   { ext: '.obj', format: 'obj' },
   { ext: '.stl', format: 'stl' },
 ];

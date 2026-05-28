@@ -402,8 +402,6 @@ export class ThreeEditor {
       scene: this.scene,
       requestShadowMapUpdate: () => this.requestShadowMapUpdate()
     });
-    // 加载器持有 scene 引用，便于 `loadGLTF` 默认 add
-    this.assetLoader = new AssetLoader(this.scene);
 
     // 指针拾取与 orbit/transform 生命周期集中在此类，避免 ThreeEditor 直接监听 DOM
     this.interactionController = new InteractionController({
@@ -419,6 +417,9 @@ export class ThreeEditor {
     this.renderer = this.rendererController.createRenderer(this.sceneSettings.renderer.antialias);
     this.rendererController.applyRendererSettings(this.renderer, this.sceneSettings.renderer);
     this.effectsController.bindRenderer(this.renderer);
+
+    // 加载器持有 scene 和 renderer 引用，便于 `loadGLTF` 默认 add + Draco 解码
+    this.assetLoader = new AssetLoader(this.scene, this.renderer);
 
     // 创建 Orbit + TransformControls，挂到 scene 与 domElement；restore 当前无选中故 detach
     const { orbit, transform } = this.interactionController.recreateControls({
@@ -1099,6 +1100,7 @@ export class ThreeEditor {
       this.orbit = recreated.orbit;
       this.transform = recreated.transform;
       this.effectsController.bindRenderer(this.renderer);
+      this.assetLoader.updateRenderer(this.renderer);
       this.conduitEditController = new ConduitEditController({ scene: this.scene, camera: this.camera, orbit: this.orbit });
       this.conduitEditController.setDomElement(this.renderer.domElement);
       this.bindTransformDragHooks();
@@ -1943,7 +1945,7 @@ export class ThreeEditor {
 
   /**
    * 通用模型加载：根据文件名/URL 扩展名自动选择对应 Loader。
-   * 支持 GLTF/GLB/FBX/OBJ/STL。
+   * 支持 GLTF/GLB/OBJ/STL。
    */
   async loadModel(url: string, opts?: { addToScene?: boolean; fileName?: string }) {
     const out = await this.assetLoader.loadModel(url, opts);

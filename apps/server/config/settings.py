@@ -167,6 +167,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "daphne",
     "django.contrib.staticfiles",
     # Django REST Framework：让我们更容易写出规范的 JSON API（序列化、校验、权限等）
     "rest_framework",
@@ -174,6 +175,9 @@ INSTALLED_APPS = [
     "corsheaders",
     # OpenAPI/Swagger 文档（/api/schema/ + /api/docs/）
     "drf_spectacular",
+    # Django Channels：WebSocket 支持（压缩进度实时推送）
+    # Celery 进度上报需要 django-celery-results 读取 AsyncResult
+    # 这里使用 redis backend 即可，不需要额外 Django app
     # 你自己的业务模块
     "customers",  # 客户用户模块（本次新增）
     "auth_api",  # 认证模块（login/token；暂时只做 login）
@@ -226,6 +230,17 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "config.wsgi.application"
+ASGI_APPLICATION = "config.asgi.application"
+
+# Django Channels 通道层配置（Redis 后端，跨进程通信）
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+        },
+    },
+}
 
 
 # Database
@@ -357,3 +372,29 @@ SPECTACULAR_SETTINGS = {
     # 默认让接口带上 bearerAuth（具体接口也可在视图上覆盖）
     "SECURITY": [{"bearerAuth": []}],
 }
+
+# Celery 配置
+# 去除 Redis URL 中的用户名，避免 ACL 受限用户无法使用 pub/sub
+def _sanitize_redis_url(url: str) -> str:
+    from urllib.parse import urlparse, urlunparse
+    parsed = urlparse(url)
+    if parsed.username:
+        netloc = parsed.hostname or ""
+        if parsed.port:
+            netloc += f":{parsed.port}"
+        if parsed.password:
+            netloc = f":{parsed.password}@{netloc}"
+        parsed = parsed._replace(netloc=netloc)
+    return urlunparse(parsed)
+
+
+CELERY_BROKER_URL = _sanitize_redis_url(REDIS_URL)
+CELERY_RESULT_BACKEND = _sanitize_redis_url(REDIS_URL)
+CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
+    "global_keyprefix": "celery_result:",
+}
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_TRACK_STARTED = True
+CELERY_RESULT_EXTENDED = True

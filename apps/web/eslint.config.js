@@ -5,7 +5,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', '**/*.cjs'] },
+  { ignores: ['dist/**', 'node_modules/**', 'public/**', '**/*.cjs'] },
   {
     settings: {
       react: { version: '18.2' },

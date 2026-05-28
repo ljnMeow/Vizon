@@ -355,7 +355,7 @@ export function GlobalMessageProvider({ children }: GlobalMessageProviderProps) 
                       aria-live="polite"
                       aria-busy={m.type === 'loading'}
                       className={[
-                        'flex items-center gap-2 rounded-lg px-2.5 py-1.5 backdrop-blur',
+                        'flex items-start gap-2 rounded-lg px-2.5 py-1.5 backdrop-blur',
                         'border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)]',
                         'shadow-[0_10px_30px_rgba(0,0,0,0.45),0_0_0_1px_rgba(59,130,246,0.20)]',
                         'bg-[var(--bg-elevated)]',

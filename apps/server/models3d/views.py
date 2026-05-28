@@ -37,7 +37,7 @@ from customers.models import Customer
 from utils.file_validation import CACHE_PRIVATE_HOUR, CACHE_PUBLIC_DAY, set_cache_control
 from utils.zip_extract import extract_model_zip, ZipExtractionError
 
-from .models import ModelAsset, ModelCategory
+from .models import ModelAsset, ModelCategory, CompressionStatus
 from .serializers import (
     ModelAssetCreateSerializer,
     ModelAssetSerializer,
@@ -192,7 +192,7 @@ class ModelAssetViewSet(viewsets.ViewSet):
         POST /api/models3d/
         新建模型：接收 multipart 表单（name + file + 可选 thumbnail + 可选 category UUID）。
         若未传 category，则归入默认分类。
-        支持 ZIP 压缩包（含多文件 GLTF / FBX）自动解压。
+        支持 ZIP 压缩包（含多文件 GLTF）自动解压。
         """
         serializer = ModelAssetCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -245,6 +245,13 @@ class ModelAssetViewSet(viewsets.ViewSet):
                 asset.thumbnail.save(thumbnail_file.name, thumbnail_file, save=False)  # pyright: ignore[reportOptionalMemberAccess]
 
             asset.save()
+
+            # 派发异步压缩任务
+            from .tasks import compress_model_task
+            task = compress_model_task.delay(asset.pk)  # pyright: ignore[reportCallIssue]
+            asset.celery_task_id = task.id
+            asset.save(update_fields=["celery_task_id"])
+
         else:
             asset = ModelAsset(
                 customer=customer,
@@ -259,6 +266,12 @@ class ModelAssetViewSet(viewsets.ViewSet):
                 asset.thumbnail.save(thumbnail_file.name, thumbnail_file, save=False)  # pyright: ignore[reportOptionalMemberAccess]
 
             asset.save()
+
+            # 派发异步压缩任务
+            from .tasks import compress_model_task
+            task = compress_model_task.delay(asset.pk)  # pyright: ignore[reportCallIssue]
+            asset.celery_task_id = task.id
+            asset.save(update_fields=["celery_task_id"])
 
         out = ModelAssetSerializer(asset, context={"request": request})
         return Response(out.data, status=status.HTTP_201_CREATED)
@@ -322,6 +335,7 @@ class ModelAssetViewSet(viewsets.ViewSet):
 
         file_field = asset.file
         thumbnail_field = asset.thumbnail
+        compressed_field = asset.compressed_file
         file_name = file_field.name if file_field and file_field.name else ""
 
         asset.delete()
@@ -343,18 +357,46 @@ class ModelAssetViewSet(viewsets.ViewSet):
 
         _delete_file_field(thumbnail_field)
 
+        # 清理压缩文件目录：models3d/compressed/{uuid}/
+        compressed_name = compressed_field.name if compressed_field and compressed_field.name else ""
+        if compressed_name:
+            parts = compressed_name.split("/")
+            # parts: ['models3d', 'compressed', '<uuid>', 'compressed.glb']
+            if len(parts) >= 3:
+                uuid_dir = os.path.join(settings.MEDIA_ROOT, parts[0], parts[1], parts[2])
+                if os.path.isdir(uuid_dir):
+                    shutil.rmtree(uuid_dir, ignore_errors=True)
+
         return Response({"deleted": True}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["get"], url_path="file")
     def file(self, request: Request, pk: str | None = None):
         """
         GET /api/models3d/{model_id}/file/
-        流式下载模型文件。
+        流式下载模型文件。优先返回压缩版本。
         """
         from django.http import FileResponse
 
         asset = self._get_asset(request, pk)
 
+        # 优先返回压缩文件
+        if (
+            asset.compression_status == CompressionStatus.COMPLETED
+            and asset.compressed_file
+            and asset.compressed_file.name
+        ):
+            filename = asset.name or asset.compressed_file.name
+            if not filename.lower().endswith(".glb"):
+                filename = Path(filename).stem + ".glb"
+            response = FileResponse(
+                asset.compressed_file.open("rb"),
+                content_type="model/gltf-binary",
+                as_attachment=True,
+                filename=filename,
+            )
+            return set_cache_control(response, CACHE_PRIVATE_HOUR)
+
+        # 回退到原始文件
         if not asset.file or not asset.file.name:
             raise ModelAssetNotFoundError("模型文件不存在")
 
@@ -388,6 +430,43 @@ class ModelAssetViewSet(viewsets.ViewSet):
             ),
             CACHE_PUBLIC_DAY,
         )
+
+    @action(detail=True, methods=["get"], url_path="compression-status")
+    def compression_status(self, request: Request, pk: str | None = None):
+        """
+        GET /api/models3d/{model_id}/compression-status/
+        查询模型压缩状态和进度，供前端轮询。
+        """
+        asset = self._get_asset(request, pk)
+
+        if asset.compression_status == CompressionStatus.COMPLETED:
+            return Response({
+                "status": "completed",
+                "original_size": asset.file_size,
+                "compressed_size": asset.compressed_file_size,
+            })
+
+        if asset.compression_status == CompressionStatus.FAILED:
+            return Response({"status": "failed"})
+
+        # 从 Celery result backend 读取任务进度
+        if asset.celery_task_id:
+            from celery.result import AsyncResult
+            result = AsyncResult(asset.celery_task_id)
+            if result.state == "PROGRESS":
+                info = result.info or {}
+                return Response({
+                    "status": "processing",
+                    "stage": info.get("stage", ""),
+                    "percent": info.get("percent", 0),
+                    "message": info.get("message", ""),
+                })
+            elif result.state == "PENDING":
+                return Response({"status": "pending"})
+            elif result.state in ("RETRY", "FAILURE"):
+                return Response({"status": "failed"})
+
+        return Response({"status": asset.compression_status})
 
     def _get_asset(self, request: Request, pk: str | None) -> ModelAsset:
         """按 public_id 查询当前用户的模型。"""

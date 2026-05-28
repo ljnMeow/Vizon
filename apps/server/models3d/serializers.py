@@ -72,6 +72,7 @@ class ModelAssetSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
     thumbnail_url = serializers.SerializerMethodField()
     file_url = serializers.SerializerMethodField()
+    compressed_file_url = serializers.SerializerMethodField()
     created_at = serializers.SerializerMethodField()
     updated_at = serializers.SerializerMethodField()
 
@@ -84,8 +85,12 @@ class ModelAssetSerializer(serializers.ModelSerializer):
             "category_name",
             "file_url",
             "thumbnail_url",
+            "compressed_file_url",
             "file_size",
+            "compressed_file_size",
             "mime_type",
+            "compression_status",
+            "celery_task_id",
             "created_at",
             "updated_at",
         ]
@@ -105,6 +110,14 @@ class ModelAssetSerializer(serializers.ModelSerializer):
         if request is not None:
             return request.build_absolute_uri(obj.file.url)
         return obj.file.url
+
+    def get_compressed_file_url(self, obj: ModelAsset) -> str | None:
+        if not obj.compressed_file or not obj.compressed_file.name:
+            return None
+        request = self.context.get("request")
+        if request is not None:
+            return request.build_absolute_uri(obj.compressed_file.url)
+        return obj.compressed_file.url
 
     def get_created_at(self, obj: ModelAsset) -> str:
         return format_datetime(obj.created_at)

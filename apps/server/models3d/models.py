@@ -3,10 +3,13 @@
 
 ModelCategory 表存储用户自定义的模型分类，默认分类不可删除。
 ModelAsset 表存储用户上传的 3D 模型文件，每条记录对应一个可复用的模型资源。
-- file：模型文件（支持 glTF/GLB/FBX/OBJ/STL 等），存放在文件系统
+- file：模型文件（支持 glTF/GLB/OBJ/STL 等），存放在文件系统
 - thumbnail：缩略图（客户端生成或上传，用于列表快速预览）
 - category：模型所属分类（ForeignKey → ModelCategory）
 - public_id：对外暴露的唯一标识，不暴露自增 PK
+- compression_status：压缩状态（pending/processing/completed/failed/skipped）
+- compressed_file：压缩后的 GLB 文件（Draco + KTX2）
+- celery_task_id：关联的 Celery 任务 ID，用于前端轮询压缩进度
 """
 
 from uuid import uuid4
@@ -14,6 +17,14 @@ from uuid import uuid4
 from django.db import models
 
 from customers.models import Customer
+
+
+class CompressionStatus(models.TextChoices):
+    PENDING = "pending", "待压缩"
+    PROCESSING = "processing", "压缩中"
+    COMPLETED = "completed", "已完成"
+    FAILED = "failed", "压缩失败"
+    SKIPPED = "skipped", "跳过"
 
 
 class ModelCategory(models.Model):
@@ -67,6 +78,21 @@ class ModelAsset(models.Model):
     )
     file_size = models.BigIntegerField(default=0)
     mime_type = models.CharField(max_length=100, blank=True, default="")
+    # 压缩相关字段
+    compression_status = models.CharField(
+        max_length=20,
+        choices=CompressionStatus.choices,
+        default=CompressionStatus.PENDING,
+        db_index=True,
+    )
+    compressed_file = models.FileField(
+        upload_to="models3d/compressed/",
+        null=True,
+        blank=True,
+        max_length=512,
+    )
+    compressed_file_size = models.BigIntegerField(default=0)
+    celery_task_id = models.CharField(max_length=255, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

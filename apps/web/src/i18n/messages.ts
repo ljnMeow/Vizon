@@ -194,6 +194,7 @@ export interface AppMessages {
       sizeLabel: string;
       uploading: string;
       uploadProcessing: string;
+      compressing: string;
       uploadSuccess: string;
       uploadFailedPrefix: string;
       /** 上传失败且无接口 message 时的兜底文案 */
@@ -223,6 +224,7 @@ export interface AppMessages {
       renamePlaceholder: string;
       uploading: string;
       uploadProcessing: string;
+      compressing: string;
       uploadSuccess: string;
       uploadFailedPrefix: string;
       /** 上传失败且无接口 message 时的兜底文案 */
@@ -848,6 +850,7 @@ export const appMessages: Record<Locale, AppMessages> = {
         sizeLabel: '大小',
         uploading: '正在上传',
         uploadProcessing: '正在处理',
+        compressing: '正在压缩文件',
         uploadSuccess: '上传成功',
         uploadFailedPrefix: '上传失败：',
         uploadFailed: '上传失败，请稍后重试',
@@ -859,7 +862,7 @@ export const appMessages: Record<Locale, AppMessages> = {
       },
       model3dLibrary: {
         uploadLabel: '上传',
-        uploadSupportedFormatsTooltip: '支持格式：glTF、GLB、FBX、OBJ、STL、ZIP',
+        uploadSupportedFormatsTooltip: '支持格式：glTF、GLB、OBJ、STL、ZIP',
         emptyModels: '暂无模型资源，点击上传按钮添加 3D 模型文件。',
         emptyNoData: '暂无分类和模型数据',
         emptyCategory: '暂无模型数据',
@@ -874,6 +877,7 @@ export const appMessages: Record<Locale, AppMessages> = {
         renamePlaceholder: '输入名称',
         uploading: '正在上传',
         uploadProcessing: '正在处理',
+        compressing: '正在压缩文件',
         uploadSuccess: '上传成功',
         uploadFailedPrefix: '上传失败：',
         uploadFailed: '上传失败，请稍后重试',
@@ -1484,6 +1488,7 @@ export const appMessages: Record<Locale, AppMessages> = {
         sizeLabel: 'Size',
         uploading: 'Uploading',
         uploadProcessing: 'Processing',
+        compressing: 'Compressing file',
         uploadSuccess: 'Uploaded',
         uploadFailedPrefix: 'Upload failed: ',
         uploadFailed: 'Upload failed, please try again later',
@@ -1495,7 +1500,7 @@ export const appMessages: Record<Locale, AppMessages> = {
       },
       model3dLibrary: {
         uploadLabel: 'Upload',
-        uploadSupportedFormatsTooltip: 'Supported formats: glTF, GLB, FBX, OBJ, STL, ZIP',
+        uploadSupportedFormatsTooltip: 'Supported formats: glTF, GLB, OBJ, STL, ZIP',
         emptyModels: 'No model resources yet. Click upload to add 3D model files.',
         emptyNoData: 'No categories or models yet',
         emptyCategory: 'No models yet',
@@ -1510,6 +1515,7 @@ export const appMessages: Record<Locale, AppMessages> = {
         renamePlaceholder: 'Enter name',
         uploading: 'Uploading',
         uploadProcessing: 'Processing',
+        compressing: 'Compressing file',
         uploadSuccess: 'Uploaded',
         uploadFailedPrefix: 'Upload failed: ',
         uploadFailed: 'Upload failed, please try again later',

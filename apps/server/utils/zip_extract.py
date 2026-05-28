@@ -1,9 +1,8 @@
 """
 ZIP 压缩包解压工具。
 
-用于多文件模型上传场景，服务端解压到 per-model 子目录，前端通过相对 URL 解析外部资源：
+用于多文件模型上传场景，服务端解压到 per-model 子目录：
 - GLTF：.gltf + .bin + textures/
-- FBX：.fbx + textures/
 """
 
 import os
@@ -18,7 +17,7 @@ _MAX_TOTAL_EXTRACTED_SIZE = 500 * 1024 * 1024  # 500 MB
 _MAX_SINGLE_FILE_SIZE = 200 * 1024 * 1024       # 200 MB
 
 # 合法的模型入口扩展名（优先级从高到低）
-_ENTRY_EXTENSIONS = (".gltf", ".glb", ".fbx")
+_ENTRY_EXTENSIONS = (".gltf", ".glb")
 
 
 class ZipExtractionError(serializers.ValidationError):
@@ -31,7 +30,7 @@ def extract_model_zip(zip_file, target_dir: str) -> str:
 
     :param zip_file: Django UploadedFile 或已打开的文件对象
     :param target_dir: 解压目标目录的绝对路径
-    :returns: 入口文件相对于 target_dir 的相对路径，如 "model.gltf" 或 "model.fbx"
+    :returns: 入口文件相对于 target_dir 的相对路径，如 "model.gltf"
     :raises ZipExtractionError: 校验失败时抛出
     """
     os.makedirs(target_dir, exist_ok=True)
@@ -91,7 +90,7 @@ def extract_model_zip(zip_file, target_dir: str) -> str:
             entry = _find_entry_point(extracted_paths)
             if entry is None:
                 raise ZipExtractionError(
-                    "ZIP 压缩包内未找到 .gltf、.glb 或 .fbx 入口文件"
+                    "ZIP 压缩包内未找到 .gltf 或 .glb 入口文件"
                 )
 
             return entry
@@ -145,7 +144,7 @@ def _ensure_path_safe(dest: str, target_dir: str) -> None:
 def _find_entry_point(extracted_paths: list[str]) -> str | None:
     """
     在已解压文件中寻找入口文件。
-    优先找 .gltf，其次 .glb，再次 .fbx，取目录层级最浅的那个。
+    优先找 .gltf，其次 .glb，取目录层级最浅的那个。
     """
     for ext in _ENTRY_EXTENSIONS:
         candidates = [

@@ -2,21 +2,38 @@
  * **资源加载器**：负责把外部资产地址解析成 three.js 可挂入场景的对象树。
  *
  * 当前边界：
- * - 封装 GLTF/GLB/FBX/OBJ/STL 的异步加载；
+ * - 封装 GLTF/GLB/OBJ/STL 的异步加载；
  * - 默认把加载结果加入传入的 `scene`，保持编辑器「导入即出现」体验；
- * - 不负责缓存、材质替换、压缩纹理解码等更重的资源系统能力。
+ * - 支持 Draco 压缩几何的 GLB 文件解码。
  */
 import * as THREE from 'three';
-import { GLTFLoader, FBXLoader, OBJLoader, STLLoader } from 'three-stdlib';
+import { GLTFLoader, OBJLoader, STLLoader } from 'three-stdlib';
 import {
   detectModelFormat,
   getModelEntryFileName,
   prepareImportedModelRoot,
   resolveMediaUrl,
 } from '../../model3d/modelLoadUtils';
+import { getDRACOLoader } from '../../model3d/decoderConfig';
 
 export class AssetLoader {
-  constructor(private readonly scene: THREE.Scene) {}
+  private _renderer: THREE.WebGLRenderer;
+
+  constructor(
+    private readonly scene: THREE.Scene,
+    renderer: THREE.WebGLRenderer,
+  ) {
+    this._renderer = renderer;
+  }
+
+  /** 更新 renderer 引用（renderer 重建时调用）。 */
+  updateRenderer(renderer: THREE.WebGLRenderer) {
+    this._renderer = renderer;
+  }
+
+  private getRenderer(): THREE.WebGLRenderer {
+    return this._renderer;
+  }
 
   /**
    * 加载 GLTF/GLB，并默认加入到 `scene`（保持与历史行为一致）。
@@ -26,6 +43,7 @@ export class AssetLoader {
   async loadGLTF(url: string, opts?: { addToScene?: boolean }) {
     const loader = new GLTFLoader();
     loader.setCrossOrigin('anonymous');
+    loader.setDRACOLoader(getDRACOLoader());
     const gltf = await loader.loadAsync(url);
     const root = gltf.scene ?? gltf.scenes?.[0];
     if (!root) throw new Error('GLTF 没有 scene');
@@ -35,7 +53,7 @@ export class AssetLoader {
 
   /**
    * 通用模型加载：根据文件名/URL 扩展名自动选择对应 Loader。
-   * 支持 GLTF/GLB/FBX/OBJ/STL。
+   * 支持 GLTF/GLB/OBJ/STL。
    * @param url 资源地址
    * @param opts.addToScene 是否把根节点加入 scene（默认 true）
    * @param opts.fileName 文件名（用于格式推断，优先于 url 扩展名）
@@ -51,15 +69,10 @@ export class AssetLoader {
       case 'glb': {
         const loader = new GLTFLoader();
         loader.setCrossOrigin('anonymous');
+        loader.setDRACOLoader(getDRACOLoader());
         const gltf = await loader.loadAsync(resolvedUrl);
         root = gltf.scene ?? gltf.scenes?.[0];
         if (!root) throw new Error('GLTF 没有 scene');
-        break;
-      }
-      case 'fbx': {
-        const fbxLoader = new FBXLoader();
-        fbxLoader.setCrossOrigin('anonymous');
-        root = await fbxLoader.loadAsync(resolvedUrl);
         break;
       }
       case 'obj': {
