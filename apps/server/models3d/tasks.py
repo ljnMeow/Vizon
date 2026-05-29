@@ -9,21 +9,17 @@ from __future__ import annotations
 
 import logging
 import os
-import shutil
-import re
 
 from asgiref.sync import async_to_sync
 from celery import shared_task
 from channels.layers import get_channel_layer
 from django.conf import settings
 
+from .file_paths import cleanup_zip_extract_dir
 from .models import ModelAsset, CompressionStatus
 from utils.model_compress import process_model_file
 
 logger = logging.getLogger(__name__)
-
-# ZIP 解压目录匹配模式
-_UUID_DIR_RE = re.compile(r"models3d/files/[0-9a-f-]{32,}/")
 
 
 def _send_progress(public_id: str, data: dict) -> None:
@@ -144,16 +140,4 @@ def compress_model_task(self, model_asset_id: int):
 def _cleanup_zip_extract(asset: ModelAsset) -> None:
     """压缩完成后，清理 ZIP 解压的多文件目录。"""
     file_name = asset.file.name if asset.file and asset.file.name else ""
-    if not _UUID_DIR_RE.search(file_name):
-        return
-
-    # 提取 UUID 子目录路径
-    parts = file_name.split("/")
-    # parts: ['models3d', 'files', '<uuid>', '...', 'entry.gltf']
-    if len(parts) < 3:
-        return
-
-    uuid_dir = os.path.join(settings.MEDIA_ROOT, parts[0], parts[1], parts[2])
-    if os.path.isdir(uuid_dir):
-        shutil.rmtree(uuid_dir, ignore_errors=True)
-        logger.info("已清理 ZIP 解压目录：%s", uuid_dir)
+    cleanup_zip_extract_dir(file_name)

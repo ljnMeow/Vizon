@@ -5,10 +5,12 @@
  * 包括新建、列表、更新、删除。
  */
 
-import { getApiBaseUrl } from '@/config/env';
-import { getAccessToken } from '../utils/authStorage';
-import { ApiError, api } from './request';
-import type { ApiEnvelope } from './request';
+import { api, uploadWithProgress } from './request';
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  type ListPageResult,
+  fetchListPage,
+} from './listPagination';
 
 /** 贴图分类（与后端 Texture.CATEGORY_CHOICES 对齐）。 */
 export type TextureCategory =
@@ -63,10 +65,24 @@ export type CreateTextureParams = {
   textureSlot?: string;
 };
 
-/** 列出当前用户的所有贴图元数据（按最近修改时间倒序），支持按分类筛选。 */
-export function listTextures(category?: TextureCategory): Promise<TextureMeta[]> {
-  const path = category ? `/api/textures/?category=${encodeURIComponent(category)}` : '/api/textures/';
-  return api.get<TextureMeta[]>(path);
+/** 分页拉取贴图列表；category 有值时走后端筛选。 */
+export function fetchTexturesPage(
+  page: number,
+  category?: TextureCategory,
+  pageSize: number = DEFAULT_LIST_PAGE_SIZE
+): Promise<ListPageResult<TextureMeta>> {
+  return fetchListPage<TextureMeta>(
+    '/api/textures/',
+    page,
+    category ? { category } : undefined,
+    pageSize
+  );
+}
+
+/** 拉取第一页贴图（兼容旧调用）。 */
+export async function listTextures(category?: TextureCategory): Promise<TextureMeta[]> {
+  const result = await fetchTexturesPage(1, category);
+  return result.results;
 }
 
 /**
@@ -81,65 +97,13 @@ export function createTexture(params: CreateTextureParams): Promise<TextureMeta>
 /**
  * 新建贴图（带上传进度）。
  *
- * 使用 XHR 替代 fetch，以获取 xhr.upload.progress 事件。
- * 响应解析逻辑与 request.ts 一致（envelope 格式兼容）。
+ * 走通用 uploadWithProgress（XHR + 401 自动刷新重放）。
  */
 export function uploadTextureWithProgress(
   params: CreateTextureParams,
   onProgress?: (percent: number) => void
 ): Promise<TextureMeta> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    const baseUrl = getApiBaseUrl();
-    xhr.open('POST', baseUrl ? `${baseUrl}/api/textures/` : '/api/textures/');
-
-    const token = getAccessToken();
-    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-
-    xhr.upload.addEventListener('progress', (e) => {
-      if (e.lengthComputable && onProgress) {
-        onProgress(Math.round((e.loaded / e.total) * 100));
-      }
-    });
-
-    xhr.onload = () => {
-      const rawText = xhr.responseText;
-      const contentType = xhr.getResponseHeader('content-type') ?? '';
-      const isJson = contentType.includes('application/json');
-
-      let parsed: unknown;
-      try {
-        parsed = rawText ? (isJson ? JSON.parse(rawText) : rawText) : null;
-      } catch {
-        parsed = rawText;
-      }
-
-      if (isEnvelope(parsed)) {
-        if (parsed.code === 0) {
-          resolve(parsed.data as TextureMeta);
-        } else {
-          reject(new ApiError(parsed.message || 'error', {
-            httpStatus: xhr.status,
-            code: parsed.code,
-            errors: parsed.errors
-          }));
-        }
-        return;
-      }
-
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(parsed as TextureMeta);
-      } else {
-        reject(new ApiError(extractMsg(parsed) || xhr.statusText || 'error', {
-          httpStatus: xhr.status,
-          errors: parsed
-        }));
-      }
-    };
-
-    xhr.onerror = () => reject(new ApiError('Network error', { httpStatus: 0 }));
-    xhr.send(buildFormData(params));
-  });
+  return uploadWithProgress<TextureMeta>('/api/textures/', buildFormData(params), onProgress);
 }
 
 function buildFormData(params: CreateTextureParams): FormData {
@@ -150,16 +114,6 @@ function buildFormData(params: CreateTextureParams): FormData {
   form.append('category', params.category);
   if (params.textureSlot) form.append('texture_slot', params.textureSlot);
   return form;
-}
-
-function isEnvelope(v: unknown): v is ApiEnvelope<TextureMeta> {
-  return typeof v === 'object' && v !== null && 'code' in v && 'message' in v;
-}
-
-function extractMsg(v: unknown): string | undefined {
-  if (typeof v === 'object' && v !== null && 'message' in v) return String((v as any).message);
-  if (typeof v === 'string') return v;
-  return undefined;
 }
 
 /** 重命名贴图。 */

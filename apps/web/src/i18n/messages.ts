@@ -11,6 +11,8 @@ export interface AppMessages {
     cancel: string;
     processing: string;
     loading: string;
+    loadingMore: string;
+    noMore: string;
     routeLoading: string;
     requireAuthChecking: string;
     errorBoundaryTitle: string;
@@ -151,6 +153,16 @@ export interface AppMessages {
     deleteSuccess: string;
     /** 删除失败前缀 */
     deleteFailedPrefix: string;
+    /** 新建场景按钮标签 */
+    newScene: string;
+    /** 新建场景确认弹窗标题 */
+    newSceneConfirmTitle: string;
+    /** 新建场景确认弹窗内容 */
+    newSceneConfirmContent: string;
+    /** 新建场景成功提示 */
+    newSceneSuccess: string;
+    /** 新建场景失败前缀 */
+    newSceneFailedPrefix: string;
     /** 载入场景时的 loading 文案 */
     loadSceneLoading: string;
     /** 下载 bundle 阶段的进度文案前缀（后跟百分比数字和 %） */
@@ -693,6 +705,8 @@ export const appMessages: Record<Locale, AppMessages> = {
       cancel: '取消',
       processing: '处理中...',
       loading: '加载中...',
+      loadingMore: '加载更多...',
+      noMore: '已加载全部',
       routeLoading: '加载中…',
       requireAuthChecking: '正在验证登录状态…',
       errorBoundaryTitle: '页面渲染出错',
@@ -815,6 +829,11 @@ export const appMessages: Record<Locale, AppMessages> = {
       deleteConfirmSuffix: '」？',
       deleteSuccess: '已删除',
       deleteFailedPrefix: '删除失败：',
+      newScene: '新建场景',
+      newSceneConfirmTitle: '新建场景',
+      newSceneConfirmContent: '新建场景会覆盖原有数据，请注意保存。',
+      newSceneSuccess: '已新建场景',
+      newSceneFailedPrefix: '新建场景失败：',
       loadSceneLoading: '正在载入场景...',
       loadSceneDownloading: '正在下载',
       loadSceneImporting: '正在导入场景...',
@@ -842,7 +861,7 @@ export const appMessages: Record<Locale, AppMessages> = {
         deleteConfirmPrefix: '确认删除贴图「',
         deleteConfirmSuffix: '」？',
         deleteSuccess: '已删除',
-        deleteFailedPrefix: '删除失败：',
+        deleteFailedPrefix: '个删除失败',
         renameSuccess: '重命名成功',
         renameFailedPrefix: '重命名失败：',
         noThumbnail: '无预览',
@@ -870,7 +889,7 @@ export const appMessages: Record<Locale, AppMessages> = {
         deleteConfirmPrefix: '确认删除模型「',
         deleteConfirmSuffix: '」？',
         deleteSuccess: '已删除',
-        deleteFailedPrefix: '删除失败：',
+        deleteFailedPrefix: '个删除失败',
         renameSuccess: '重命名成功',
         renameFailedPrefix: '重命名失败：',
         noThumbnail: '无预览',
@@ -1331,6 +1350,8 @@ export const appMessages: Record<Locale, AppMessages> = {
       cancel: 'Cancel',
       processing: 'Processing...',
       loading: 'Loading...',
+      loadingMore: 'Loading more...',
+      noMore: 'No more items',
       routeLoading: 'Loading…',
       requireAuthChecking: 'Checking session…',
       errorBoundaryTitle: 'Something went wrong',
@@ -1453,6 +1474,11 @@ export const appMessages: Record<Locale, AppMessages> = {
       deleteConfirmSuffix: '"?',
       deleteSuccess: 'Deleted',
       deleteFailedPrefix: 'Delete failed: ',
+      newScene: 'New Scene',
+      newSceneConfirmTitle: 'New Scene',
+      newSceneConfirmContent: 'Creating a new scene will overwrite the current data. Please save first.',
+      newSceneSuccess: 'New scene created',
+      newSceneFailedPrefix: 'Failed to create scene: ',
       loadSceneLoading: 'Loading scene...',
       loadSceneDownloading: 'Downloading',
       loadSceneImporting: 'Importing scene...',
@@ -1480,7 +1506,7 @@ export const appMessages: Record<Locale, AppMessages> = {
         deleteConfirmPrefix: 'Delete texture "',
         deleteConfirmSuffix: '"?',
         deleteSuccess: 'Deleted',
-        deleteFailedPrefix: 'Delete failed: ',
+        deleteFailedPrefix: ' failed to delete',
         renameSuccess: 'Renamed',
         renameFailedPrefix: 'Rename failed: ',
         noThumbnail: 'No preview',
@@ -1508,7 +1534,7 @@ export const appMessages: Record<Locale, AppMessages> = {
         deleteConfirmPrefix: 'Delete model "',
         deleteConfirmSuffix: '"?',
         deleteSuccess: 'Deleted',
-        deleteFailedPrefix: 'Delete failed: ',
+        deleteFailedPrefix: ' failed to delete',
         renameSuccess: 'Renamed',
         renameFailedPrefix: 'Rename failed: ',
         noThumbnail: 'No preview',

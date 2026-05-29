@@ -12,9 +12,12 @@ Customer 模块的 API 视图。
 - POST /api/customers/{id}/password/
 """
 
+from django.conf import settings
 from rest_framework import status, viewsets
-from rest_framework.exceptions import APIException
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+
+from utils.viewsets import make_not_found_error
 
 from .models import Customer, CustomerPublicId
 from .serializers import (
@@ -24,27 +27,23 @@ from .serializers import (
 )
 
 
-class CustomerNotFoundError(APIException):
-    """
-    统一的“客户不存在”异常。
-
-    用在查询/修改/删除时目标不存在的场景：
-    - 返回 HTTP 404，更符合语义
-    - 通过全局异常处理器输出统一错误结构
-    """
-
-    status_code = 404
-    default_detail = "该条数据不存在"
-    default_code = "not_found"
+CustomerNotFoundError = make_not_found_error(detail="该条数据不存在")
 
 
 class CustomerViewSet(viewsets.ModelViewSet):
     """
     客户的 CRUD 视图。
+
+    OPEN_API_AUTH=1 时免鉴权（仅用于开发灌数）；生产应设为 0。
     """
 
     # 不暴露 PATCH（保留 PUT：你希望有标准的“更新”接口）
     http_method_names = ["get", "post", "put", "delete", "head", "options"]
+
+    def get_permissions(self):
+        if settings.OPEN_API_AUTH:
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
     # 对外用 public_id（UUID）定位资源，避免暴露自增 id
     lookup_field = "public_id"
@@ -60,7 +59,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
         - public__public_id = URL 参数里的 UUID
 
         约定：
-        - 如果找不到数据，抛出 CustomerNotFoundError（最终会返回 500 + 统一错误信息）
+        - 如果找不到数据，抛出 CustomerNotFoundError（HTTP 404）
         """
 
         public_id = self.kwargs.get(self.lookup_field)

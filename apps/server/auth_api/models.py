@@ -1,10 +1,6 @@
 """
-auth_api 的数据模型。
+auth_api 数据模型占位。
 
-说明：
-- refresh token 的会话状态已迁到 Redis（不再落库）。
+Refresh token 会话已迁移至 Redis（见 auth_api/redis_store.py）；
+历史表结构由 migrations 保留，勿在此新增 ORM 模型。
 """
-
-from __future__ import annotations
-
-from django.db import models  # noqa: F401

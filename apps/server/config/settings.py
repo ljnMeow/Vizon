@@ -67,10 +67,10 @@ def _require_bool_env(name: str) -> bool:
     raise RuntimeError(f"环境变量 {name} 值非法：{raw!r}。允许 1/0/true/false/yes/no")
 
 
-# 全局“鉴权开关”（开发/初始化阶段专用）
-# - OPEN_API_AUTH=1：放开所有 DRF API 的默认鉴权（相当于全局 AllowAny）
-# - OPEN_API_AUTH=0：默认需要登录（更安全，生产推荐）
-# 注意：这里不提供默认值，避免“没配却以为生效”。
+# 客户 CRUD 灌数开关（开发/初始化阶段专用）
+# - OPEN_API_AUTH=1：仅 /api/customers/ 免鉴权
+# - OPEN_API_AUTH=0：客户接口也需 JWT（生产推荐）
+# 资源 API（scenes/textures/models3d）始终在视图上强制鉴权，不受此开关影响。
 OPEN_API_AUTH = _require_bool_env("OPEN_API_AUTH")
 
 # Redis 用于 token 会话管理（refresh token 的服务端状态）
@@ -126,18 +126,30 @@ FILE_UPLOAD_MAX_SIZE_MODEL = int(os.getenv("FILE_UPLOAD_MAX_SIZE_MODEL", 200 * 1
 FILE_UPLOAD_MAX_SIZE_SCENE = int(os.getenv("FILE_UPLOAD_MAX_SIZE_SCENE", 200 * 1024 * 1024))
 FILE_UPLOAD_MAX_SIZE_THUMBNAIL = int(os.getenv("FILE_UPLOAD_MAX_SIZE_THUMBNAIL", 5 * 1024 * 1024))
 
+# 列表 API 默认分页大小
+API_PAGE_SIZE = int(os.getenv("API_PAGE_SIZE", "50"))
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
+def _require_nonempty_env(name: str) -> str:
+    """读取必须非空的环境变量（fail-fast）。"""
+    raw = os.getenv(name)
+    if raw is None or not str(raw).strip():
+        raise RuntimeError(
+            f"缺少必须的环境变量：{name}（请在 apps/server/.env 或系统环境变量中显式配置）"
+        )
+    return str(raw).strip()
+
+
 # SECURITY WARNING: keep the secret key used in production secret!
-# SECRET_KEY 用于加密签名（比如 session/csrf token 等）。
-# 生产环境务必放到环境变量/密钥管理系统里，不要写死在仓库。
-SECRET_KEY = "django-insecure-(s!m9#kf^0e9ywm1c&fy=3&9q4$q-$!uxom-63il@yg9$$57$^"
+# SECRET_KEY 用于加密签名（JWT / session / CSRF 等），禁止写死在仓库。
+SECRET_KEY = _require_nonempty_env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG=True 时：报错页面会展示更完整的调试信息（方便开发，但不适合线上）。
-DEBUG = True
+DEBUG = _require_bool_env("DEBUG")
 
 # 允许访问的域名（Host 头）。
 #
@@ -316,7 +328,12 @@ LOGGING = {
             "handlers": ["console"],
             "level": "ERROR",
             "propagate": False,
-        }
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
     },
 }
 
@@ -338,11 +355,10 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.BasicAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
-        # 这里不靠“隐式默认”，而是由 OPEN_API_AUTH 显式决定
-        "rest_framework.permissions.AllowAny"
-        if OPEN_API_AUTH
-        else "rest_framework.permissions.IsAuthenticated",
+        "rest_framework.permissions.IsAuthenticated",
     ],
+    "DEFAULT_PAGINATION_CLASS": "config.pagination.StandardResultsPagination",
+    "PAGE_SIZE": API_PAGE_SIZE,
     # OpenAPI schema 生成器（Swagger/Redoc 都依赖它）
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     # 统一异常输出（配合 Renderer 变成统一错误结构）

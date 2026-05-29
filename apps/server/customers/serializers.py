@@ -11,25 +11,24 @@ from django.core.validators import EmailValidator
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
+from utils.serializer_fields import FormattedDateTimeField
+
 from .models import Customer, CustomerPublicId
-from utils.datetime import format_datetime
 
 
 class CustomerReadSerializer(serializers.ModelSerializer):
     """
-    用于“读取客户数据”的序列化器。
+    用于"读取客户数据"的序列化器。
 
     注意：
     - 不返回 password（安全考虑）
     """
 
-    # 从关联表 customer_accounts_public_id 读取 UUID
     account_id = serializers.UUIDField(
         source="public.public_id", read_only=True, allow_null=True
     )
-    # 时间格式化：YYYY-MM-DD HH:mm:ss（用方法字段避免类型桩不兼容）
-    create_time = serializers.SerializerMethodField()
-    update_time = serializers.SerializerMethodField()
+    create_time = FormattedDateTimeField()
+    update_time = FormattedDateTimeField()
 
     class Meta:
         model = Customer
@@ -41,13 +40,6 @@ class CustomerReadSerializer(serializers.ModelSerializer):
             "create_time",
             "update_time",
         ]
-
-    def get_create_time(self, obj: Customer) -> str:
-        # 统一格式化工具：所有 serializer 都复用它
-        return format_datetime(obj.create_time)
-
-    def get_update_time(self, obj: Customer) -> str:
-        return format_datetime(obj.update_time)
 
 
 class CustomerCreateSerializer(serializers.ModelSerializer):
@@ -111,7 +103,7 @@ class CustomerUpdateSerializer(serializers.ModelSerializer):
     account_id = serializers.UUIDField(
         source="public.public_id", read_only=True, allow_null=True
     )
-    update_time = serializers.SerializerMethodField()
+    update_time = FormattedDateTimeField()
 
     class Meta:
         model = Customer
@@ -130,6 +122,3 @@ class CustomerUpdateSerializer(serializers.ModelSerializer):
             "max_length": "昵称长度为 10 个字符串以内",
         },
     )
-
-    def get_update_time(self, obj: Customer) -> str:
-        return format_datetime(obj.update_time)

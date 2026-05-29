@@ -18,7 +18,10 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+from .health_views import HealthCheckView
+
 urlpatterns = [
+    path("api/health/", HealthCheckView.as_view(), name="health"),
     # Django 自带的后台管理站点（后续可创建超级管理员账号登录）
     path("admin/", admin.site.urls),
     # OpenAPI schema + Swagger UI

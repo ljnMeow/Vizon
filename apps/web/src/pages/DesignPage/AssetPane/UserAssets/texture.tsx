@@ -14,8 +14,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useFetchOnFirstActive } from '../../../../hooks/useFetchOnFirstActive';
+import { useBulkSelection } from '../../../../hooks/useBulkSelection';
 
 import { Accordion } from '../../../../components/Accordion';
+import { ListScrollFooter } from '../../../../components/ListScrollFooter';
+import { useInfiniteScrollList } from '../../../../hooks/useInfiniteScrollList';
 import { Tooltip } from '../../../../components/Tooltip';
 import { dialog } from '../../../../components/GlobalDialog';
 import { message } from '../../../../components/GlobalMessage';
@@ -27,7 +30,7 @@ import {
   type TextureCategory,
   type TextureMeta,
   deleteTexture,
-  listTextures,
+  fetchTexturesPage,
   updateTexture,
   uploadTextureWithProgress,
 } from '../../../../api/textures';
@@ -37,16 +40,10 @@ import {
   type TextureUploadFormatHintKey,
 } from '../../../../utils/textureCategoryUpload';
 import { generateThumbnail } from '../../../../utils/textureThumbnail';
+import { formatSize } from '../../../../utils/format';
 
 /** 分类 key 类型，含 '' 表示"全部"。 */
 type CategoryFilter = TextureCategory | '';
-
-/** 将字节数格式化为人类可读的文件大小字符串。 */
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 /** 按钮通用样式。 */
 const btnBase =
@@ -70,15 +67,10 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
   const t = appMessages[locale].userAssets.textureLibrary;
   const { openPreview } = useImagePreview();
 
-  const [textures, setTextures] = useState<TextureMeta[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // 受控 Accordion 展开的分类 key（单选，默认第一个）
   const [openCatKey, setOpenCatKey] = useState<TextureCategory | null>(null);
@@ -86,6 +78,31 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
   const pendingScrollKeyRef = useRef<TextureCategory | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchTexturesPageForFilter = useCallback(
+    (page: number) => fetchTexturesPage(page, categoryFilter || undefined),
+    [categoryFilter]
+  );
+
+  const {
+    items: textures,
+    setItems: setTextures,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    refresh,
+    onListScroll,
+  } = useInfiniteScrollList<TextureMeta>({
+    fetchPage: fetchTexturesPageForFilter,
+    resetKey: categoryFilter,
+  });
+
+  const refreshTextures = useCallback(() => {
+    void refresh();
+  }, [refresh]);
+
+  useFetchOnFirstActive(isActive, refreshTextures);
 
   /** 分类筛选选项（"全部"作为可选项，非 placeholder）。 */
   const categoryOptions: SelectOption<CategoryFilter>[] = [
@@ -114,8 +131,7 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
 
   const changeCategoryFilter = (v: CategoryFilter) => {
     setCategoryFilter(v);
-    setSelectMode(false);
-    setSelectedIds(new Set());
+    exitSelectMode();
   };
 
   /** 当前选中分类对应的上传 accept 与 Tooltip 文案。 */
@@ -130,36 +146,27 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
     return `${t.uploadSupportedFormatsPrefix}${t[hintKey]}`;
   }, [categoryUploadConfig, t]);
 
-  /** 拉取贴图列表（全量；分类筛选在本地完成）。 */
-  const fetchTextures = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await listTextures();
-      setTextures(data);
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err);
-      setError(raw || t.loadFailed);
-    } finally {
-      setLoading(false);
-    }
-  }, [t.loadFailed]);
-
-  useFetchOnFirstActive(isActive, fetchTextures);
-
   /** 按当前分类筛选后的展示列表。 */
   const displayTextures = useMemo(
     () => (categoryFilter ? textures.filter((tex) => tex.category === categoryFilter) : textures),
     [textures, categoryFilter]
   );
 
+  const {
+    selectMode,
+    selectedIds,
+    toggleSelect,
+    toggleSelectAll,
+    toggleSelectMode,
+    exitSelectMode,
+  } = useBulkSelection(displayTextures, (tex) => tex.texture_id);
+
   // 列表为空时退出选择模式，避免隐藏按钮后状态残留
   useEffect(() => {
     if (displayTextures.length === 0 && selectMode) {
-      setSelectMode(false);
-      setSelectedIds(new Set());
+      exitSelectMode();
     }
-  }, [displayTextures.length, selectMode]);
+  }, [displayTextures.length, selectMode, exitSelectMode]);
 
   /** 上传贴图（需先选中分类，支持多选）。 */
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -202,7 +209,7 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
       }
     }
 
-    await fetchTextures();
+    await refresh();
     loadingHandle.hide();
 
     if (failedMessages.length === 0) {
@@ -237,29 +244,6 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
     }
   };
 
-  const toggleSelectMode = () => {
-    setSelectMode((prev) => {
-      if (prev) setSelectedIds(new Set());
-      return !prev;
-    });
-  };
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    setSelectedIds((prev) => {
-      if (prev.size === displayTextures.length) return new Set();
-      return new Set(displayTextures.map((t2) => t2.texture_id));
-    });
-  };
-
   /** 批量删除。 */
   const onBatchDelete = async () => {
     const count = selectedIds.size;
@@ -272,24 +256,18 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
     });
     if (!confirmed) return;
 
-    let succeeded = 0;
-    for (const id of selectedIds) {
-      try {
-        await deleteTexture(id);
-        succeeded++;
-      } catch {
-        // continue deleting the rest
-      }
-    }
+    const results = await Promise.allSettled(
+      Array.from(selectedIds).map((id) => deleteTexture(id)),
+    );
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
 
     setTextures((prev) => prev.filter((t2) => !selectedIds.has(t2.texture_id)));
-    setSelectedIds(new Set());
-    setSelectMode(false);
+    exitSelectMode();
 
     if (succeeded === count) {
       void message.success(t.deleteSuccess);
     } else {
-      void message.error(`${count - succeeded}${t.deleteFailedPrefix.slice(-3)}`);
+      void message.error(`${count - succeeded} ${t.deleteFailedPrefix}`);
     }
   };
 
@@ -433,8 +411,8 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
         )}
         <button
           type="button"
-          onClick={() => { void fetchTextures(); }}
-          disabled={loading}
+          onClick={() => { void refresh(); }}
+          disabled={loading || loadingMore}
           className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40"
           title={appMessages[locale].userAssets.refresh}
         >
@@ -542,10 +520,10 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
   if (error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center text-xs text-[var(--text-muted)]">
-        <span className="text-[var(--color-error,#ef4444)]">{error}</span>
+        <span className="text-[var(--color-error,#ef4444)]">{error || t.loadFailed}</span>
         <button
           type="button"
-          onClick={() => { void fetchTextures(); }}
+          onClick={() => { void refresh(); }}
           className={btnBase + ' text-[var(--text-secondary)]'}
         >
           {appMessages[locale].userAssets.refresh}
@@ -554,7 +532,7 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
     );
   }
 
-  if (textures.length === 0 && !categoryFilter) {
+  if (textures.length === 0 && !categoryFilter && !loading) {
     return (
       <div className="flex h-full flex-col gap-3">
         {renderToolbar()}
@@ -570,7 +548,11 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
       {renderToolbar()}
 
       {/* 贴图列表 */}
-      <div ref={listScrollRef} className="flex-1 min-h-0 overflow-y-auto px-2 pb-2">
+      <div
+        ref={listScrollRef}
+        className="flex-1 min-h-0 overflow-y-auto px-2 pb-2"
+        onScroll={onListScroll}
+      >
         {grouped ? (
           // 全部分类 → Accordion 分组
           <Accordion<TextureCategory>
@@ -593,11 +575,12 @@ export function TexturePanel({ isActive }: { isActive: boolean }) {
           </div>
         )}
 
-        {displayTextures.length === 0 && categoryFilter && (
+        {displayTextures.length === 0 && categoryFilter && !loading && (
           <div className="py-8 text-center text-xs text-[var(--text-muted)]">
             {t.emptyTextures}
           </div>
         )}
+        <ListScrollFooter loading={loading} loadingMore={loadingMore} hasMore={hasMore} />
       </div>
     </div>
   );

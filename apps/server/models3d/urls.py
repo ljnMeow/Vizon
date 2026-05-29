@@ -5,8 +5,9 @@ API 路径（挂载在全局 /api/ 下）：
 - /api/models3d/                       （模型列表、创建）
 - /api/models3d/{model_id}/            （模型详情、更新、删除）
 - /api/models3d/{model_id}/file/       （下载模型文件）
-- /api/models3d/categories/            （分类列表、创建）
-- /api/models3d/categories/{id}/       （分类更新、删除）
+- /api/models3d/categories/                 （分类列表、创建）
+- /api/models3d/categories/{id}/models/       （该分类下全部模型，不分页）
+- /api/models3d/categories/{id}/              （分类更新、删除）
 """
 
 from django.urls import include, path

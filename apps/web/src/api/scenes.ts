@@ -10,7 +10,12 @@
 
 import { getApiBaseUrl } from '@/config/env';
 import { getAccessToken } from '../utils/authStorage';
-import { api } from './request';
+import { ApiError, api, withAuthRetry } from './request';
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  type ListPageResult,
+  fetchListPage,
+} from './listPagination';
 
 /** 场景元数据（与后端 SceneSerializer 字段对齐）。 */
 export type SceneMeta = {
@@ -34,6 +39,8 @@ export type SceneMeta = {
  * 使用 /api/scenes/{id}/bundle/ 路径（经 Vite 代理），避免直接 fetch /media/ 产生的跨域问题。
  * 手动附加 Authorization 头，因为 request.ts 只处理 JSON，不适合二进制响应。
  *
+ * 401 token 过期时，通过 withAuthRetry 自动刷新并重放一次。
+ *
  * @param onProgress 下载进度回调，参数为 0-100 的整数；服务端未返回 Content-Length 时不调用。
  */
 export async function downloadSceneBundle(
@@ -43,42 +50,66 @@ export async function downloadSceneBundle(
   const baseUrl = getApiBaseUrl();
   const path = `/api/scenes/${sceneId}/bundle/`;
   const url = baseUrl ? `${baseUrl}${path}` : path;
-  const token = getAccessToken();
-  const headers: Record<string, string> = {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(url, { headers });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const doFetch = async (): Promise<Blob> => {
+    const token = getAccessToken();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  // 有 Content-Length 时用 ReadableStream 追踪实际下载字节数
-  const contentLength = res.headers.get('content-length');
-  const total = contentLength ? parseInt(contentLength, 10) : 0;
+    const res = await fetch(url, { headers });
 
-  if (!total || !res.body || !onProgress) {
-    // 无法追踪进度时直接返回 blob（onProgress 不会被调用）
-    return res.blob();
-  }
+    if (!res.ok) {
+      // 401 时尝试把响应体当 envelope 解析，便于 withAuthRetry 识别 token 过期
+      let parsed: unknown = null;
+      try {
+        const ct = res.headers.get('content-type') ?? '';
+        if (ct.includes('application/json')) {
+          parsed = await res.clone().json();
+        }
+      } catch {
+        // 忽略解析失败
+      }
+      const envelope = parsed as { code?: number; message?: string } | null;
+      const message = envelope?.message || `HTTP ${res.status}`;
+      throw new ApiError(message, {
+        httpStatus: res.status,
+        code: envelope?.code,
+        errors: parsed,
+      });
+    }
 
-  const reader = res.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let received = 0;
+    // 有 Content-Length 时用 ReadableStream 追踪实际下载字节数
+    const contentLength = res.headers.get('content-length');
+    const total = contentLength ? parseInt(contentLength, 10) : 0;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    received += value.length;
-    onProgress(Math.min(99, Math.round((received / total) * 100)));
-  }
+    if (!total || !res.body || !onProgress) {
+      // 无法追踪进度时直接返回 blob（onProgress 不会被调用）
+      return res.blob();
+    }
 
-  // 组装完整 Blob
-  const buffer = new Uint8Array(received);
-  let offset = 0;
-  for (const chunk of chunks) {
-    buffer.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return new Blob([buffer], { type: 'application/zip' });
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      onProgress(Math.min(99, Math.round((received / total) * 100)));
+    }
+
+    // 组装完整 Blob
+    const buffer = new Uint8Array(received);
+    let offset = 0;
+    for (const chunk of chunks) {
+      buffer.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return new Blob([buffer], { type: 'application/zip' });
+  };
+
+  return withAuthRetry(doFetch);
 }
 
 /** 新建场景的参数。 */
@@ -101,9 +132,18 @@ export type UpdateSceneParams = {
   thumbnail?: Blob;
 };
 
-/** 列出当前用户的所有场景元数据（按最近修改时间倒序）。 */
-export function listScenes(): Promise<SceneMeta[]> {
-  return api.get<SceneMeta[]>('/api/scenes/');
+/** 分页拉取场景列表。 */
+export function fetchScenesPage(
+  page: number,
+  pageSize: number = DEFAULT_LIST_PAGE_SIZE
+): Promise<ListPageResult<SceneMeta>> {
+  return fetchListPage<SceneMeta>('/api/scenes/', page, undefined, pageSize);
+}
+
+/** 拉取第一页场景（兼容旧调用；大量数据请用 fetchScenesPage + 滚动加载）。 */
+export async function listScenes(): Promise<SceneMeta[]> {
+  const page = await fetchScenesPage(1);
+  return page.results;
 }
 
 /**

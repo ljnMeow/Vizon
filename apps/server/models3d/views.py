@@ -10,17 +10,17 @@
 - GET    /api/models3d/{model_id}/file/  下载模型文件
 
 分类接口：
-- GET    /api/models3d/categories/           列出当前用户所有分类（含模型计数）
-- POST   /api/models3d/categories/           新建分类
-- PUT    /api/models3d/categories/{id}/      重命名分类
-- DELETE /api/models3d/categories/{id}/      删除分类
+- GET    /api/models3d/categories/                    列出当前用户所有分类（含模型计数，分页）
+- GET    /api/models3d/categories/{id}/models/        该分类下全部模型（不分页，data 为数组）
+- POST   /api/models3d/categories/                    新建分类
+- PUT    /api/models3d/categories/{id}/               重命名分类
+- DELETE /api/models3d/categories/{id}/               删除分类
 """
 
 from __future__ import annotations
 
 import os
 import shutil
-import re
 from pathlib import Path
 from uuid import uuid4
 
@@ -29,14 +29,23 @@ from django.db.models import Count
 
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import APIException
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from customers.models import Customer
-from utils.file_validation import CACHE_PRIVATE_HOUR, CACHE_PUBLIC_DAY, set_cache_control
+from utils.permissions import IsCustomerAuthenticated
+from utils.viewsets import (
+    CustomerScopedMixin,
+    FileDownloadMixin,
+    delete_file_field,
+    make_not_found_error,
+    paginate_serialized_list,
+    serialize_queryset_list,
+)
 from utils.zip_extract import extract_model_zip, ZipExtractionError
 
+from customers.models import Customer
+
+from .file_paths import cleanup_compressed_dir, cleanup_zip_extract_dir, is_zip_extract_path
 from .models import ModelAsset, ModelCategory, CompressionStatus
 from .serializers import (
     ModelAssetCreateSerializer,
@@ -48,33 +57,8 @@ from .serializers import (
 )
 
 
-class ModelAssetNotFoundError(APIException):
-    """模型不存在异常。"""
-
-    status_code = 404
-    default_detail = "模型不存在"
-    default_code = "not_found"
-
-
-class ModelCategoryNotFoundError(APIException):
-    """分类不存在异常。"""
-
-    status_code = 404
-    default_detail = "分类不存在"
-    default_code = "not_found"
-
-
-def _get_customer(request: Request) -> Customer:
-    return request.customer  # type: ignore[attr-defined]
-
-
-def _delete_file_field(field) -> None:
-    if not field or not field.name:
-        return
-    try:
-        field.delete(save=False)
-    except Exception:
-        pass
+ModelAssetNotFoundError = make_not_found_error(detail="模型不存在")
+ModelCategoryNotFoundError = make_not_found_error(detail="分类不存在")
 
 
 def _get_or_create_default_category(customer: Customer) -> ModelCategory:
@@ -93,26 +77,31 @@ def _get_or_create_default_category(customer: Customer) -> ModelCategory:
 # ---------------------------------------------------------------------------
 
 
-class ModelCategoryViewSet(viewsets.ViewSet):
+class ModelCategoryViewSet(CustomerScopedMixin, viewsets.ViewSet):
     """模型分类 CRUD 视图集。"""
+
+    permission_classes = [IsCustomerAuthenticated]
+    lookup_model = ModelCategory
+    not_found_error = ModelCategoryNotFoundError
 
     def list(self, request: Request) -> Response:
         """GET /api/models3d/categories/"""
-        customer = _get_customer(request)
+        customer = self.get_customer(request)
         categories = (
             ModelCategory.objects.filter(customer=customer)
             .annotate(model_count=Count("models"))
             .order_by("-is_default", "created_at")
         )
-        serializer = ModelCategorySerializer(categories, many=True)
-        return Response(serializer.data)
+        return paginate_serialized_list(
+            request, categories, ModelCategorySerializer, view=self
+        )
 
     def create(self, request: Request) -> Response:
         """POST /api/models3d/categories/"""
         serializer = ModelCategoryCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         vdata: dict = serializer.validated_data  # type: ignore[assignment]
-        customer = _get_customer(request)
+        customer = self.get_customer(request)
         name = vdata["name"]
 
         if ModelCategory.objects.filter(customer=customer, name=name).exists():
@@ -130,7 +119,7 @@ class ModelCategoryViewSet(viewsets.ViewSet):
         vdata: dict = serializer.validated_data  # type: ignore[assignment]
         new_name = vdata["name"]
 
-        customer = _get_customer(request)
+        customer = self.get_customer(request)
         if ModelCategory.objects.filter(customer=customer, name=new_name).exclude(pk=cat.pk).exists():
             return Response({"detail": "分类名称已存在"}, status=409)
 
@@ -154,11 +143,22 @@ class ModelCategoryViewSet(viewsets.ViewSet):
         return Response({"deleted": True}, status=status.HTTP_200_OK)
 
     def _get_category(self, request: Request, pk: str | None) -> ModelCategory:
-        customer = _get_customer(request)
-        cat = ModelCategory.objects.filter(public_id=pk, customer=customer).first()
-        if cat is None:
-            raise ModelCategoryNotFoundError()
-        return cat
+        return self._get_object(request, pk)  # pyright: ignore[reportReturnType]
+
+    @action(detail=True, methods=["get"], url_path="models")
+    def list_models(self, request: Request, pk: str | None = None) -> Response:
+        """
+        GET /api/models3d/categories/{category_id}/models/
+        返回该分类下全部模型；经 envelope 后 data 为 Model3dMeta[]，不是分页结构。
+        """
+        cat = self._get_category(request, pk)
+        customer = self.get_customer(request)
+        assets = (
+            ModelAsset.objects.filter(customer=customer, category=cat)
+            .select_related("category")
+            .order_by("-updated_at")
+        )
+        return serialize_queryset_list(request, assets, ModelAssetSerializer)
 
 
 # ---------------------------------------------------------------------------
@@ -166,26 +166,38 @@ class ModelCategoryViewSet(viewsets.ViewSet):
 # ---------------------------------------------------------------------------
 
 
-class ModelAssetViewSet(viewsets.ViewSet):
+class ModelAssetViewSet(CustomerScopedMixin, FileDownloadMixin, viewsets.ViewSet):
     """模型 CRUD + 文件下载视图集。"""
+
+    permission_classes = [IsCustomerAuthenticated]
+    lookup_model = ModelAsset
+    not_found_error = ModelAssetNotFoundError
 
     def list(self, request: Request) -> Response:
         """
         GET /api/models3d/
-        返回当前用户的所有模型元数据列表，按最近修改时间倒序。
-        支持 ?category=<category_id> 查询参数按分类筛选。
+        返回当前用户的模型元数据分页列表，按最近修改时间倒序。
+        - ?category=<category_id>：按分类筛选（分页）
+        - ?search=<keyword>：按名称模糊搜索（分页）
         """
-        customer = _get_customer(request)
-        assets = ModelAsset.objects.filter(customer=customer)
+        customer = self.get_customer(request)
+        assets = (
+            ModelAsset.objects.filter(customer=customer)
+            .select_related("category")
+            .order_by("-updated_at")
+        )
 
-        category_id = request.query_params.get("category")
+        category_id = (request.query_params.get("category") or "").strip()
         if category_id:
             assets = assets.filter(category__public_id=category_id)
 
-        serializer = ModelAssetSerializer(
-            assets, many=True, context={"request": request}
+        search = (request.query_params.get("search") or "").strip()
+        if search:
+            assets = assets.filter(name__icontains=search)
+
+        return paginate_serialized_list(
+            request, assets, ModelAssetSerializer, view=self
         )
-        return Response(serializer.data)
 
     def create(self, request: Request) -> Response:
         """
@@ -197,7 +209,7 @@ class ModelAssetViewSet(viewsets.ViewSet):
         serializer = ModelAssetCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        customer = _get_customer(request)
+        customer = self.get_customer(request)
         file = serializer.validated_data.get("file")  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
         thumbnail_file = serializer.validated_data.get("thumbnail")  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
         name = serializer.validated_data.get("name", "") or file.name  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
@@ -294,7 +306,7 @@ class ModelAssetViewSet(viewsets.ViewSet):
         serializer = ModelAssetUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        customer = _get_customer(request)
+        customer = self.get_customer(request)
         update_fields = ["updated_at"]
 
         vdata: dict = serializer.validated_data  # type: ignore[assignment]
@@ -337,49 +349,25 @@ class ModelAssetViewSet(viewsets.ViewSet):
         thumbnail_field = asset.thumbnail
         compressed_field = asset.compressed_file
         file_name = file_field.name if file_field and file_field.name else ""
+        compressed_name = compressed_field.name if compressed_field and compressed_field.name else ""
 
         asset.delete()
 
-        # 检测是否为 ZIP 解压目录（路径含 UUID 子目录）
-        _UUID_RE = re.compile(r"models3d/files/[0-9a-f-]{32,}/")
-        if _UUID_RE.search(file_name):
-            # 删除整个解压目录
-            dir_path = os.path.join(settings.MEDIA_ROOT, file_name.split("/")[-2], "")  # noqa
-            # 从完整路径中提取 UUID 子目录
-            parts = file_name.split("/")
-            # parts: ['models3d', 'files', '<uuid>', '...', 'entry.gltf']
-            if len(parts) >= 3:
-                uuid_dir = os.path.join(settings.MEDIA_ROOT, parts[0], parts[1], parts[2])
-                if os.path.isdir(uuid_dir):
-                    shutil.rmtree(uuid_dir, ignore_errors=True)
+        if is_zip_extract_path(file_name):
+            cleanup_zip_extract_dir(file_name)
         else:
-            _delete_file_field(file_field)
+            delete_file_field(file_field)
 
-        _delete_file_field(thumbnail_field)
-
-        # 清理压缩文件目录：models3d/compressed/{uuid}/
-        compressed_name = compressed_field.name if compressed_field and compressed_field.name else ""
-        if compressed_name:
-            parts = compressed_name.split("/")
-            # parts: ['models3d', 'compressed', '<uuid>', 'compressed.glb']
-            if len(parts) >= 3:
-                uuid_dir = os.path.join(settings.MEDIA_ROOT, parts[0], parts[1], parts[2])
-                if os.path.isdir(uuid_dir):
-                    shutil.rmtree(uuid_dir, ignore_errors=True)
+        delete_file_field(thumbnail_field)
+        cleanup_compressed_dir(compressed_name)
 
         return Response({"deleted": True}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["get"], url_path="file")
     def file(self, request: Request, pk: str | None = None):
-        """
-        GET /api/models3d/{model_id}/file/
-        流式下载模型文件。优先返回压缩版本。
-        """
-        from django.http import FileResponse
-
+        """GET /api/models3d/{model_id}/file/ — 优先返回压缩 GLB。"""
         asset = self._get_asset(request, pk)
 
-        # 优先返回压缩文件
         if (
             asset.compression_status == CompressionStatus.COMPLETED
             and asset.compressed_file
@@ -388,47 +376,30 @@ class ModelAssetViewSet(viewsets.ViewSet):
             filename = asset.name or asset.compressed_file.name
             if not filename.lower().endswith(".glb"):
                 filename = Path(filename).stem + ".glb"
-            response = FileResponse(
-                asset.compressed_file.open("rb"),
-                content_type="model/gltf-binary",
-                as_attachment=True,
+            return self.serve_attachment(
+                asset.compressed_file,
                 filename=filename,
+                content_type="model/gltf-binary",
+                missing_message="模型文件不存在",
+                not_found_error=ModelAssetNotFoundError,
             )
-            return set_cache_control(response, CACHE_PRIVATE_HOUR)
 
-        # 回退到原始文件
-        if not asset.file or not asset.file.name:
-            raise ModelAssetNotFoundError("模型文件不存在")
-
-        filename = asset.name or asset.file.name
-        response = FileResponse(
-            asset.file.open("rb"),
-            content_type="application/octet-stream",
-            as_attachment=True,
+        filename = asset.name or (asset.file.name if asset.file else "") or "model"
+        return self.serve_attachment(
+            asset.file,
             filename=filename,
+            missing_message="模型文件不存在",
+            not_found_error=ModelAssetNotFoundError,
         )
-        return set_cache_control(response, CACHE_PRIVATE_HOUR)
 
     @action(detail=True, methods=["get"], url_path="thumbnail")
     def thumbnail(self, request: Request, pk: str | None = None):
-        """
-        GET /api/models3d/{model_id}/thumbnail/
-        内联显示缩略图（Cache-Control: public, max-age=86400）。
-        """
-        from django.http import FileResponse
-
+        """GET /api/models3d/{model_id}/thumbnail/"""
         asset = self._get_asset(request, pk)
-
-        if not asset.thumbnail or not asset.thumbnail.name:
-            raise ModelAssetNotFoundError("缩略图不存在")
-
-        return set_cache_control(
-            FileResponse(
-                asset.thumbnail.open("rb"),
-                content_type="image/png",
-                as_attachment=False,
-            ),
-            CACHE_PUBLIC_DAY,
+        return self.serve_thumbnail_inline(
+            asset.thumbnail,
+            missing_message="缩略图不存在",
+            not_found_error=ModelAssetNotFoundError,
         )
 
     @action(detail=True, methods=["get"], url_path="compression-status")
@@ -470,8 +441,4 @@ class ModelAssetViewSet(viewsets.ViewSet):
 
     def _get_asset(self, request: Request, pk: str | None) -> ModelAsset:
         """按 public_id 查询当前用户的模型。"""
-        customer = _get_customer(request)
-        asset = ModelAsset.objects.filter(public_id=pk, customer=customer).first()
-        if asset is None:
-            raise ModelAssetNotFoundError()
-        return asset
+        return self._get_object(request, pk)  # pyright: ignore[reportReturnType]

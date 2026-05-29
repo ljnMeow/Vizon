@@ -27,8 +27,11 @@ def issue_customer_access_token(
     签发 access token（JWT）。
     """
 
-    if expires_in_seconds is None:
-        expires_in_seconds = int(getattr(settings, "ACCESS_TOKEN_EXPIRES_SECONDS", 120))
+    ttl_seconds = (
+        settings.ACCESS_TOKEN_EXPIRES_SECONDS
+        if expires_in_seconds is None
+        else expires_in_seconds
+    )
 
     now = datetime.now(tz=timezone.utc)
     payload: Dict[str, Any] = {
@@ -36,7 +39,7 @@ def issue_customer_access_token(
         "typ": "access",
         "jti": str(uuid.uuid4()),
         "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(seconds=expires_in_seconds)).timestamp()),
+        "exp": int((now + timedelta(seconds=ttl_seconds)).timestamp()),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
@@ -48,14 +51,15 @@ def issue_customer_refresh_token(
     签发 refresh token（JWT）。
     """
 
-    if expires_in_seconds is None:
-        expires_in_seconds = int(
-            getattr(settings, "REFRESH_TOKEN_EXPIRES_SECONDS", 300)
-        )
+    ttl_seconds = (
+        settings.REFRESH_TOKEN_EXPIRES_SECONDS
+        if expires_in_seconds is None
+        else expires_in_seconds
+    )
 
     now = datetime.now(tz=timezone.utc)
     jti = str(uuid.uuid4())
-    exp_ts = int((now + timedelta(seconds=expires_in_seconds)).timestamp())
+    exp_ts = int((now + timedelta(seconds=ttl_seconds)).timestamp())
     payload: Dict[str, Any] = {
         "sub": account_id,
         "typ": "refresh",

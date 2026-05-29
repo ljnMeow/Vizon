@@ -1,13 +1,13 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TextureMeta } from '../../api/textures';
-import { listTextures } from '../../api/textures';
+import { fetchTexturesPage } from '../../api/textures';
 import { LocaleProvider } from '../../hooks/useLocale';
 import { STORAGE_KEYS } from '../../utils/keys';
 import { TexturePicker, type TexturePickerProps } from '../TexturePicker';
 
 vi.mock('../../api/textures', () => ({
-  listTextures: vi.fn(),
+  fetchTexturesPage: vi.fn(),
 }));
 
 const mockTexture: TextureMeta = {
@@ -43,8 +43,12 @@ function renderTexturePicker(overrides: Partial<TexturePickerProps> = {}) {
 
 describe('TexturePicker', () => {
   beforeEach(() => {
-    vi.mocked(listTextures).mockReset();
-    vi.mocked(listTextures).mockResolvedValue([]);
+    vi.mocked(fetchTexturesPage).mockReset();
+    vi.mocked(fetchTexturesPage).mockResolvedValue({
+      results: [],
+      count: 0,
+      hasMore: false,
+    });
     window.localStorage.setItem(STORAGE_KEYS.LOCALE, 'zh-CN');
     Element.prototype.getBoundingClientRect = vi.fn(() => ({
       x: 0,
@@ -73,24 +77,32 @@ describe('TexturePicker', () => {
   it('禁用时不会打开面板或请求列表', () => {
     renderTexturePicker({ disabled: true });
     fireEvent.click(screen.getByRole('button', { name: 'Select texture' }));
-    expect(listTextures).not.toHaveBeenCalled();
+    expect(fetchTexturesPage).not.toHaveBeenCalled();
     expect(screen.queryByText('暂无贴图')).not.toBeInTheDocument();
   });
 
   it('打开时按分类拉取贴图并展示列表', async () => {
-    vi.mocked(listTextures).mockResolvedValue([mockTexture]);
+    vi.mocked(fetchTexturesPage).mockResolvedValue({
+      results: [mockTexture],
+      count: 1,
+      hasMore: false,
+    });
     renderTexturePicker();
 
     fireEvent.click(screen.getByRole('button', { name: 'Select texture' }));
 
     await waitFor(() => {
-      expect(listTextures).toHaveBeenCalledWith('color_map');
+      expect(fetchTexturesPage).toHaveBeenCalledWith(1, 'color_map');
       expect(screen.getByText('Wood')).toBeInTheDocument();
     });
   });
 
   it('选择贴图后回调 onSelect 并关闭面板', async () => {
-    vi.mocked(listTextures).mockResolvedValue([mockTexture]);
+    vi.mocked(fetchTexturesPage).mockResolvedValue({
+      results: [mockTexture],
+      count: 1,
+      hasMore: false,
+    });
     const { onSelect } = renderTexturePicker();
 
     fireEvent.click(screen.getByRole('button', { name: 'Select texture' }));
@@ -137,7 +149,11 @@ describe('TexturePicker', () => {
   });
 
   it('点击面板外部时关闭下拉', async () => {
-    vi.mocked(listTextures).mockResolvedValue([mockTexture]);
+    vi.mocked(fetchTexturesPage).mockResolvedValue({
+      results: [mockTexture],
+      count: 1,
+      hasMore: false,
+    });
     renderTexturePicker();
 
     fireEvent.click(screen.getByRole('button', { name: 'Select texture' }));

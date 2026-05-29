@@ -17,17 +17,13 @@ import { useLoadedScene } from '../../../../hooks/useLoadedScene';
 import { useLocale } from '../../../../hooks/useLocale';
 import { useSceneSettings } from '../../../../hooks/useSceneSettings';
 import { appMessages } from '../../../../i18n/messages';
-import { type SceneMeta, deleteScene, downloadSceneBundle, listScenes } from '../../../../api/scenes';
+import { fetchScenesPage, type SceneMeta, deleteScene, downloadSceneBundle } from '../../../../api/scenes';
+import { ListScrollFooter } from '../../../../components/ListScrollFooter';
+import { useInfiniteScrollList } from '../../../../hooks/useInfiniteScrollList';
 import { importProjectBundle } from '../../../../utils/documentBundle';
 import { encodeHistoryI18nName } from '../../../../utils/historyI18n';
 import { useFetchOnFirstActive } from '../../../../hooks/useFetchOnFirstActive';
-
-/** 将字节数格式化为人类可读的文件大小字符串。 */
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+import { formatSize } from '../../../../utils/format';
 
 /** 按钮通用样式：小号、圆角、带边框。 */
 const btnBase =
@@ -50,30 +46,57 @@ export function ProjectPanel({ isActive }: { isActive: boolean }) {
   const { editor } = useSceneSettings();
   const { loadedSceneId, setLoadedSceneId } = useLoadedScene();
 
-  const [scenes, setScenes] = useState<SceneMeta[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    items: scenes,
+    setItems: setScenes,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    refresh,
+    onListScroll,
+  } = useInfiniteScrollList<SceneMeta>({
+    fetchPage: fetchScenesPage,
+  });
+
   // 正在载入的场景 ID，用于禁用该卡片的按钮
   const [loadingId, setLoadingId] = useState<string | null>(null);
   // 正在删除的场景 ID
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // 正在新建场景
+  const [creatingNew, setCreatingNew] = useState(false);
 
-  /** 拉取场景列表。 */
-  const fetchScenes = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const refreshScenes = useCallback(() => {
+    void refresh();
+  }, [refresh]);
+
+  useFetchOnFirstActive(isActive, refreshScenes);
+
+  /**
+   * 新建场景：弹出 confirm 确认后重置编辑器画布。
+   * 新建会覆盖当前画布的所有数据。
+   */
+  const onCreateNewScene = async () => {
+    if (!editor) return;
+    const confirmed = await dialog.confirm({
+      title: t.newSceneConfirmTitle,
+      content: t.newSceneConfirmContent,
+      danger: true,
+      confirmText: t.newScene,
+    });
+    if (!confirmed) return;
+    setCreatingNew(true);
     try {
-      const data = await listScenes();
-      setScenes(data);
+      await editor.resetWorkspace();
+      setLoadedSceneId(null);
+      void message.success(t.newSceneSuccess);
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
-      setError(raw || t.loadFailed);
+      void message.error(`${t.newSceneFailedPrefix}${raw}`);
     } finally {
-      setLoading(false);
+      setCreatingNew(false);
     }
-  }, [t.loadFailed]);
-
-  useFetchOnFirstActive(isActive, fetchScenes);
+  };
 
   /**
    * 载入场景：下载 bundle ZIP → 包装成 File → 通过编辑器历史机制导入。
@@ -180,10 +203,10 @@ export function ProjectPanel({ isActive }: { isActive: boolean }) {
   if (error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center text-xs text-[var(--text-muted)]">
-        <span className="text-[var(--color-error,#ef4444)]">{error}</span>
+        <span className="text-[var(--color-error,#ef4444)]">{error || t.loadFailed}</span>
         <button
           type="button"
-          onClick={() => { void fetchScenes(); }}
+          onClick={() => { void refresh(); }}
           className={btnBase + ' text-[var(--text-secondary)]'}
         >
           {t.refresh}
@@ -192,29 +215,62 @@ export function ProjectPanel({ isActive }: { isActive: boolean }) {
     );
   }
 
-  if (scenes.length === 0) {
+  if (scenes.length === 0 && !loading) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
-        <p className="text-xs text-[var(--text-muted)] leading-relaxed">{t.emptyProjects}</p>
-        <button
-          type="button"
-          onClick={() => { void fetchScenes(); }}
-          className={btnBase + ' text-[var(--text-secondary)]'}
-        >
-          {t.refresh}
-        </button>
+      <div className="flex h-full flex-col min-h-0">
+        <div className="flex shrink-0 items-center justify-end gap-1 px-2 py-1">
+          <button
+            type="button"
+            onClick={() => { void onCreateNewScene(); }}
+            disabled={!editor || creatingNew}
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40"
+            title={t.newScene}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 1.5v9M1.5 6h9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => { void refresh(); }}
+            disabled={loading || loadingMore}
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40"
+            title={t.refresh}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M1 6a5 5 0 0 1 9.3-2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              <path d="M11 6a5 5 0 0 1-9.3 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              <path d="M10 1v3h-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 11V8h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-4 text-center">
+          <p className="text-xs text-[var(--text-muted)] leading-relaxed">{t.emptyProjects}</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex h-full flex-col min-h-0">
-      {/* 顶部刷新按钮 */}
-      <div className="flex shrink-0 items-center justify-end px-2 py-1">
+      {/* 顶部操作按钮 */}
+      <div className="flex shrink-0 items-center justify-end gap-1 px-2 py-1">
         <button
           type="button"
-          onClick={() => { void fetchScenes(); }}
-          disabled={loading}
+          onClick={() => { void onCreateNewScene(); }}
+          disabled={!editor || creatingNew}
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40"
+          title={t.newScene}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M6 1.5v9M1.5 6h9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={() => { void refresh(); }}
+          disabled={loading || loadingMore}
           className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40"
           title={appMessages[locale].userAssets.refresh}
         >
@@ -228,7 +284,10 @@ export function ProjectPanel({ isActive }: { isActive: boolean }) {
       </div>
 
       {/* 场景卡片列表（可滚动） */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 space-y-2">
+      <div
+        className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 space-y-2"
+        onScroll={onListScroll}
+      >
         {scenes.map((scene) => {
           const isBusy = loadingId === scene.scene_id || deletingId === scene.scene_id;
           const name = scene.name || t.noName;
@@ -294,6 +353,7 @@ export function ProjectPanel({ isActive }: { isActive: boolean }) {
             </div>
           );
         })}
+        <ListScrollFooter loading={loading} loadingMore={loadingMore} hasMore={hasMore} />
       </div>
     </div>
   );

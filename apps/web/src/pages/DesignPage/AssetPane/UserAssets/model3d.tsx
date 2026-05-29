@@ -2,7 +2,8 @@
  * 模型资源面板：展示并管理用户上传的 3D 模型资源。
  *
  * 功能：
- * - 首次进入 Tab 时自动拉取分类列表和模型列表
+ * - 分类列表滚动分页；展开分类时 GET ?category= 拉全量（后端返回数组，非分页结构）
+ * - 默认展开第一个分类；搜索仅在已加载模型中本地过滤
  * - Accordion 按分类分组展示模型
  * - 分类 CRUD：新建、重命名（编辑图标）、删除（有模型时 warning）
  * - 模型卡片：缩略图预览、双击重命名
@@ -14,8 +15,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useFetchOnFirstActive } from '../../../../hooks/useFetchOnFirstActive';
+import { useBulkSelection } from '../../../../hooks/useBulkSelection';
 
 import { Accordion } from '../../../../components/Accordion';
+import { ListScrollFooter } from '../../../../components/ListScrollFooter';
+import {
+  SCROLL_LOAD_THRESHOLD_PX,
+  useInfiniteScrollList,
+} from '../../../../hooks/useInfiniteScrollList';
+import { usePerCategoryModels } from '../../../../hooks/usePerCategoryModels';
 import { Tooltip } from '../../../../components/Tooltip';
 import { dialog } from '../../../../components/GlobalDialog';
 import { message } from '../../../../components/GlobalMessage';
@@ -30,8 +38,8 @@ import {
   createModel3dCategory,
   deleteModel3d,
   deleteModel3dCategory,
-  listModel3dCategories,
-  listModel3ds,
+  fetchModel3dCategoriesPage,
+  fetchModel3dsPage,
   updateModel3d,
   updateModel3dCategory,
   updateModel3dThumbnail,
@@ -39,14 +47,8 @@ import {
   watchCompressionProgress,
 } from '../../../../api/model3ds';
 import { getApiErrorMessage } from '../../../../utils/apiError';
+import { formatSize } from '../../../../utils/format';
 import { generateModel3dThumbnail, generateModel3dThumbnailFromUrl } from 'vizon-3d-core';
-
-/** 将字节数格式化为人类可读的文件大小字符串。 */
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 /** 压缩阶段对应的中文提示文本（含百分比）。 */
 function _getStageText(
@@ -109,16 +111,86 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
   const t = appMessages[locale].userAssets.model3dLibrary;
   const { openPreview } = useImagePreview();
 
-  const [categories, setCategories] = useState<Model3dCategory[]>([]);
-  const [models, setModels] = useState<Model3dMeta[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [openCategoryKey, setOpenCategoryKey] = useState<string | null>(null);
+
+  const {
+    items: categories,
+    refresh: refreshCategories,
+    loadMore: loadMoreCategories,
+    loading: loadingCategories,
+    loadingMore: loadingMoreCategories,
+    hasMore: hasMoreCategories,
+    error: categoriesError,
+  } = useInfiniteScrollList<Model3dCategory>({
+    fetchPage: fetchModel3dCategoriesPage,
+  });
+
+  const searchQueryNorm = searchQuery.trim().toLowerCase();
+
+  // 搜索模式：走服务端分页，可搜到所有模型（不受已加载分类限制）
+  const isSearchMode = searchQueryNorm.length > 0;
+  const {
+    items: searchResults,
+    loading: searchLoading,
+    loadingMore: searchLoadingMore,
+    hasMore: searchHasMore,
+    error: searchError,
+    refresh: refreshSearch,
+    loadMore: loadMoreSearch,
+    onListScroll: onSearchListScroll,
+  } = useInfiniteScrollList<Model3dMeta>({
+    fetchPage: useCallback(
+      (page: number) => fetchModel3dsPage(page, undefined, undefined, searchQueryNorm),
+      [searchQueryNorm]
+    ),
+    resetKey: searchQueryNorm,
+    enabled: isSearchMode,
+  });
+
+  const {
+    getSlot,
+    ensureLoaded,
+    refreshCategory,
+    clearAll: clearCategoryModels,
+    upsertModel,
+    removeModels,
+    moveModelToCategory,
+    getAllLoadedModels,
+  } = usePerCategoryModels();
+
+  const openSlot = openCategoryKey ? getSlot(openCategoryKey) : null;
+
+  // 搜索模式下用搜索状态，否则用分类列表状态
+  const loading = isSearchMode
+    ? searchLoading && searchResults.length === 0
+    : loadingCategories && categories.length === 0;
+  const loadingMore = isSearchMode ? searchLoadingMore : loadingMoreCategories;
+  const hasMore = isSearchMode ? searchHasMore : hasMoreCategories;
+  const error = isSearchMode
+    ? searchError
+    : categoriesError ?? openSlot?.error ?? null;
+
+  const hasMoreCategoriesRef = useRef(hasMoreCategories);
+  hasMoreCategoriesRef.current = hasMoreCategories;
+
+  /** 滚动分页：搜索模式走搜索结果分页，否则走分类列表分页。 */
+  const onListScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const el = e.currentTarget;
+      const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (remaining > SCROLL_LOAD_THRESHOLD_PX) return;
+      if (isSearchMode) {
+        void loadMoreSearch();
+      } else if (hasMoreCategoriesRef.current) {
+        void loadMoreCategories();
+      }
+    },
+    [isSearchMode, loadMoreSearch, loadMoreCategories]
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState('');
 
   // 分类编辑状态
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
@@ -126,26 +198,51 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
   const [creatingCat, setCreatingCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
 
-  // 受控 Accordion 展开的分类 key（单选，默认第一个）
-  const [openCategoryKey, setOpenCategoryKey] = useState<string | null>(null);
   /** 列表滚动容器；展开分类后需要把该分类滚动到可视区域顶部。 */
   const listScrollRef = useRef<HTMLDivElement>(null);
   /** 标记下一次展开后需要把该分类滚动到可视区域顶部。 */
   const pendingScrollKeyRef = useRef<string | null>(null);
 
+  /** 展开分类时拉取该分类下全部模型。 */
+  useEffect(() => {
+    if (openCategoryKey) {
+      ensureLoaded(openCategoryKey);
+    }
+  }, [openCategoryKey, ensureLoaded]);
+
+  const allLoadedModels = getAllLoadedModels();
+  // 搜索模式用服务端分页结果；非搜索模式用手风琴已加载模型
+  const displayModels = isSearchMode ? searchResults : allLoadedModels;
+  const hasAnyModels = categories.some((c) => c.model_count > 0);
+
+  const {
+    selectMode,
+    selectedIds,
+    toggleSelect,
+    toggleSelectAll,
+    toggleSelectMode,
+    exitSelectMode,
+  } = useBulkSelection(displayModels, (m) => m.model_id);
+
   /** 移动模型（支持批量）到指定分类。 */
   const onMoveModels = async (modelIds: string[], categoryId: string) => {
+    const loaded = getAllLoadedModels();
     let succeeded = 0;
     for (const id of modelIds) {
       try {
         const updated = await updateModel3d(id, { category: categoryId });
-        setModels((prev) => prev.map((m) => (m.model_id === id ? updated : m)));
+        const existing = loaded.find((m) => m.model_id === id);
+        if (existing) {
+          moveModelToCategory(updated, existing.category_id);
+        } else {
+          upsertModel(updated);
+        }
         succeeded++;
       } catch {
         // continue
       }
     }
-    await fetchCategories();
+    await refreshCategories();
     if (succeeded === modelIds.length) {
       void message.success(t.moveSuccess);
     } else if (succeeded > 0) {
@@ -159,7 +256,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
   const openMoveDialog = async (modelIds: string[]) => {
     const targetCategories = categories.filter(
       (c) => !modelIds.every((id) => {
-        const m = models.find((mm) => mm.model_id === id);
+        const m = getAllLoadedModels().find((mm) => mm.model_id === id);
         return m && m.category_id === c.category_id;
       })
     );
@@ -185,35 +282,19 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /** 拉取分类列表。 */
-  const fetchCategories = useCallback(async () => {
-    try {
-      const data = await listModel3dCategories();
-      setCategories(data);
-    } catch {
-      // 静默处理，分类加载失败不影响模型展示
+  const refreshAll = useCallback(async () => {
+    await refreshCategories();
+    clearCategoryModels();
+    if (openCategoryKey) {
+      await refreshCategory(openCategoryKey);
     }
-  }, []);
+  }, [refreshCategories, clearCategoryModels, refreshCategory, openCategoryKey]);
 
-  /** 拉取模型列表。 */
-  const fetchModels = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await listModel3ds();
-      setModels(data);
-    } catch (err) {
-      setError(getApiErrorMessage(err, t.loadFailed));
-    } finally {
-      setLoading(false);
-    }
-  }, [t.loadFailed]);
+  const refreshOnActivate = useCallback(async () => {
+    await refreshCategories();
+  }, [refreshCategories]);
 
-  const fetchAll = useCallback(async () => {
-    await Promise.all([fetchCategories(), fetchModels()]);
-  }, [fetchCategories, fetchModels]);
-
-  useFetchOnFirstActive(isActive, fetchAll);
+  useFetchOnFirstActive(isActive, refreshOnActivate);
 
   // ---- 分类 CRUD ----
 
@@ -232,7 +313,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
       await createModel3dCategory(name);
       setCreatingCat(false);
       setNewCatName('');
-      await fetchCategories();
+      await refreshCategories();
       void message.success(t.renameCategorySuccess);
     } catch (err) {
       const msg = getApiErrorMessage(err, t.renameCategoryFailed);
@@ -263,8 +344,10 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
     }
     try {
       await updateModel3dCategory(editingCatId, { name: editCatName.trim() });
-      await fetchCategories();
-      await fetchModels();
+      await refreshCategories();
+      if (openCategoryKey) {
+        await refreshCategory(openCategoryKey);
+      }
       void message.success(t.renameCategorySuccess);
     } catch (err) {
       const msg = getApiErrorMessage(err, t.renameCategoryFailed);
@@ -293,7 +376,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
     if (!confirmed) return;
     try {
       await deleteModel3dCategory(cat.category_id);
-      await fetchCategories();
+      await refreshCategories();
     } catch (err) {
       const msg = getApiErrorMessage(err, t.deleteCategoryFailed);
       if (msg.includes('模型') || msg.includes('model')) {
@@ -316,7 +399,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
     if (categories.length === 0) {
       try {
         await createModel3dCategory('默认模型');
-        await fetchCategories();
+        await refreshCategories();
       } catch {
         // 静默处理
       }
@@ -409,7 +492,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
       }),
     );
 
-    await Promise.all([fetchCategories(), fetchModels()]);
+    await refreshAll();
     setUploading(false);
   };
 
@@ -427,36 +510,13 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
     }
     try {
       const updated = await updateModel3d(editingId, { name: editName.trim() });
-      setModels((prev) => prev.map((m) => (m.model_id === editingId ? updated : m)));
+      upsertModel(updated);
       void message.success(t.renameSuccess);
     } catch (err) {
       void message.error(`${t.renameFailedPrefix}${getApiErrorMessage(err, '')}`);
     } finally {
       setEditingId(null);
     }
-  };
-
-  const toggleSelectMode = () => {
-    setSelectMode((prev) => {
-      if (prev) setSelectedIds(new Set());
-      return !prev;
-    });
-  };
-
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    setSelectedIds((prev) => {
-      if (prev.size === filteredModels.length) return new Set();
-      return new Set(filteredModels.map((m) => m.model_id));
-    });
   };
 
   /** 批量删除。 */
@@ -471,25 +531,22 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
     });
     if (!confirmed) return;
 
-    let succeeded = 0;
-    for (const id of selectedIds) {
-      try {
-        await deleteModel3d(id);
-        succeeded++;
-      } catch {
-        // continue
-      }
-    }
+    const results = await Promise.allSettled(
+      Array.from(selectedIds).map((id) => deleteModel3d(id)),
+    );
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
 
-    setModels((prev) => prev.filter((m) => !selectedIds.has(m.model_id)));
-    setSelectedIds(new Set());
-    setSelectMode(false);
-    await fetchCategories();
+    removeModels(selectedIds);
+    exitSelectMode();
+    await refreshCategories();
+    if (openCategoryKey) {
+      await refreshCategory(openCategoryKey);
+    }
 
     if (succeeded === count) {
       void message.success(t.deleteSuccess);
     } else {
-      void message.error(`${count - succeeded}${t.deleteFailedPrefix.slice(-3)}`);
+      void message.error(`${count - succeeded} ${t.deleteFailedPrefix}`);
     }
   };
 
@@ -733,8 +790,8 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
         </Tooltip>
         <button
           type="button"
-          onClick={() => { void Promise.all([fetchCategories(), fetchModels()]); }}
-          disabled={loading}
+          onClick={() => { void refreshAll(); }}
+          disabled={loading || loadingMore}
           className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40"
           title={appMessages[locale].userAssets.refresh}
         >
@@ -748,7 +805,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
       </div>
       {/* Row 2: 选择模式按钮 */}
       <div className="flex items-center gap-1.5 flex-wrap">
-        {models.length > 0 && (
+        {hasAnyModels && (
         <button
           type="button"
           onClick={toggleSelectMode}
@@ -763,7 +820,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
             onClick={toggleSelectAll}
             className={btnBase + ' text-[var(--text-secondary)]'}
           >
-            {selectedIds.size === filteredModels.length && filteredModels.length > 0 ? t.deselectAllLabel : t.selectAllLabel}
+            {selectedIds.size === displayModels.length && displayModels.length > 0 ? t.deselectAllLabel : t.selectAllLabel}
           </button>
         )}
         {selectMode && selectedIds.size > 0 && categories.length > 1 && (
@@ -838,7 +895,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
 
   // ——— 状态渲染 ———
 
-  if (loading && models.length === 0) {
+  if (loading && categories.length === 0 && !hasAnyModels) {
     return (
       <div className="flex h-full items-center justify-center text-xs text-[var(--text-muted)]">
         {appMessages[locale].common.loading}
@@ -849,10 +906,10 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
   if (error) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center text-xs text-[var(--text-muted)]">
-        <span className="text-[var(--color-error,#ef4444)]">{error}</span>
+        <span className="text-[var(--color-error,#ef4444)]">{error || t.loadFailed}</span>
         <button
           type="button"
-          onClick={() => { void Promise.all([fetchCategories(), fetchModels()]); }}
+          onClick={() => { void refreshAll(); }}
           className={btnBase + ' text-[var(--text-secondary)]'}
         >
           {appMessages[locale].userAssets.refresh}
@@ -861,7 +918,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
     );
   }
 
-  if (models.length === 0 && categories.length === 0) {
+  if (!hasAnyModels && categories.length === 0) {
     return (
       <div className="flex h-full flex-col gap-3">
         {renderToolbar()}
@@ -874,39 +931,74 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
     );
   }
 
-  // 按搜索词过滤
-  const filteredModels = searchQuery
-    ? models.filter((m) => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : models;
+  /** 渲染某分类下的模型区域（展开后按 category id 拉全量）。 */
+  const renderCategoryBody = (cat: Model3dCategory) => {
+    const slot = getSlot(cat.category_id);
+    const items = slot.items;
 
-  // 按分类分组模型
-  const categoryModels = categories.map((cat) => ({
-    ...cat,
-    models: filteredModels.filter((m) => m.category_id === cat.category_id),
-  }));
+    if (slot.loading && items.length === 0) {
+      return (
+        <div className="py-4 text-center text-xs text-[var(--text-muted)]">
+          {appMessages[locale].common.loading}
+        </div>
+      );
+    }
+    if (items.length > 0) {
+      return (
+        <div className="grid grid-cols-2 gap-2">
+          {items.map(renderCard)}
+        </div>
+      );
+    }
+    return (
+      <div className="py-4 text-center text-xs text-[var(--text-muted)]">
+        {t.emptyCategory}
+      </div>
+    );
+  };
+
+  // 搜索模式：扁平网格列表
+  const renderSearchResults = () => {
+    if (searchLoading && searchResults.length === 0) {
+      return (
+        <div className="py-8 text-center text-xs text-[var(--text-muted)]">
+          {appMessages[locale].common.loading}
+        </div>
+      );
+    }
+    if (searchResults.length === 0) {
+      return (
+        <div className="py-8 text-center text-xs text-[var(--text-muted)]">
+          {t.emptyNoData}
+        </div>
+      );
+    }
+    return (
+      <div className="grid grid-cols-2 gap-2">
+        {searchResults.map(renderCard)}
+      </div>
+    );
+  };
 
   return (
     <div className="flex h-full flex-col min-h-0">
       {renderToolbar()}
 
-      {/* 模型列表（按分类分组） */}
-      <div ref={listScrollRef} className="flex-1 min-h-0 overflow-y-auto px-2 pb-2">
-        {categoryModels.length > 0 ? (
+      <div
+        ref={listScrollRef}
+        className="flex-1 min-h-0 overflow-y-auto px-2 pb-2"
+        onScroll={onListScroll}
+      >
+        {isSearchMode ? (
+          renderSearchResults()
+        ) : categories.length > 0 ? (
           <Accordion
             openKeys={openCategoryKey ?? []}
             onOpenKeysChange={onCategoryOpenChange}
-            items={categoryModels.map((cm) => ({
-              key: cm.category_id,
-              header: renderCategoryHeader(cm),
-              content: cm.models.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2">
-                  {cm.models.map(renderCard)}
-                </div>
-              ) : (
-                <div className="py-4 text-center text-xs text-[var(--text-muted)]">
-                  {t.emptyCategory}
-                </div>
-              ),
+            items={categories.map((cat) => ({
+              key: cat.category_id,
+              header: renderCategoryHeader(cat),
+              content: renderCategoryBody(cat),
             }))}
             itemClassName="[&]:scroll-mt-0"
           />
@@ -915,6 +1007,7 @@ export function Model3dPanel({ isActive }: { isActive: boolean }) {
             {t.emptyNoData}
           </div>
         )}
+        <ListScrollFooter loading={loading} loadingMore={loadingMore} hasMore={hasMore} />
       </div>
     </div>
   );

@@ -6,9 +6,13 @@
  */
 
 import { getApiBaseUrl } from '@/config/env';
-import { getAccessToken, getRefreshToken, setAuthTokens } from '../utils/authStorage';
-import { ApiError, api } from './request';
-import type { ApiEnvelope } from './request';
+import { getAccessToken } from '../utils/authStorage';
+import { api, uploadWithProgress } from './request';
+import {
+  DEFAULT_LIST_PAGE_SIZE,
+  type ListPageResult,
+  fetchListPage,
+} from './listPagination';
 
 /** 模型分类。 */
 export type Model3dCategory = {
@@ -50,9 +54,18 @@ export type CreateModel3dParams = {
 // 分类 API
 // ---------------------------------------------------------------------------
 
-/** 列出当前用户的所有模型分类。 */
-export function listModel3dCategories(): Promise<Model3dCategory[]> {
-  return api.get<Model3dCategory[]>('/api/models3d/categories/');
+/** 分页拉取模型分类。 */
+export function fetchModel3dCategoriesPage(
+  page: number,
+  pageSize: number = DEFAULT_LIST_PAGE_SIZE
+): Promise<ListPageResult<Model3dCategory>> {
+  return fetchListPage<Model3dCategory>('/api/models3d/categories/', page, undefined, pageSize);
+}
+
+/** 拉取第一页分类（兼容旧调用）。 */
+export async function listModel3dCategories(): Promise<Model3dCategory[]> {
+  const page = await fetchModel3dCategoriesPage(1);
+  return page.results;
 }
 
 /** 创建模型分类。 */
@@ -77,125 +90,47 @@ export function deleteModel3dCategory(categoryId: string): Promise<void> {
 // 模型 API
 // ---------------------------------------------------------------------------
 
-/** 列出当前用户的所有模型元数据，支持按分类 ID 筛选。 */
-export function listModel3ds(categoryId?: string): Promise<Model3dMeta[]> {
-  const path = categoryId
-    ? `/api/models3d/?category=${encodeURIComponent(categoryId)}`
-    : '/api/models3d/';
-  return api.get<Model3dMeta[]>(path);
+/** 分页拉取模型列表；支持按分类和名称搜索筛选。 */
+export function fetchModel3dsPage(
+  page: number,
+  categoryId?: string,
+  pageSize: number = DEFAULT_LIST_PAGE_SIZE,
+  search?: string,
+): Promise<ListPageResult<Model3dMeta>> {
+  const params: Record<string, string | undefined> = {};
+  if (categoryId) params.category = categoryId;
+  if (search) params.search = search;
+  return fetchListPage<Model3dMeta>(
+    '/api/models3d/',
+    page,
+    Object.keys(params).length > 0 ? params : undefined,
+    pageSize
+  );
 }
 
-/** 新建模型（带上传进度，支持 token 过期自动刷新重试）。 */
+/** 拉取某分类下的全部模型（专用接口，响应 data 为数组，非 { count, results }）。 */
+export async function listModel3dsByCategory(categoryId: string): Promise<Model3dMeta[]> {
+  const data = await api.get<Model3dMeta[]>(
+    `/api/models3d/categories/${encodeURIComponent(categoryId)}/models/`
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+/** 拉取模型列表（指定分类时拉全量，否则仅第一页）。 */
+export async function listModel3ds(categoryId?: string): Promise<Model3dMeta[]> {
+  if (categoryId) {
+    return listModel3dsByCategory(categoryId);
+  }
+  const page = await fetchModel3dsPage(1);
+  return page.results;
+}
+
+/** 新建模型（带上传进度，自动处理 401 token 刷新重放）。 */
 export function uploadModel3dWithProgress(
   params: CreateModel3dParams,
   onProgress?: (percent: number) => void
 ): Promise<Model3dMeta> {
-  return _doUploadWithProgress(params, onProgress, false);
-}
-
-async function _doUploadWithProgress(
-  params: CreateModel3dParams,
-  onProgress: ((percent: number) => void) | undefined,
-  isRetry: boolean,
-): Promise<Model3dMeta> {
-  const result = await new Promise<{ data: Model3dMeta } | { error: ApiError }>((resolve) => {
-    const xhr = new XMLHttpRequest();
-    const baseUrl = getApiBaseUrl();
-    xhr.open('POST', baseUrl ? `${baseUrl}/api/models3d/` : '/api/models3d/');
-
-    const token = getAccessToken();
-    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-
-    xhr.upload.addEventListener('progress', (e) => {
-      if (e.lengthComputable && onProgress) {
-        onProgress(Math.round((e.loaded / e.total) * 100));
-      }
-    });
-
-    xhr.onload = () => {
-      const rawText = xhr.responseText;
-      const contentType = xhr.getResponseHeader('content-type') ?? '';
-      const isJson = contentType.includes('application/json');
-
-      let parsed: unknown;
-      try {
-        parsed = rawText ? (isJson ? JSON.parse(rawText) : rawText) : null;
-      } catch {
-        parsed = rawText;
-      }
-
-      // 401 且包含 token 过期信息 → 交由外层重试
-      if (xhr.status === 401 && !isRetry) {
-        const msg = extractMsg(parsed) || '';
-        if (msg.includes('token') && (msg.includes('过期') || msg.includes('expired') || msg.includes('无效') || msg.includes('invalid'))) {
-          resolve({ error: new ApiError(msg, { httpStatus: 401, errors: parsed }) });
-          return;
-        }
-      }
-
-      if (isEnvelope(parsed)) {
-        if (parsed.code === 0) {
-          resolve({ data: parsed.data as Model3dMeta });
-        } else {
-          resolve({ error: new ApiError(parsed.message || 'error', {
-            httpStatus: xhr.status,
-            code: parsed.code,
-            errors: parsed.errors
-          }) });
-        }
-        return;
-      }
-
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve({ data: parsed as Model3dMeta });
-      } else {
-        resolve({ error: new ApiError(extractMsg(parsed) || xhr.statusText || 'error', {
-          httpStatus: xhr.status,
-          errors: parsed
-        }) });
-      }
-    };
-
-    xhr.onerror = () => resolve({ error: new ApiError('Network error', { httpStatus: 0 }) });
-    xhr.send(buildFormData(params));
-  });
-
-  if ('data' in result) return result.data;
-
-  const err = result.error;
-  // 401 token 过期 → 刷新后重试一次
-  if (!isRetry && err.httpStatus === 401) {
-    try {
-      await _refreshTokens();
-      return _doUploadWithProgress(params, onProgress, true);
-    } catch {
-      throw err;
-    }
-  }
-
-  throw err;
-}
-
-async function _refreshTokens() {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) throw new ApiError('缺少 refresh_token', { httpStatus: 401 });
-
-  const baseUrl = getApiBaseUrl();
-  const url = baseUrl ? `${baseUrl}/api/auth/refresh/` : '/api/auth/refresh/';
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
-
-  if (!res.ok) throw new ApiError('refresh 失败', { httpStatus: res.status });
-
-  const data = await res.json();
-  const envelope = data?.data ?? data;
-  if (!envelope?.access_token || !envelope?.refresh_token) {
-    throw new ApiError('refresh 响应缺少 token', { httpStatus: res.status });
-  }
-  setAuthTokens({ accessToken: envelope.access_token, refreshToken: envelope.refresh_token });
+  return uploadWithProgress<Model3dMeta>('/api/models3d/', buildFormData(params), onProgress);
 }
 
 function buildFormData(params: CreateModel3dParams): FormData {
@@ -205,16 +140,6 @@ function buildFormData(params: CreateModel3dParams): FormData {
   if (params.thumbnail) form.append('thumbnail', params.thumbnail, 'thumbnail.png');
   if (params.category) form.append('category', params.category);
   return form;
-}
-
-function isEnvelope(v: unknown): v is ApiEnvelope<Model3dMeta> {
-  return typeof v === 'object' && v !== null && 'code' in v && 'message' in v;
-}
-
-function extractMsg(v: unknown): string | undefined {
-  if (typeof v === 'object' && v !== null && 'message' in v) return String((v as any).message);
-  if (typeof v === 'string') return v;
-  return undefined;
 }
 
 /** 更新模型（重命名 + 移动分类）。 */
@@ -293,7 +218,9 @@ export function watchCompressionProgress(
     const baseUrl = getApiBaseUrl();
     const wsProtocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = baseUrl ? baseUrl.replace(/^https?:\/\//, '') : window.location.host;
-    const wsUrl = `${wsProtocol}//${wsHost}/ws/models3d/${modelId}/compression/`;
+    const token = getAccessToken();
+    const tokenQs = token ? `?token=${encodeURIComponent(token)}` : '';
+    const wsUrl = `${wsProtocol}//${wsHost}/ws/models3d/${modelId}/compression/${tokenQs}`;
 
     let settled = false;
     let fallbackStarted = false;

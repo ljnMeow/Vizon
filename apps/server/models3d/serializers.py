@@ -12,18 +12,10 @@
 
 from rest_framework import serializers
 
-from utils.datetime import format_datetime
-from utils.file_validation import get_model_file_validators, get_thumbnail_validators, THUMBNAIL_EXTENSIONS
+from utils.file_validation import get_model_file_validators, get_thumbnail_validators
+from utils.serializer_fields import AbsoluteFileUrlField, FormattedDateTimeField
 
 from .models import ModelAsset, ModelCategory
-
-
-def _thumbnail_validators():
-    from utils.file_validation import FileExtensionValidator, FileSizeValidator, DEFAULT_MAX_THUMBNAIL_SIZE
-    return [
-        FileExtensionValidator(THUMBNAIL_EXTENSIONS),
-        FileSizeValidator(DEFAULT_MAX_THUMBNAIL_SIZE),
-    ]
 
 
 class ModelCategorySerializer(serializers.ModelSerializer):
@@ -31,8 +23,8 @@ class ModelCategorySerializer(serializers.ModelSerializer):
 
     category_id = serializers.UUIDField(source="public_id", read_only=True)
     model_count = serializers.IntegerField(read_only=True, default=0)
-    created_at = serializers.SerializerMethodField()
-    updated_at = serializers.SerializerMethodField()
+    created_at = FormattedDateTimeField()
+    updated_at = FormattedDateTimeField()
 
     class Meta:
         model = ModelCategory
@@ -44,12 +36,6 @@ class ModelCategorySerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-
-    def get_created_at(self, obj: ModelCategory) -> str:
-        return format_datetime(obj.created_at)
-
-    def get_updated_at(self, obj: ModelCategory) -> str:
-        return format_datetime(obj.updated_at)
 
 
 class ModelCategoryCreateSerializer(serializers.Serializer):
@@ -70,11 +56,11 @@ class ModelAssetSerializer(serializers.ModelSerializer):
     model_id = serializers.UUIDField(source="public_id", read_only=True)
     category_id = serializers.UUIDField(source="category.public_id", read_only=True)
     category_name = serializers.CharField(source="category.name", read_only=True)
-    thumbnail_url = serializers.SerializerMethodField()
-    file_url = serializers.SerializerMethodField()
-    compressed_file_url = serializers.SerializerMethodField()
-    created_at = serializers.SerializerMethodField()
-    updated_at = serializers.SerializerMethodField()
+    thumbnail_url = AbsoluteFileUrlField(source="thumbnail")
+    file_url = AbsoluteFileUrlField(source="file")
+    compressed_file_url = AbsoluteFileUrlField(source="compressed_file")
+    created_at = FormattedDateTimeField()
+    updated_at = FormattedDateTimeField()
 
     class Meta:
         model = ModelAsset
@@ -94,36 +80,6 @@ class ModelAssetSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-
-    def get_thumbnail_url(self, obj: ModelAsset) -> str | None:
-        if not obj.thumbnail:
-            return None
-        request = self.context.get("request")
-        if request is not None:
-            return request.build_absolute_uri(obj.thumbnail.url)
-        return obj.thumbnail.url
-
-    def get_file_url(self, obj: ModelAsset) -> str | None:
-        if not obj.file:
-            return None
-        request = self.context.get("request")
-        if request is not None:
-            return request.build_absolute_uri(obj.file.url)
-        return obj.file.url
-
-    def get_compressed_file_url(self, obj: ModelAsset) -> str | None:
-        if not obj.compressed_file or not obj.compressed_file.name:
-            return None
-        request = self.context.get("request")
-        if request is not None:
-            return request.build_absolute_uri(obj.compressed_file.url)
-        return obj.compressed_file.url
-
-    def get_created_at(self, obj: ModelAsset) -> str:
-        return format_datetime(obj.created_at)
-
-    def get_updated_at(self, obj: ModelAsset) -> str:
-        return format_datetime(obj.updated_at)
 
 
 class ModelAssetCreateSerializer(serializers.Serializer):
@@ -146,7 +102,7 @@ class ModelAssetUpdateSerializer(serializers.Serializer):
     category = serializers.UUIDField(required=False)
     thumbnail = serializers.ImageField(
         required=False, allow_null=True,
-        validators=_thumbnail_validators(),
+        validators=get_thumbnail_validators(),
     )
 
     def validate(self, attrs):

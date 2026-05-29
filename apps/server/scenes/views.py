@@ -1,104 +1,57 @@
 """
 场景模块的 API 视图。
 
-当前接口：
-- GET    /api/scenes/                 列出当前用户所有场景（元数据 + thumbnail URL）
-- POST   /api/scenes/                 新建场景（multipart: name, bundle ZIP, thumbnail PNG）
-- GET    /api/scenes/{scene_id}/      获取单个场景元数据
-- PUT    /api/scenes/{scene_id}/      覆盖更新（重新上传 bundle + thumbnail）
-- DELETE /api/scenes/{scene_id}/      删除场景（同时删除磁盘文件）
-- GET    /api/scenes/{scene_id}/bundle/  下载 bundle ZIP 文件
-
-所有端点通过 CustomerJWTAuthentication + IsAuthenticated 保护。
-视图内部始终用 request.customer 过滤，只返回当前用户自己的场景。
+所有端点要求 Customer JWT；视图内按 request.customer 隔离数据。
 """
 
 from __future__ import annotations
 
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import APIException
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from customers.models import Customer
-from utils.file_validation import CACHE_PRIVATE_HOUR, CACHE_PUBLIC_DAY, set_cache_control
+from utils.permissions import IsCustomerAuthenticated
+from utils.viewsets import (
+    CustomerScopedMixin,
+    FileDownloadMixin,
+    delete_file_field,
+    make_not_found_error,
+    paginate_serialized_list,
+)
 
 from .models import Scene
 from .serializers import SceneCreateSerializer, SceneSerializer, SceneUpdateSerializer
 
-
-class SceneNotFoundError(APIException):
-    """
-    场景不存在异常。
-
-    在查询/修改/删除时，目标场景不存在（或不属于当前用户）时抛出。
-    统一返回 HTTP 404，配合全局异常处理器输出统一错误结构。
-    """
-
-    status_code = 404
-    default_detail = "场景不存在"
-    default_code = "not_found"
+SceneNotFoundError = make_not_found_error(detail="场景不存在")
 
 
-def _get_customer(request: Request) -> Customer:
-    """从请求中取出当前登录用户对应的 Customer 实例。"""
-    # CustomerJWTAuthentication 在 authenticate() 中已将 Customer 绑定到 request.customer
-    return request.customer  # type: ignore[attr-defined]
+class SceneViewSet(CustomerScopedMixin, FileDownloadMixin, viewsets.ViewSet):
+    """场景 CRUD + bundle / thumbnail 下载。"""
 
-
-def _delete_file_field(field) -> None:
-    """安全删除 FileField / ImageField 关联的磁盘文件。"""
-    if not field or not field.name:
-        return
-    try:
-        field.delete(save=False)
-    except Exception:
-        # 文件已不存在或无权删除时不中断主流程
-        pass
-
-
-class SceneViewSet(viewsets.ViewSet):
-    """
-    场景 CRUD + bundle 下载视图集。
-
-    使用 ViewSet（而非 ModelViewSet）以便对每个 action 有更精细的控制，
-    特别是"删除场景时同步删除磁盘文件"和"下载 bundle"等自定义逻辑。
-    """
+    permission_classes = [IsCustomerAuthenticated]
+    lookup_model = Scene
+    not_found_error = SceneNotFoundError
 
     def list(self, request: Request) -> Response:
-        """
-        GET /api/scenes/
-        返回当前用户的所有场景元数据列表，按最近修改时间倒序。
-        不含 bundle 内容，仅包含 thumbnail URL 和基础信息。
-        """
-        customer = _get_customer(request)
-        scenes = Scene.objects.filter(customer=customer)
-        serializer = SceneSerializer(scenes, many=True, context={"request": request})
-        return Response(serializer.data)
+        customer = self.get_customer(request)
+        scenes = Scene.objects.filter(customer=customer).order_by("-updated_at")
+        return paginate_serialized_list(
+            request, scenes, SceneSerializer, view=self
+        )
 
     def create(self, request: Request) -> Response:
-        """
-        POST /api/scenes/
-        新建场景：接收 multipart 表单（name + bundle ZIP + 可选 thumbnail）。
-        自动计算 bundle_size 并存储，返回场景元数据。
-        """
         serializer = SceneCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        customer = _get_customer(request)
+        customer = self.get_customer(request)
         bundle_file = serializer.validated_data["bundle"]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
         thumbnail_file = serializer.validated_data.get("thumbnail")  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
         name = serializer.validated_data.get("name", "")  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
 
-        # 从上传文件对象直接读取字节数，避免二次读取文件
         bundle_size = bundle_file.size if hasattr(bundle_file, "size") else 0  # pyright: ignore[reportOptionalMemberAccess]
 
-        scene = Scene(
-            customer=customer,
-            name=name,
-            bundle_size=bundle_size,
-        )
+        scene = Scene(customer=customer, name=name, bundle_size=bundle_size)
         scene.bundle.save(bundle_file.name, bundle_file, save=False)  # pyright: ignore[reportOptionalMemberAccess, reportArgumentType]
         if thumbnail_file:
             scene.thumbnail.save(thumbnail_file.name, thumbnail_file, save=False)
@@ -108,123 +61,71 @@ class SceneViewSet(viewsets.ViewSet):
         return Response(out.data, status=status.HTTP_201_CREATED)
 
     def retrieve(self, request: Request, pk: str | None = None) -> Response:
-        """
-        GET /api/scenes/{scene_id}/
-        获取单个场景元数据；场景不属于当前用户时返回 404。
-        """
         scene = self._get_scene(request, pk)
         serializer = SceneSerializer(scene, context={"request": request})
         return Response(serializer.data)
 
     def update(self, request: Request, pk: str | None = None) -> Response:
-        """
-        PUT /api/scenes/{scene_id}/
-        覆盖更新：替换 bundle 文件（+ 可选 thumbnail），旧文件同步删除。
-        """
         scene = self._get_scene(request, pk)
         serializer = SceneUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        bundle_file = serializer.validated_data["bundle"]  # pyright: ignore[reportIndexIssue, reportOptionalSubscript]
-        thumbnail_file = serializer.validated_data.get("thumbnail")  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
-        name = serializer.validated_data.get("name", "")  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
+        validated: dict = serializer.validated_data  # pyright: ignore[reportAssignmentType]
+        bundle_file = validated.get("bundle")
+        thumbnail_file = validated.get("thumbnail")
+        # name 字段 default="" 总会存在；仅在显式传入时更新，避免改名误清空
+        name_provided = "name" in request.data  # pyright: ignore[reportOperatorIssue]
+        new_name = validated.get("name", "")
 
-        # 先删除旧文件，再保存新文件，避免磁盘空间累积
-        old_bundle = scene.bundle
-        old_thumbnail = scene.thumbnail
+        old_bundle = scene.bundle if bundle_file else None
+        old_thumbnail = scene.thumbnail if thumbnail_file else None
 
-        scene.name = name
-        scene.bundle_size = bundle_file.size if hasattr(bundle_file, "size") else 0  # pyright: ignore[reportOptionalMemberAccess]
-
-        # 保存新文件（save=False 延迟到 scene.save()）
-        scene.bundle.save(bundle_file.name, bundle_file, save=False)  # pyright: ignore[reportOptionalMemberAccess, reportArgumentType]
+        if name_provided:
+            scene.name = new_name
+        if bundle_file:
+            scene.bundle_size = bundle_file.size if hasattr(bundle_file, "size") else 0
+            scene.bundle.save(bundle_file.name, bundle_file, save=False)
         if thumbnail_file:
             scene.thumbnail.save(thumbnail_file.name, thumbnail_file, save=False)
-
         scene.save()
 
-        # 主记录保存成功后再删除旧文件，确保事务一致
-        _delete_file_field(old_bundle)
-        if thumbnail_file:
-            _delete_file_field(old_thumbnail)
+        if old_bundle:
+            delete_file_field(old_bundle)
+        if old_thumbnail:
+            delete_file_field(old_thumbnail)
 
         out = SceneSerializer(scene, context={"request": request})
         return Response(out.data)
 
     def destroy(self, request: Request, pk: str | None = None) -> Response:
-        """
-        DELETE /api/scenes/{scene_id}/
-        删除场景记录并同步删除磁盘上的 bundle 和 thumbnail 文件。
-        """
         scene = self._get_scene(request, pk)
-
-        # 先缓存文件字段引用，数据库删除后 FileField 仍可访问 .name
         bundle_field = scene.bundle
         thumbnail_field = scene.thumbnail
-
         scene.delete()
-
-        # 数据库记录删除后清理文件，顺序不影响一致性（文件孤儿比数据孤儿更易处理）
-        _delete_file_field(bundle_field)
-        _delete_file_field(thumbnail_field)
-
+        delete_file_field(bundle_field)
+        delete_file_field(thumbnail_field)
         return Response({"deleted": True}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["get"], url_path="bundle")
     def bundle(self, request: Request, pk: str | None = None):
-        """
-        GET /api/scenes/{scene_id}/bundle/
-        流式下载场景的 bundle ZIP 文件。
-
-        直接返回 FileResponse（application/zip），前端通过 API 代理请求，
-        避免跨域访问 /media/ 静态文件的 CORS 问题。
-        """
-        from django.http import FileResponse
-
         scene = self._get_scene(request, pk)
-
-        if not scene.bundle or not scene.bundle.name:
-            raise SceneNotFoundError("bundle 文件不存在")
-
-        # 以二进制模式打开文件，Django 会自动分块流式传输，避免内存峰值
         filename = f"{scene.name or 'bundle'}.zip"
-        response = FileResponse(
-            scene.bundle.open("rb"),
-            content_type="application/zip",
-            as_attachment=True,
+        return self.serve_attachment(
+            scene.bundle,
             filename=filename,
+            content_type="application/zip",
+            missing_message="bundle 文件不存在",
+            not_found_error=SceneNotFoundError,
         )
-        return set_cache_control(response, CACHE_PRIVATE_HOUR)
 
     @action(detail=True, methods=["get"], url_path="thumbnail")
     def thumbnail(self, request: Request, pk: str | None = None):
-        """
-        GET /api/scenes/{scene_id}/thumbnail/
-        内联显示缩略图（Cache-Control: public, max-age=86400）。
-        """
-        from django.http import FileResponse
-
         scene = self._get_scene(request, pk)
-
-        if not scene.thumbnail or not scene.thumbnail.name:
-            raise SceneNotFoundError("缩略图不存在")
-
-        return set_cache_control(
-            FileResponse(
-                scene.thumbnail.open("rb"),
-                content_type="image/png",
-                as_attachment=False,
-            ),
-            CACHE_PUBLIC_DAY,
+        return self.serve_thumbnail_inline(
+            scene.thumbnail,
+            missing_message="缩略图不存在",
+            not_found_error=SceneNotFoundError,
         )
 
     def _get_scene(self, request: Request, pk: str | None) -> Scene:
-        """
-        按 public_id 查询当前用户的场景。
-        不存在或不属于当前用户时统一抛 404，避免信息泄漏。
-        """
-        customer = _get_customer(request)
-        scene = Scene.objects.filter(public_id=pk, customer=customer).first()
-        if scene is None:
-            raise SceneNotFoundError()
-        return scene
+        return self._get_object(request, pk)  # pyright: ignore[reportReturnType]

@@ -199,6 +199,113 @@ async function ensureRefreshed(baseUrl: string) {
   return refreshingPromise;
 }
 
+/**
+ * 通用的"401 → 刷新 token → 重放一次"包装器。
+ *
+ * 适用于二进制下载、XHR 上传等无法走 request() 的特殊请求路径。
+ * 调用方传入 doRequest（带当前 token 执行一次请求）和 classifier
+ * （判断错误是否属于"token 过期"，需要刷新后重放）。
+ *
+ * 刷新失败时统一走 logoutToLoginAfterNotice 跳转登录。
+ */
+export async function withAuthRetry<T>(
+  doRequest: () => Promise<T>,
+  classifier: (err: unknown) => boolean = isTokenExpiredLike
+): Promise<T> {
+  const baseUrl = resolveBaseUrl();
+  try {
+    return await doRequest();
+  } catch (err) {
+    if (!classifier(err)) throw err;
+    try {
+      await ensureRefreshed(baseUrl);
+    } catch {
+      await logoutToLoginAfterNotice();
+      return await new Promise<T>(() => undefined);
+    }
+    // 刷新成功 → 重放一次
+    return doRequest();
+  }
+}
+
+/**
+ * 把 XHR/fetch 响应文本解析为 envelope 或原始值。
+ * 与 requestOnce 内部逻辑保持一致，供 XHR 上传等场景复用。
+ */
+function parseResponseBody(rawText: string, contentType: string): unknown {
+  const isJson = contentType.includes('application/json');
+  if (!rawText) return null;
+  if (!isJson) return rawText;
+  try {
+    return JSON.parse(rawText) as unknown;
+  } catch {
+    return rawText;
+  }
+}
+
+/**
+ * 通用的 XHR 上传（带进度），自动处理 envelope 和 401 token 刷新。
+ *
+ * 与 api.post(formData) 行为对齐，但额外暴露 onProgress 回调。
+ * 复用 withAuthRetry 处理 token 过期。
+ */
+export function uploadWithProgress<T>(
+  path: string,
+  formData: FormData,
+  onProgress?: (percent: number) => void,
+  method: 'POST' | 'PUT' = 'POST'
+): Promise<T> {
+  const doOnce = (): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      const baseUrl = resolveBaseUrl();
+      const url = joinUrl(baseUrl, path);
+      const xhr = new XMLHttpRequest();
+      xhr.open(method, url);
+
+      const token = getAccessToken();
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.setRequestHeader('Accept', 'application/json');
+
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable && onProgress) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      });
+
+      xhr.onload = () => {
+        const rawText = xhr.responseText;
+        const contentType = xhr.getResponseHeader('content-type') ?? '';
+        const parsed = parseResponseBody(rawText, contentType);
+
+        if (isEnvelope(parsed)) {
+          if (parsed.code === 0) {
+            resolve(parsed.data as T);
+          } else {
+            reject(new ApiError(parsed.message || 'error', {
+              httpStatus: xhr.status,
+              code: parsed.code,
+              errors: parsed.errors,
+            }));
+          }
+          return;
+        }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(parsed as T);
+        } else {
+          reject(new ApiError(extractMessage(parsed) || xhr.statusText || 'error', {
+            httpStatus: xhr.status,
+            errors: parsed,
+          }));
+        }
+      };
+
+      xhr.onerror = () => reject(new ApiError('Network error', { httpStatus: 0 }));
+      xhr.send(formData);
+    });
+
+  return withAuthRetry(doOnce);
+}
+
 function resolveAuthInvalidNoticeText() {
   const fallback: Locale = 'zh-CN';
   if (typeof window === 'undefined') return appMessages[fallback].auth.sessionInvalidToast;

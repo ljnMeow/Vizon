@@ -16,10 +16,15 @@ from typing import Optional
 import redis
 from django.conf import settings
 
+# 模块级单例，避免每次 refresh/login 新建 TCP 连接
+_redis_client: redis.Redis | None = None
+
 
 def _client() -> redis.Redis:
-    # decode_responses=True -> 直接拿到 str（不需要手动 decode bytes）
-    return redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+    global _redis_client
+    if _redis_client is None:
+        _redis_client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+    return _redis_client
 
 
 def _refresh_session_key(jti: str) -> str:

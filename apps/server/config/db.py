@@ -30,6 +30,19 @@ def build_databases(base_dir: Path) -> dict:
     postgres_password = os.getenv("POSTGRES_PASSWORD", "").strip()
     postgres_host = os.getenv("POSTGRES_HOST", "").strip() or "127.0.0.1"
     postgres_port = os.getenv("POSTGRES_PORT", "").strip() or "5432"
+    conn_max_age_raw = os.getenv("POSTGRES_CONN_MAX_AGE", "").strip()
+    conn_max_age = 0
+    if conn_max_age_raw:
+        try:
+            conn_max_age = int(conn_max_age_raw)
+        except ValueError as ex:
+            raise RuntimeError(
+                f"环境变量 POSTGRES_CONN_MAX_AGE 值非法：{conn_max_age_raw!r}（须为非负整数秒）"
+            ) from ex
+        if conn_max_age < 0:
+            raise RuntimeError(
+                f"环境变量 POSTGRES_CONN_MAX_AGE 值非法：{conn_max_age_raw!r}（须为非负整数秒）"
+            )
 
     missing = []
     if not postgres_db:
@@ -58,6 +71,6 @@ def build_databases(base_dir: Path) -> dict:
             "PASSWORD": postgres_password,
             "HOST": postgres_host,
             "PORT": postgres_port,
-            # 可选：如果你后续遇到“连接偶发断开”，可以在这里加 CONN_MAX_AGE 等参数
+            "CONN_MAX_AGE": conn_max_age,
         }
     }

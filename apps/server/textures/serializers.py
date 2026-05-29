@@ -9,25 +9,20 @@
 
 from rest_framework import serializers
 
-from utils.datetime import format_datetime
 from utils.file_validation import get_texture_file_validators, get_thumbnail_validators
+from utils.serializer_fields import AbsoluteFileUrlField, FormattedDateTimeField
 
 from .models import Texture
 
 
 class TextureSerializer(serializers.ModelSerializer):
-    """
-    贴图元数据读取序列化器（用于列表和详情响应）。
-
-    - public_id 作为对外 ID，不暴露自增主键
-    - thumbnail_url / file_url 通过请求上下文构建绝对 URL
-    """
+    """贴图元数据读取序列化器（用于列表和详情响应）。"""
 
     texture_id = serializers.UUIDField(source="public_id", read_only=True)
-    thumbnail_url = serializers.SerializerMethodField()
-    file_url = serializers.SerializerMethodField()
-    created_at = serializers.SerializerMethodField()
-    updated_at = serializers.SerializerMethodField()
+    thumbnail_url = AbsoluteFileUrlField(source="thumbnail")
+    file_url = AbsoluteFileUrlField(source="file")
+    created_at = FormattedDateTimeField()
+    updated_at = FormattedDateTimeField()
 
     class Meta:
         model = Texture
@@ -45,28 +40,6 @@ class TextureSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-
-    def get_thumbnail_url(self, obj: Texture) -> str | None:
-        if not obj.thumbnail:
-            return None
-        request = self.context.get("request")
-        if request is not None:
-            return request.build_absolute_uri(obj.thumbnail.url)
-        return obj.thumbnail.url
-
-    def get_file_url(self, obj: Texture) -> str | None:
-        if not obj.file:
-            return None
-        request = self.context.get("request")
-        if request is not None:
-            return request.build_absolute_uri(obj.file.url)
-        return obj.file.url
-
-    def get_created_at(self, obj: Texture) -> str:
-        return format_datetime(obj.created_at)
-
-    def get_updated_at(self, obj: Texture) -> str:
-        return format_datetime(obj.updated_at)
 
 
 class TextureCreateSerializer(serializers.Serializer):
